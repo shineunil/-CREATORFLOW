@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ============================================================
  *  CREATORFLOW 프론트엔드 전역 설정 파일
  * ============================================================
@@ -12,10 +12,12 @@
 //    [라이브 전환 시] 커스텀 도메인으로 바꾸고 싶다면
 //    "https://api.creatorflow.com" 으로 교체
 // -------------------------------------------------------
+// process.env.NODE_ENV 는 Vercel 배포 시 자동으로 "production" 으로 세팅됩니다.
+// Next.js SSR 환경에서도 100% 안정적으로 작동합니다.
 export const API_BASE_URL =
-  typeof window !== "undefined" && window.location.hostname !== "localhost"
-    ? "https://creatorflow-1-7ng3.onrender.com"   // 라이브 백엔드 주소
-    : "http://localhost:8000";                      // 로컬 개발용 (자동 적용)
+  process.env.NODE_ENV === "production"
+    ? "https://creatorflow-1-7ng3.onrender.com"  // 라이브 백엔드 주소
+    : "http://localhost:8000";                     // 로컬 개발용 (자동 적용)
 
 // -------------------------------------------------------
 // 2. Paddle 결제 설정
