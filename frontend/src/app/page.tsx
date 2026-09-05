@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Youtube, MousePointerClick, Crown, BarChart3, ArrowRight, Zap, PlayCircle, TrendingUp } from "lucide-react";
+import { PlaySquare, MousePointerClick, Crown, BarChart3, ArrowRight, Zap, PlayCircle, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function LandingPage() {
@@ -38,20 +38,20 @@ export default function LandingPage() {
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 text-sm font-medium text-zinc-300 mb-8 shadow-xl">
-            <Youtube size={16} className="text-red-500" />
-            <span>유튜브 알고리즘의 선택을 받는 가장 확실한 방법</span>
+            <PlaySquare size={16} className="text-red-500" />
+            <span>The Most Guaranteed Way to Beat the YouTube Algorithm</span>
           </div>
           
           <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-8 leading-[1.1]">
-            썸네일 하나가 <br className="hidden md:block" />
+            One Thumbnail <br className="hidden md:block" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500">
-              영상의 운명을 결정합니다.
+              Decides Your Video's Fate.
             </span>
           </h1>
           
           <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto mb-12 leading-relaxed">
-            더 이상 감에 의존하지 마세요. 여러 개의 썸네일을 올리기만 하면,<br className="hidden md:block" />
-            시스템이 자동으로 번갈아 노출하며 최고의 클릭률(CTR)을 찾아냅니다.
+            Stop relying on gut feelings. Just upload your variants, <br className="hidden md:block" />
+            and our system will automatically test them to find the highest CTR winner.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -60,7 +60,7 @@ export default function LandingPage() {
               className="group relative flex items-center gap-2 px-8 py-4 bg-white text-black font-black text-lg rounded-full overflow-hidden transition-transform hover:scale-105 active:scale-95"
             >
               <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-zinc-200 to-white opacity-0 group-hover:opacity-100 transition-opacity" />
-              <span className="relative z-10">무료로 내 썸네일 테스트하기</span>
+              <span className="relative z-10">Start Optimizing for Free</span>
               <ArrowRight size={20} className="relative z-10 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
@@ -145,28 +145,28 @@ export default function LandingPage() {
       <section className="py-32 bg-zinc-950 border-t border-zinc-900 relative z-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-20">
-            <h2 className="text-3xl md:text-5xl font-black mb-6">오직 콘텐츠에만 집중하세요.</h2>
-            <p className="text-zinc-400 text-lg">복잡한 A/B 테스트와 데이터 분석은 모두 시스템이 알아서 처리합니다.</p>
+            <h2 className="text-3xl md:text-5xl font-black mb-6">You Focus on Creating.</h2>
+            <p className="text-zinc-400 text-lg">We handle the complex A/B testing and data analysis automatically.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <FeatureCard 
               delay={0.1}
               icon={<MousePointerClick size={32} className="text-blue-400" />}
-              title="1. 썸네일 업로드"
-              desc="테스트하고 싶은 여러 장의 썸네일과 제목을 업로드하세요. 단 1분이면 세팅이 완료됩니다."
+              title="1. Upload Variants"
+              desc="Upload multiple thumbnails and titles. Setup takes less than 60 seconds."
             />
             <FeatureCard 
               delay={0.2}
               icon={<Zap size={32} className="text-yellow-400" />}
-              title="2. 실시간 자동 교체"
-              desc="설정된 시간마다 유튜브 썸네일을 자동으로 번갈아 노출하며 시청자의 반응을 수집합니다."
+              title="2. Real-time Hourly Swaps"
+              desc="We automatically rotate your thumbnails and track viewer engagement in real-time."
             />
             <FeatureCard 
               delay={0.3}
               icon={<BarChart3 size={32} className="text-emerald-400" />}
-              title="3. 승자 자동 적용"
-              desc="가장 높은 클릭률(CTR)을 기록한 썸네일을 최종 승자로 선정하고 영구적으로 적용합니다."
+              title="3. Crown the Winner"
+              desc="The thumbnail with the highest CTR is permanently applied to maximize your views."
             />
           </div>
         </div>
@@ -184,13 +184,13 @@ export default function LandingPage() {
         >
           <PlayCircle size={64} className="mx-auto text-red-500 mb-8 opacity-80" />
           <h2 className="text-4xl md:text-6xl font-black text-white mb-8">
-            지금 바로 조회수를 끌어올리세요
+            Ready to Explode Your Views?
           </h2>
           <p className="text-xl text-zinc-400 mb-10">
-            감으로 찍는 썸네일은 이제 그만. 데이터가 증명하는 진짜 결과를 확인하세요.
+            Stop guessing. Start testing. Let the data decide your next viral hit.
           </p>
           <Link href="/login" className="inline-flex px-12 py-5 bg-red-600 text-white hover:bg-red-500 rounded-full font-black text-xl transition-all hover:scale-105 active:scale-95 shadow-[0_0_40px_rgba(239,68,68,0.4)]">
-            무료로 시작하기
+            Get Started for Free
           </Link>
         </motion.div>
       </section>
