@@ -342,17 +342,23 @@ async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: C
     
     if original_var:
         from youtube_api import update_youtube_thumbnail, update_youtube_title
-        import urllib.request
         
-        # 썸네일 복구
+        # 원본 썸네일 복구
         if original_var.thumbnail_image_url:
             if original_var.thumbnail_image_url.startswith("http"):
                 file_path = os.path.join("uploads", f"temp_original_{test.id}.jpg")
                 try:
-                    urllib.request.urlretrieve(original_var.thumbnail_image_url, file_path)
-                    await update_youtube_thumbnail(test.video.youtube_video_id, file_path, channel.oauth_refresh_token)
+                    import httpx
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.get(original_var.thumbnail_image_url)
+                        if resp.status_code == 200:
+                            with open(file_path, "wb") as f:
+                                f.write(resp.content)
+                            await update_youtube_thumbnail(test.video.youtube_video_id, file_path, channel.oauth_refresh_token)
+                        else:
+                            logger.error(f"원본 썸네일 복구 실패 (상태 코드: {resp.status_code})")
                 except Exception as e:
-                    logger.error(f"원본 썸네일 복구 다운로드 실패: {e}")
+                    logger.error(f"원본 썸네일 복구 다운로드 에러: {e}")
             else:
                 try:
                     file_name = original_var.thumbnail_image_url.split('/')[-1]

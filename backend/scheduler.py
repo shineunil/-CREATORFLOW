@@ -136,12 +136,19 @@ class AVSchedulerEngine:
             file_path = os.path.join("uploads", file_name)
             
             if not os.path.exists(file_path) and next_var.thumbnail_image_url.startswith("http"):
-                import urllib.request
+                import httpx
                 try:
-                    urllib.request.urlretrieve(next_var.thumbnail_image_url, file_path)
-                    logger.info(f"외부 썸네일 다운로드 완료: {file_path}")
+                    # 💥 비동기(async) 다운로드로 메인 이벤트 루프 블로킹(셀프 데드락) 방지
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.get(next_var.thumbnail_image_url)
+                        if resp.status_code == 200:
+                            with open(file_path, "wb") as f:
+                                f.write(resp.content)
+                            logger.info(f"새 썸네일 다운로드 완료: {file_path}")
+                        else:
+                            logger.error(f"썸네일 다운로드 실패 (상태 코드: {resp.status_code})")
                 except Exception as e:
-                    logger.error(f"썸네일 다운로드 실패: {e}")
+                    logger.error(f"썸네일 다운로드 에러: {e}")
             
             if os.path.exists(file_path):
                 await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token)
