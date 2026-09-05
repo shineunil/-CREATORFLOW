@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -38,7 +38,7 @@ export default function LandingPage() {
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 text-sm font-medium text-zinc-300 mb-8 shadow-xl">
-            <PlaySquare size={16} className="text-red-500" />
+            <Youtube size={16} className="text-red-500" />
             <span>The Most Guaranteed Way to Beat the YouTube Algorithm</span>
           </div>
           
@@ -66,7 +66,7 @@ export default function LandingPage() {
           </div>
         </motion.div>
 
-        {/* Visual A/B Test Showcase */}
+        {/* Visual A/B Test Showcase (Authentic YouTube UI) */}
         <motion.div 
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -74,66 +74,81 @@ export default function LandingPage() {
           className="mt-24 relative max-w-5xl mx-auto"
         >
           <div className="absolute -inset-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-[2.5rem] blur-2xl opacity-20" />
-          <div className="relative bg-zinc-900/80 backdrop-blur-2xl border border-zinc-800 rounded-[2rem] p-4 md:p-8 shadow-2xl">
+          <div className="relative bg-zinc-900/80 backdrop-blur-2xl border border-zinc-800 rounded-[2rem] p-6 md:p-10 shadow-2xl">
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12 relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 relative">
+              
               {/* Thumbnail A (Loser) */}
-              <div className="relative group rounded-xl overflow-hidden border-2 border-zinc-800 bg-black">
-                <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-zinc-400 z-10 uppercase tracking-wider">
-                  Original (A)
+              <div className="relative group rounded-2xl border-2 border-zinc-800 bg-[#0f0f0f] p-4 md:p-5 flex flex-col">
+                {/* Platform Meta (CTR, Status) */}
+                <div className="flex justify-between items-center mb-5">
+                   <span className="bg-zinc-800 text-zinc-300 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">Original (A)</span>
+                   <div className="text-right">
+                     <div className="text-[10px] text-zinc-500 uppercase font-bold">Current CTR</div>
+                     <div className="text-xl font-black text-zinc-400">4.2%</div>
+                   </div>
                 </div>
-                <img 
-                  src="https://images.unsplash.com/photo-1616469829581-73993eb86b02?q=80&w=800&auto=format&fit=crop" 
-                  alt="Boring Thumbnail"
-                  className="w-full aspect-video object-cover opacity-60 grayscale-[40%] transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute bottom-0 inset-x-0 p-5 bg-gradient-to-t from-black via-black/80 to-transparent">
-                  <h3 className="text-lg font-bold text-white mb-2">How to build a PC</h3>
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Click-Through Rate</div>
-                      <div className="text-xl font-black text-zinc-300">4.2%</div>
+
+                {/* Actual YouTube Card Mockup */}
+                <div className="flex flex-col cursor-pointer">
+                  <div className="relative rounded-xl overflow-hidden aspect-video">
+                     <img src="https://images.unsplash.com/photo-1616469829581-73993eb86b02?q=80&w=800&auto=format&fit=crop" alt="Thumbnail A" className="w-full h-full object-cover opacity-80 grayscale-[30%]" />
+                     {/* Time Badge */}
+                     <div className="absolute bottom-1.5 right-1.5 bg-black/90 text-white text-xs font-medium px-1.5 py-0.5 rounded">
+                       12:45
+                     </div>
+                  </div>
+                  <div className="flex gap-3 mt-3">
+                    <div className="w-9 h-9 rounded-full bg-zinc-800 flex-shrink-0 mt-0.5">
+                       <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" alt="Avatar" className="w-full h-full rounded-full object-cover opacity-80" />
                     </div>
-                    <div className="text-right">
-                      <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Views</div>
-                      <div className="text-sm font-bold text-zinc-400">12,450</div>
+                    <div className="flex flex-col text-left">
+                      <h3 className="text-zinc-300 text-[15px] font-semibold leading-tight line-clamp-2">How to build a PC (Step by Step Guide)</h3>
+                      <span className="text-zinc-500 text-[13px] mt-1">CreatorFlow Tech</span>
+                      <span className="text-zinc-500 text-[13px]">12K views • 3 hours ago</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Thumbnail B (Winner) */}
-              <div className="relative group rounded-xl overflow-hidden border-2 border-red-500 shadow-[0_0_40px_rgba(239,68,68,0.2)] bg-black">
-                <div className="absolute top-4 left-4 bg-red-600 px-4 py-1.5 rounded-full text-xs font-black text-white z-10 uppercase tracking-wider flex items-center gap-1.5 shadow-lg">
-                  <Crown size={14} /> Winner (B)
+              <div className="relative group rounded-2xl border-2 border-red-500 bg-[#0f0f0f] p-4 md:p-5 flex flex-col shadow-[0_0_30px_rgba(239,68,68,0.15)] overflow-hidden">
+                <div className="absolute inset-0 bg-red-500/5 pointer-events-none" />
+                
+                {/* Platform Meta (CTR, Status) */}
+                <div className="flex justify-between items-center mb-5 relative z-10">
+                   <span className="bg-red-600 text-white text-xs font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 uppercase tracking-wider shadow-lg"><Crown size={14}/> Winner (B)</span>
+                   <div className="text-right">
+                     <div className="text-[10px] text-red-400 uppercase font-bold flex items-center justify-end gap-1"><TrendingUp size={12}/> Live CTR</div>
+                     <div className="text-3xl font-black text-red-500">{ctr}%</div>
+                   </div>
                 </div>
-                <img 
-                  src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop" 
-                  alt="Exciting Thumbnail"
-                  className="w-full aspect-video object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute bottom-0 inset-x-0 p-5 bg-gradient-to-t from-black via-black/90 to-transparent">
-                  <h3 className="text-xl font-black text-white mb-2 drop-shadow-md text-shadow-sm">
-                    I BUILT THE ULTIMATE GAMING PC! 🤯
-                  </h3>
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <div className="text-[10px] text-red-400/80 uppercase font-bold mb-1">Click-Through Rate</div>
-                      <div className="text-3xl font-black text-red-400">{ctr}%</div>
+
+                {/* Actual YouTube Card Mockup */}
+                <div className="flex flex-col cursor-pointer relative z-10">
+                  <div className="relative rounded-xl overflow-hidden aspect-video">
+                     <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop" alt="Thumbnail B" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                     {/* Time Badge */}
+                     <div className="absolute bottom-1.5 right-1.5 bg-black/90 text-white text-xs font-medium px-1.5 py-0.5 rounded">
+                       12:45
+                     </div>
+                  </div>
+                  <div className="flex gap-3 mt-3">
+                    <div className="w-9 h-9 rounded-full bg-zinc-800 flex-shrink-0 mt-0.5">
+                       <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" alt="Avatar" className="w-full h-full rounded-full object-cover" />
                     </div>
-                    <div className="text-right">
-                      <div className="text-[10px] text-green-400/80 uppercase font-bold mb-1">Views</div>
-                      <div className="text-lg font-black text-green-400 flex items-center gap-1">
-                        <TrendingUp size={16} /> 89,200
-                      </div>
+                    <div className="flex flex-col text-left">
+                      <h3 className="text-white text-[15px] font-semibold leading-tight line-clamp-2">I BUILT THE ULTIMATE GAMING PC! 🤯</h3>
+                      <span className="text-zinc-400 text-[13px] mt-1">CreatorFlow Tech</span>
+                      <span className="text-zinc-400 text-[13px]">89K views • 3 hours ago</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* VS Badge */}
-              <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-zinc-950 border border-zinc-700 rounded-full items-center justify-center z-20 shadow-2xl">
-                <span className="text-lg font-black italic text-zinc-500">VS</span>
+              <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-zinc-950 border-2 border-zinc-700 rounded-full items-center justify-center z-20 shadow-2xl">
+                <span className="text-xl font-black italic text-zinc-500">VS</span>
               </div>
             </div>
 
@@ -176,7 +191,7 @@ export default function LandingPage() {
       <section className="py-32 relative overflow-hidden text-center z-10">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-red-950/20 pointer-events-none" />
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
+          initial={{ opacity: 0, y: 0.9 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
