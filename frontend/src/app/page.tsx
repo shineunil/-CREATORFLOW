@@ -38,7 +38,7 @@ export default function LandingPage() {
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 text-sm font-medium text-zinc-300 mb-8 shadow-xl">
-            <Youtube size={16} className="text-red-500" />
+            <PlaySquare size={16} className="text-red-500" />
             <span>The Most Guaranteed Way to Beat the YouTube Algorithm</span>
           </div>
           
