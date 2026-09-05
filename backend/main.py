@@ -72,6 +72,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="CreatorFlow API", lifespan=lifespan)
 
+# 💥 Render 배포 시 uploads 폴더가 없으면 에러가 나므로, 마운트하기 전에 미리 폴더를 강제로 생성해 줍니다.
+os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.add_middleware(
