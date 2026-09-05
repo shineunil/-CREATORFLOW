@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Check, Crown, Zap, CreditCard, Sparkles, ShieldCheck } from "lucide-react";
 import Modal from "@/components/Modal";
 import { apiFetch } from "@/lib/api";
+import { PADDLE_CONFIG } from "@/lib/config";
 
 import { initializePaddle, Paddle } from '@paddle/paddle-js';
 
@@ -14,8 +15,8 @@ export default function PricingPage() {
 
   useEffect(() => {
     initializePaddle({ 
-      environment: 'sandbox', 
-      token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!,
+      environment: PADDLE_CONFIG.environment, 
+      token: PADDLE_CONFIG.clientToken,
       eventCallback: async function(data) {
         if (data.name === "checkout.completed") {
           setIsCheckoutModalOpen(false);
@@ -95,7 +96,7 @@ export default function PricingPage() {
     const checkoutOptions: any = {
       items: [
         {
-          priceId: process.env.NEXT_PUBLIC_PADDLE_PRICE_ID_PRO!,
+          priceId: PADDLE_CONFIG.proPriceId,
           quantity: 1
         }
       ]

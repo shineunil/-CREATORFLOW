@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE_URL } from "./config";
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   let token = typeof window !== "undefined" ? localStorage.getItem("jwt_token") : null;
