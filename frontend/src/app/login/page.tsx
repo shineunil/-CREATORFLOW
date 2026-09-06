@@ -6,7 +6,7 @@ import { FlaskConical, PlaySquare, ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
   const handleGoogleLogin = () => {
-    window.location.href = "http://localhost:8000/api/auth/login";
+    window.location.href = "https://creatorflow-sff9-o4brraeeo-eimo.vercel.app/api/auth/login";
   };
 
   return (
