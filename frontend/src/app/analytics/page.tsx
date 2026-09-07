@@ -14,7 +14,10 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     apiFetch("/api/analytics")
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Failed to load analytics (${res.status})`);
+        return res.json();
+      })
       .then(d => setData(d))
       .catch(console.error);
   }, []);
@@ -50,7 +53,7 @@ export default function AnalyticsPage() {
       <div className="glass-panel p-8 rounded-2xl border border-zinc-800/50">
          <h2 className="text-xl font-bold mb-6">Cumulative Extra Views Trend</h2>
          <div className="h-64 flex items-center justify-center border-t border-zinc-800/50 pt-8">
-           <p className="text-zinc-500">Chart will appear when enough test data is accumulated.</p>
+           <p className="text-zinc-400">Chart will appear when enough test data is accumulated.</p>
          </div>
       </div>
     </div>

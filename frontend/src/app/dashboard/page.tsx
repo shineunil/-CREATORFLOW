@@ -1,17 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   CheckCircle2,
-  MoreHorizontal,
-  LogOut,
-  PlaySquare,
   Sparkles,
   FlaskConical,
   Settings2,
   Trash2,
-  Edit2,
-  Loader2
+  Loader2,
+  AlertTriangle
 } from "lucide-react";
 import {
   BarChart,
@@ -43,8 +40,11 @@ export default function Dashboard() {
   const [testData, setTestData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSwapping, setIsSwapping] = useState<string | null>(null);
-  const [connectedChannel, setConnectedChannel] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<any>({});
+  // 여러 테스트를 연달아 빠르게 "즉시 교체"하면 각자 독립적으로 전체 목록을 새로고침하는데,
+  // 네트워크 응답 순서가 요청 순서와 다르게 도착하면 이전(더 느린) 새로고침이 최신 상태를 덮어쓸 수
+  // 있다. 매번 새로고침 시도에 번호를 매겨, 가장 최근 시도의 응답만 화면에 반영한다.
+  const testsRefreshTokenRef = useRef(0);
 
   // Modal State
   const [modalConfig, setModalConfig] = useState<{
@@ -76,15 +76,22 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    const channelFromUrl = searchParams.get("connected_channel");
-    const tokenFromUrl = searchParams.get("token");
-    if (channelFromUrl && tokenFromUrl) {
-      setConnectedChannel(channelFromUrl);
+    const errorFromUrl = searchParams.get("error");
+
+    if (errorFromUrl === "channel_limit_reached") {
+      showAlert(
+        "채널 연동 한도 도달",
+        "현재 요금제에서 연동 가능한 채널 개수를 모두 사용했습니다. 더 많은 채널을 연동하려면 PRO/AGENCY로 업그레이드해주세요.",
+        "warning"
+      );
       router.replace("/dashboard");
-    } else {
-      const stored = localStorage.getItem("connectedChannel");
-      if (stored) setConnectedChannel(stored);
     }
+
+    // token/connected_channel URL 파라미터는 ClientLayout.tsx의 전역 useEffect가 이 페이지가
+    // 마운트되기 전에 이미 localStorage에 저장하고 URL에서 제거한다. 여기서 다시 읽어서 처리하던
+    // 예전 코드는 완전히 중복이었고(ClientLayout이 raw window.history.replaceState로 URL을 바꿔도
+    // Next의 useSearchParams는 갱신되지 않아 이 페이지가 그 뒤에도 계속 예전 값을 보고 재실행됨),
+    // connectedChannel 상태값도 실제로는 화면 어디에도 쓰이지 않아 제거했다.
 
     apiFetch("/api/user/me")
       .then(res => res.json())
@@ -174,7 +181,11 @@ export default function Dashboard() {
       const res = await apiFetch(`/api/tests/${testId}/swap`, { method: "POST" });
       if (res.ok) {
         showAlert("수동 교체 Success", "Thumbnail swapped successfully.", "success");
-        apiFetch("/api/tests").then(r => r.json()).then(d => setTestData(d.tests || []));
+        const myToken = ++testsRefreshTokenRef.current;
+        apiFetch("/api/tests").then(r => r.json()).then(d => {
+          if (testsRefreshTokenRef.current !== myToken) return; // 더 최신 새로고침이 이미 진행됨 - 이 응답은 버림
+          setTestData(d.tests || []);
+        });
       } else {
         showAlert("Swap Failed", "수동 교체에 실패했습니다.", "error");
       }
@@ -190,24 +201,38 @@ export default function Dashboard() {
       <div className="px-8 pt-8 pb-4">
         <div>
           <h1 className="text-3xl font-black text-white tracking-tight">Optimization Dashboard</h1>
-          <p className="text-sm text-zinc-500 mt-2">
+          <p className="text-sm text-zinc-400 mt-2">
             Currently <span className="text-cyan-400 font-semibold">{testData.filter(t => t.status === "RUNNING").length}</span> videos are being optimized.
           </p>
         </div>
       </div>
 
+      {userProfile.needs_reconnect && (
+        <div className="mx-8 mb-2 flex flex-wrap items-center gap-3 justify-between px-5 py-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={20} className="text-amber-400 flex-shrink-0" aria-hidden="true" />
+            <p className="text-sm">
+              YouTube 채널 연동이 만료되어 자동 A/B 테스트가 일시 중지되었습니다. 다시 로그인해서 재연동해주세요.
+            </p>
+          </div>
+          <Link href="/login" className="px-4 py-2 bg-amber-500 text-black text-sm font-bold rounded-lg hover:bg-amber-400 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            채널 재연동하기
+          </Link>
+        </div>
+      )}
+
       <div className="p-8 w-full space-y-6">
         {isLoading ? (
-          <div className="text-zinc-400 text-center py-20 animate-pulse">Loading data...</div>
+          <div className="text-zinc-400 text-center py-20 animate-pulse" role="status">Loading data...</div>
         ) : testData.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 text-center bg-zinc-900/30 rounded-3xl border border-zinc-800/50 border-dashed">
-            <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mb-6">
-              <FlaskConical size={32} className="text-zinc-500" />
+            <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mb-6" aria-hidden="true">
+              <FlaskConical size={32} className="text-zinc-400" />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">No active optimizations</h2>
             <p className="text-zinc-400 mb-8 max-w-md">새로운 영상의 Thumbnail A/B 테스트를 만들어 조 views수를 극대화 해보세요.</p>
-            <Link href="/new" className="px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors flex items-center gap-2">
-              <Sparkles size={18} /> Create New Test
+            <Link href="/new" className="px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+              <Sparkles size={18} aria-hidden="true" /> Create New Test
             </Link>
           </div>
         ) : (
@@ -218,11 +243,11 @@ export default function Dashboard() {
                   <div className="flex items-center gap-3 mb-2">
                     {test.status === "RUNNING" ? (
                       <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold border border-cyan-500/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" /> Running
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" aria-hidden="true" /> Running
                       </span>
                     ) : (
                       <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20">
-                        <CheckCircle2 size={12} /> Optimization Finished
+                        <CheckCircle2 size={12} aria-hidden="true" /> Optimization Finished
                       </span>
                     )}
                   </div>
@@ -231,33 +256,39 @@ export default function Dashboard() {
                 </div>
                 
                 <div className="flex gap-10 text-right">
-                  <Stat label="Extra Views Gained" value={`+${Math.max(...test.variations.map((v: any) => v.total_views_gained || 0))}  views`} highlight />
+                  <Stat label="Extra Views Gained" value={`+${test.variations.length > 0 ? Math.max(...test.variations.map((v: any) => v.total_views_gained || 0)) : 0}  views`} highlight />
                   <Stat label="Total Candidates" value={`${test.variations.length}`} />
+                  {test.daily_analytics && test.daily_analytics.length > 0 && test.daily_analytics[test.daily_analytics.length - 1].impressions_ctr != null && (
+                    <Stat
+                      label="Analytics CTR (참고용, 최대 1일 지연)"
+                      value={`${test.daily_analytics[test.daily_analytics.length - 1].impressions_ctr.toFixed(1)}%`}
+                    />
+                  )}
                 </div>
 
                 {test.status === "RUNNING" && (
                   <div className="w-full flex flex-col gap-3 pt-4 border-t border-zinc-800/50 mt-2">
                     <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => handleSwapTest(test.test_id)} 
+                      <button
+                        onClick={() => handleSwapTest(test.test_id)}
                         disabled={isSwapping === test.test_id}
-                        className="px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                       >
                         {isSwapping === test.test_id ? (
                           <>
-                            <Loader2 size={16} className="animate-spin" /> Swapping...
+                            <Loader2 size={16} className="animate-spin" aria-hidden="true" /> Swapping...
                           </>
                         ) : (
                           <>
-                            <Settings2 size={16} /> Thumbnail 후보 이미지 즉시 교체
+                            <Settings2 size={16} aria-hidden="true" /> Thumbnail 후보 이미지 즉시 교체
                           </>
                         )}
                       </button>
-                      <button onClick={() => handleStopTest(test.test_id)} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-sm font-bold transition-colors cursor-pointer flex items-center gap-2">
-                        <CheckCircle2 size={16} /> Lock Winning Thumbnail
+                      <button onClick={() => handleStopTest(test.test_id)} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-sm font-bold transition-colors cursor-pointer flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+                        <CheckCircle2 size={16} aria-hidden="true" /> Lock Winning Thumbnail
                       </button>
-                      <button onClick={() => handleDeleteTest(test.test_id)} className="ml-auto px-4 py-2 bg-zinc-700/50 hover:bg-red-900/40 text-zinc-200 hover:text-red-400 border border-zinc-500/50 hover:border-red-500/50 rounded-lg text-sm font-black transition-all cursor-pointer flex items-center gap-2 shadow-sm" title="테스트를 즉시 Cancel하고 유튜브 Thumbnail을 원본으로 복구합니다">
-                        <Trash2 size={16} /> 테스트 완전 Cancel 및 삭제
+                      <button onClick={() => handleDeleteTest(test.test_id)} className="ml-auto px-4 py-2 bg-zinc-700/50 hover:bg-red-900/40 text-zinc-200 hover:text-red-400 border border-zinc-500/50 hover:border-red-500/50 rounded-lg text-sm font-black transition-all cursor-pointer flex items-center gap-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" title="테스트를 즉시 Cancel하고 유튜브 Thumbnail을 원본으로 복구합니다">
+                        <Trash2 size={16} aria-hidden="true" /> 테스트 완전 Cancel 및 삭제
                       </button>
                     </div>
                     <div className="bg-zinc-800/30 rounded-lg p-3 text-xs text-zinc-400 leading-relaxed border border-zinc-800/50">
@@ -274,9 +305,9 @@ export default function Dashboard() {
                     key={v.id}
                     title={v.name}
                     videoTitle={v.title_text}
-                    ctr={`+${v.total_views_gained || 0}`}
+                    viewsGained={`+${v.total_views_gained || 0}`}
                     views={`${v.total_views_gained || 0}  views`}
-                    data={v.chart_data || [{day: "Day 1", ctr: 0}]}
+                    data={v.chart_data || [{day: "Day 1", views_gained: 0}]}
                     color={index === 0 ? "#a1a1aa" : (v.is_winner ? "#06b6d4" : "#8b5cf6")}
                     isWinner={v.is_winner}
                     thumbnailUrl={v.thumbnail_image_url}
@@ -304,12 +335,12 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
   );
 }
 
-function VariationCard({ title, videoTitle, ctr, views, data, color, isWinner, thumbnailUrl }: any) {
+function VariationCard({ title, videoTitle, viewsGained, views, data, color, isWinner, thumbnailUrl }: any) {
   return (
     <div className={`relative glass-panel rounded-2xl p-5 flex flex-col transition-all duration-300 border ${isWinner ? "winner-glow transform -translate-y-1 border-cyan-500/50" : "border-zinc-800"}`}>
       {isWinner && (
         <div className="absolute -top-3 -right-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-bold px-3 py-1 rounded-full shadow-lg shadow-cyan-500/20 flex items-center gap-1 border border-cyan-400/50 z-20">
-          <CheckCircle2 size={16} /> 1위 승리
+          <CheckCircle2 size={16} aria-hidden="true" /> 1위 승리
         </div>
       )}
       
@@ -335,15 +366,15 @@ function VariationCard({ title, videoTitle, ctr, views, data, color, isWinner, t
 
       <div className="mt-auto">
         <div className="flex justify-between items-end mb-2">
-          <span className="text-sm text-zinc-400 uppercase font-medium tracking-wide">누적 상승 조 views수</span>
-          <span className={`text-xl font-bold ${isWinner ? "text-cyan-400" : "text-zinc-200"}`}>{ctr}</span>
+          <span className="text-sm text-zinc-400 uppercase font-medium tracking-wide">누적 상승 조회수</span>
+          <span className={`text-xl font-bold ${isWinner ? "text-cyan-400" : "text-zinc-200"}`}>{viewsGained}</span>
         </div>
         <div className="h-24 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data}>
-              <Bar dataKey="ctr" radius={[2, 2, 0, 0]}>
+              <Bar dataKey="views_gained" radius={[2, 2, 0, 0]}>
                 {data.map((entry: any, index: number) => (
-                  <Cell key={`cell-${index}`} fill={entry.ctr > 0 ? color : "#3f3f46"} className="transition-all duration-300 hover:opacity-80" />
+                  <Cell key={`cell-${index}`} fill={entry.views_gained > 0 ? color : "#3f3f46"} className="transition-all duration-300 hover:opacity-80" />
                 ))}
               </Bar>
             </BarChart>

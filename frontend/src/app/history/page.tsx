@@ -8,7 +8,10 @@ export default function HistoryPage() {
 
   useEffect(() => {
     apiFetch("/api/history")
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Failed to load history (${res.status})`);
+        return res.json();
+      })
       .then(data => {
         if (data.tests) setTests(data.tests);
       })
@@ -24,14 +27,14 @@ export default function HistoryPage() {
 
       <div className="space-y-6">
         {tests.length === 0 ? (
-          <div className="text-center py-20 text-zinc-500 glass-panel rounded-2xl border border-zinc-800/50">
+          <div className="text-center py-20 text-zinc-400 glass-panel rounded-2xl border border-zinc-800/50">
             No completed optimization records found.
           </div>
         ) : (
           tests.map((test, i) => (
             <div key={i} className="glass-panel p-6 rounded-2xl border border-zinc-800/50 flex flex-col md:flex-row justify-between gap-6">
               <div>
-                <p className="text-xs text-zinc-500 mb-2">Test Ended: {new Date(test.end_time).toLocaleDateString()}</p>
+                <p className="text-xs text-zinc-400 mb-2">Test Ended: {new Date(test.end_time).toLocaleDateString()}</p>
                 <h3 className="text-lg font-bold">{test.video?.youtube_video_id}</h3>
               </div>
               <div className="flex gap-4">

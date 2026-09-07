@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
-import { ArrowLeft, UploadCloud, Upload, Plus, Settings2, Play, CheckCircle2, Sparkles, Trash2, LayoutDashboard, Image as ImageIcon, Crown, RefreshCcw } from "lucide-react";
+import React, { useState, useRef, Suspense } from "react";
+import { ArrowLeft, UploadCloud, Upload, Plus, Play, CheckCircle2, Sparkles, Trash2, LayoutDashboard, RefreshCcw, Wand2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -49,15 +49,20 @@ function NewTestContent() {
   
   // Variations state
   const [variations, setVariations] = useState<any[]>([
-    { id: "B", title_text: "", thumbnail_image_url: null, analyzing: false, ml_score: null, ml_feedback: null },
+    { id: "B", title_text: "", thumbnail_image_url: null, analyzing: false, ml_score: null, ml_feedback: null, showGenerator: false, generateHeadline: "" },
   ]);
   
-  const [swapInterval, setSwapInterval] = useState("60");
+  const [swapInterval, setSwapInterval] = useState("240");
   const [durationHours, setDurationHours] = useState("24");
   
   const [videos, setVideos] = useState<any[]>([]);
   const [activeTestVideoIds, setActiveTestVideoIds] = useState<Set<string>>(new Set());
   const [userProfile, setUserProfile] = useState<any>({});
+
+  // 후보별로 마지막으로 시작된 업로드 요청의 순번을 기록합니다.
+  // 같은 후보에 연달아 빠르게 이미지를 올리면 네트워크 응답이 요청 순서와 다르게 도착할 수 있는데,
+  // 이 토큰 없이는 먼저 보낸(느린) 요청의 응답이 나중에 도착해 최신 업로드 결과를 덮어써버립니다.
+  const uploadTokenRef = useRef<Record<string, number>>({});
   
   React.useEffect(() => {
     apiFetch("/api/user/me")
@@ -97,7 +102,7 @@ function NewTestContent() {
   }, [videoIdFromUrl]);
 
   const handleTitleChange = (id: string, newTitle: string) => {
-    setVariations(variations.map(v => v.id === id ? { ...v, title_text: newTitle } : v));
+    setVariations(prev => prev.map(v => v.id === id ? { ...v, title_text: newTitle } : v));
   };
 
   // Image Upload
@@ -105,27 +110,34 @@ function NewTestContent() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // 이 업로드 요청이 해당 후보의 "최신" 요청임을 표시합니다. 응답이 도착했을 때 이 토큰이
+    // 여전히 최신인 경우에만 화면에 반영해, 뒤늦게 도착한 이전 요청의 응답이 최신 업로드 결과를
+    // 덮어쓰지 않도록 합니다.
+    const myToken = (uploadTokenRef.current[targetVarId] || 0) + 1;
+    uploadTokenRef.current[targetVarId] = myToken;
+    const isStale = () => uploadTokenRef.current[targetVarId] !== myToken;
+
     setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: true } : v));
 
     try {
       const formData = new FormData();
       formData.append("file", file, file.name);
-      
+
       const response = await apiFetch("/api/upload", {
         method: "POST",
         body: formData,
       });
-      
+
       if (response.ok) {
         const data = await response.json();
-        
+
         // Call ML analysis
         const analyzeRes = await apiFetch("/api/analyze-thumbnail", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename: data.filename })
         });
-        
+
         let score = null;
         let feedback = null;
         if (analyzeRes.ok) {
@@ -133,21 +145,86 @@ function NewTestContent() {
           score = analyzeData.score;
           feedback = analyzeData.feedback;
         }
-        
-        setVariations(prev => prev.map(v => v.id === targetVarId ? { 
-          ...v, 
+
+        if (isStale()) return;
+        setVariations(prev => prev.map(v => v.id === targetVarId ? {
+          ...v,
           thumbnail_image_url: data.url,
           ml_score: score,
           ml_feedback: feedback,
           analyzing: false
         } : v));
       } else {
+        if (isStale()) return;
         showAlert("Upload Failed", "Failed to upload image.", "error");
         setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: false } : v));
       }
     } catch (error) {
       console.error("Upload error:", error);
+      if (isStale()) return;
       showAlert("Error Occurred", "An error occurred while uploading the image.", "error");
+      setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: false } : v));
+    }
+  };
+
+  const toggleGenerator = (targetVarId: string) => {
+    setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, showGenerator: !v.showGenerator } : v));
+  };
+
+  const handleGenerateHeadlineChange = (targetVarId: string, text: string) => {
+    setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, generateHeadline: text } : v));
+  };
+
+  // AI Thumbnail Assist: 베이스 이미지 + 문구로 유튜브 규격 썸네일을 자동 생성 (PIL 기반, 외부 API 비용 없음)
+  const handleGenerateThumbnail = async (e: React.ChangeEvent<HTMLInputElement>, targetVarId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const targetVar = variations.find(v => v.id === targetVarId);
+    const headline = (targetVar?.generateHeadline || "").trim();
+    if (!headline) {
+      showAlert("문구를 입력해주세요", "썸네일에 넣을 짧은 문구를 먼저 입력한 뒤 베이스 이미지를 선택해주세요.", "warning");
+      e.target.value = "";
+      return;
+    }
+
+    const myToken = (uploadTokenRef.current[targetVarId] || 0) + 1;
+    uploadTokenRef.current[targetVarId] = myToken;
+    const isStale = () => uploadTokenRef.current[targetVarId] !== myToken;
+
+    setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: true } : v));
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file, file.name);
+      formData.append("headline", headline);
+
+      const response = await apiFetch("/api/generate-thumbnail", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (isStale()) return;
+        setVariations(prev => prev.map(v => v.id === targetVarId ? {
+          ...v,
+          thumbnail_image_url: data.url,
+          ml_score: data.analysis?.score ?? null,
+          ml_feedback: data.analysis?.feedback ?? null,
+          analyzing: false,
+          showGenerator: false,
+        } : v));
+      } else {
+        const err = await response.json().catch(() => ({}));
+        if (isStale()) return;
+        showAlert("생성 실패", err.detail || "썸네일 생성에 실패했습니다.", "error");
+        setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: false } : v));
+      }
+    } catch (error) {
+      console.error("Generate thumbnail error:", error);
+      if (isStale()) return;
+      showAlert("오류 발생", "썸네일 생성 중 오류가 발생했습니다.", "error");
       setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: false } : v));
     }
   };
@@ -167,30 +244,35 @@ function NewTestContent() {
       return;
     }
     
-    // Find the next available letter ID (B, C, D, E)
-    const existingIds = variations.map(v => v.id);
-    let nextId = "B";
-    for (let i = 66; i <= 69; i++) {
-      const letter = String.fromCharCode(i);
-      if (!existingIds.includes(letter)) {
-        nextId = letter;
-        break;
+    setVariations(prev => {
+      // Find the next available letter ID (B, C, D, E)
+      const existingIds = prev.map(v => v.id);
+      let nextId = "B";
+      for (let i = 66; i <= 69; i++) {
+        const letter = String.fromCharCode(i);
+        if (!existingIds.includes(letter)) {
+          nextId = letter;
+          break;
+        }
       }
-    }
-    
-    setVariations([...variations, { id: nextId, title_text: "", thumbnail_image_url: null, analyzing: false }]);
+      return [...prev, { id: nextId, title_text: "", thumbnail_image_url: null, analyzing: false, showGenerator: false, generateHeadline: "" }];
+    });
   };
 
   const removeVariation = (idToRemove: string) => {
-    setVariations(variations.filter(v => v.id !== idToRemove));
+    setVariations(prev => prev.filter(v => v.id !== idToRemove));
   };
+
+  const [isSubmittingTest, setIsSubmittingTest] = useState(false);
 
   const handleStartTest = async () => {
     if (!selectedVideo) {
       showAlert("Select a Video", "Please select an original video to optimize.", "warning");
       return;
     }
+    if (isSubmittingTest) return;
 
+    setIsSubmittingTest(true);
     try {
       const response = await apiFetch("/api/tests", {
         method: "POST",
@@ -226,28 +308,34 @@ function NewTestContent() {
              () => router.push("/pricing")
            );
         } else {
-           showAlert("Execution Error", "An error occurred while executing the optimization.", "error");
+           const errData = await response.json().catch(() => ({}));
+           showAlert("Execution Error", errData.detail || "An error occurred while executing the optimization.", "error");
         }
         return;
       }
 
+      // 방금 만든 테스트의 영상을 즉시 "테스트 중"으로 표시 (이 화면으로 다시 돌아왔을 때
+      // 이미 테스트 중인 영상에 또 테스트를 거는 걸 방지 - /api/tests 재요청 없이도 바로 반영)
+      setActiveTestVideoIds(prev => new Set(prev).add(selectedVideo.id));
       setStep(3); // Success step
     } catch (e) {
       console.error(e);
-      showAlert("Error Occurred", "A server communication error occurred.", "error");
+      showAlert("Error Occurred", "A server communication error occurred. Please check your connection and try again.", "error");
+    } finally {
+      setIsSubmittingTest(false);
     }
   };
 
   return (
     <div className="w-full p-8 animate-fade-in-up">
-      <Link href="/" className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors mb-8">
-        <ArrowLeft size={20} />
+      <Link href="/" className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors mb-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+        <ArrowLeft size={20} aria-hidden="true" />
         <span className="font-semibold">Back to Dashboard</span>
       </Link>
 
       <div className="mb-10">
         <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
-          <Sparkles className="text-cyan-400" size={28} /> Start New Thumbnail Optimization
+          <Sparkles className="text-cyan-400" size={28} aria-hidden="true" /> Start New Thumbnail Optimization
         </h1>
         <p className="text-zinc-400">Upload multiple thumbnails and titles. We will find the best performing combination.</p>
       </div>
@@ -257,7 +345,7 @@ function NewTestContent() {
           <h2 className="text-xl font-bold border-b border-zinc-800 pb-4">1. Select Original Video</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {videos.length === 0 ? (
-              <div className="col-span-full text-center p-12 text-zinc-500 glass-panel rounded-2xl border border-zinc-800/50">
+              <div className="col-span-full text-center p-12 text-zinc-400 glass-panel rounded-2xl border border-zinc-800/50" role="status">
                 Loading recent videos from your connected YouTube channel...
               </div>
             ) : (
@@ -273,24 +361,24 @@ function NewTestContent() {
                       <img src={v.thumbnail_url} alt={v.title} className={`w-full h-full object-cover transition-transform ${!isTesting && 'group-hover:scale-105'}`} />
                       {isTesting && (
                         <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/90 text-white text-xs font-bold shadow-lg backdrop-blur-md">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Testing
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" aria-hidden="true" /> Testing
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="p-4 flex-1 flex flex-col">
                       <h3 className="font-bold text-sm text-zinc-200 line-clamp-2 mb-2 group-hover:text-cyan-400 transition-colors flex-1">{v.title}</h3>
-                      <div className="flex justify-between items-center text-xs text-zinc-500 mb-4">
-                        <span>{parseInt(v.view_count).toLocaleString()} views</span>
+                      <div className="flex justify-between items-center text-xs text-zinc-400 mb-4">
+                        <span>{parseInt(v.view_count || '0').toLocaleString()} views</span>
                         <span>{new Date(v.published_at).toLocaleDateString()}</span>
                       </div>
-                      
-                      <button 
+
+                      <button
                         disabled={isTesting}
                         onClick={() => { if (!isTesting) { setSelectedVideo(v); setStep(2); } }}
-                        className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                          isTesting 
-                            ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' 
+                        className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
+                          isTesting
+                            ? 'bg-zinc-800 text-zinc-400 cursor-not-allowed'
                             : 'bg-zinc-800/80 hover:bg-cyan-500 hover:text-white text-zinc-300'
                         }`}
                       >
@@ -329,8 +417,8 @@ function NewTestContent() {
               <h2 className="text-xl font-bold flex items-center gap-2">
                 2. Add Candidates
               </h2>
-              <button onClick={addVariation} className="flex items-center gap-2 text-sm font-bold text-cyan-400 hover:text-cyan-300 transition-colors bg-cyan-950/30 px-4 py-2 rounded-full border border-cyan-500/20 hover:border-cyan-500/50">
-                <Plus size={16} /> Add Candidate (Max 5)
+              <button onClick={addVariation} className="flex items-center gap-2 text-sm font-bold text-cyan-400 hover:text-cyan-300 transition-colors bg-cyan-950/30 px-4 py-2 rounded-full border border-cyan-500/20 hover:border-cyan-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+                <Plus size={16} aria-hidden="true" /> Add Candidate (Max 5)
               </button>
             </div>
 
@@ -345,8 +433,8 @@ function NewTestContent() {
                     <button 
                       onClick={() => removeVariation(v.id)}
                       className="absolute -top-4 -right-4 w-11 h-11 bg-zinc-900 border border-zinc-700 rounded-full flex items-center justify-center text-zinc-400 hover:text-red-400 hover:border-red-600 hover:bg-red-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 transition-all z-10 shadow-lg cursor-pointer"
-                      aria-label={`Candidate ${v.id}Delete`}
-                      title="CandidateDelete"
+                      aria-label={`Delete Candidate ${v.id}`}
+                      title={`Delete Candidate ${v.id}`}
                     >
                       <Trash2 size={20} aria-hidden="true" />
                     </button>
@@ -367,30 +455,61 @@ function NewTestContent() {
                           <img src={v.thumbnail_image_url} alt={`Thumbnail ${v.id}`} className={`w-full aspect-video object-cover ${v.analyzing ? 'opacity-50 blur-sm' : ''}`} />
                           {!v.analyzing && (
                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm">
-                              <span className="font-bold text-white flex items-center gap-2"><Upload size={18}/> Re-upload</span>
+                              <span className="font-bold text-white flex items-center gap-2"><Upload size={18} aria-hidden="true" /> Re-upload</span>
                             </div>
                           )}
                         </label>
+                      ) : v.analyzing ? (
+                        <div className="w-full aspect-video rounded-xl border-2 border-dashed border-zinc-700 bg-zinc-900/50 flex flex-col items-center justify-center" role="status">
+                          <span className="w-8 h-8 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin mb-3" aria-hidden="true"></span>
+                          <span className="font-bold text-cyan-400">{v.showGenerator ? "썸네일 자동 생성 중..." : "업로드 및 분석 중..."}</span>
+                        </div>
+                      ) : v.showGenerator ? (
+                        <div className="w-full aspect-video rounded-xl border-2 border-dashed border-violet-500/40 bg-violet-950/10 flex flex-col items-center justify-center p-5 gap-3">
+                          <div className="flex items-center gap-2 text-violet-300 text-sm font-bold">
+                            <Wand2 size={16} aria-hidden="true" /> AI Thumbnail Assist
+                          </div>
+                          <input
+                            type="text"
+                            value={v.generateHeadline}
+                            onChange={(e) => handleGenerateHeadlineChange(v.id, e.target.value)}
+                            placeholder="썸네일에 넣을 짧은 문구 (예: I BUILT THE ULTIMATE PC)"
+                            maxLength={60}
+                            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                          />
+                          <label className="cursor-pointer w-full">
+                            <input
+                              type="file"
+                              onChange={(e) => handleGenerateThumbnail(e, v.id)}
+                              accept="image/png, image/jpeg, image/webp"
+                              className="hidden"
+                            />
+                            <div className="flex items-center justify-center gap-2 w-full py-2.5 bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 rounded-lg text-sm font-bold text-violet-200 transition-colors">
+                              <UploadCloud size={16} aria-hidden="true" /> 베이스 사진 선택 &amp; 생성
+                            </div>
+                          </label>
+                          <button onClick={() => toggleGenerator(v.id)} className="text-xs text-zinc-400 hover:text-zinc-300 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded">
+                            직접 업로드로 돌아가기
+                          </button>
+                        </div>
                       ) : (
                         <label className="block w-full aspect-video rounded-xl border-2 border-dashed border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800/80 hover:border-cyan-500/50 flex flex-col items-center justify-center cursor-pointer transition-all group/upload relative">
-                          <input 
-                            type="file" 
-                            onChange={(e) => handleImageUpload(e, v.id)} 
-                            accept="image/png, image/jpeg" 
-                            className="hidden" 
+                          <input
+                            type="file"
+                            onChange={(e) => handleImageUpload(e, v.id)}
+                            accept="image/png, image/jpeg"
+                            className="hidden"
                           />
-                          {v.analyzing ? (
-                            <div className="flex flex-col items-center justify-center">
-                              <span className="w-8 h-8 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin mb-3"></span>
-                              <span className="font-bold text-cyan-400">업로드 및 분석 중...</span>
-                            </div>
-                          ) : (
-                            <>
-                              <UploadCloud size={48} className="text-zinc-500 group-hover/upload:text-cyan-400 mb-4 transition-colors" />
-                              <span className="text-lg font-bold text-zinc-300 group-hover/upload:text-white">Click to upload image</span>
-                              <span className="text-sm font-medium text-zinc-500 mt-2">Recommended: 1280x720 (Max 2MB)</span>
-                            </>
-                          )}
+                          <UploadCloud size={48} className="text-zinc-400 group-hover/upload:text-cyan-400 mb-4 transition-colors" aria-hidden="true" />
+                          <span className="text-lg font-bold text-zinc-300 group-hover/upload:text-white">Click to upload image</span>
+                          <span className="text-sm font-medium text-zinc-400 mt-2">Recommended: 1280x720 (Max 2MB)</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleGenerator(v.id); }}
+                            className="mt-3 flex items-center gap-1.5 text-xs font-bold text-violet-400 hover:text-violet-300 px-3 py-1.5 rounded-full bg-violet-950/40 border border-violet-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                          >
+                            <Wand2 size={12} aria-hidden="true" /> AI로 자동 생성해보기
+                          </button>
                         </label>
                       )}
                     </div>
@@ -407,10 +526,10 @@ function NewTestContent() {
                         />
                       </div>
                       
-                      {v.ml_score && (
+                      {v.ml_score != null && (
                         <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
                           <div className="flex items-center gap-2 mb-2">
-                            <Sparkles size={16} className="text-emerald-400" />
+                            <Sparkles size={16} className="text-emerald-400" aria-hidden="true" />
                             <span className="font-bold text-emerald-400 text-sm">AI Thumbnail Analysis Complete (Score: {v.ml_score}점)</span>
                           </div>
                           <p className="text-xs text-emerald-200/70">{v.ml_feedback}</p>
@@ -428,26 +547,35 @@ function NewTestContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
                   <label className="block text-sm font-bold text-zinc-300 mb-2">Swap Interval</label>
-                  <select 
+                  <select
                     value={swapInterval}
                     onChange={(e) => {
-                      if (e.target.value === "30" && !userProfile.is_pro) {
-                        showAlert("Plan Restriction", "30-min Swap Interval is a PRO feature.\nPlease upgrade to PRO to use this.", "warning", () => router.push("/pricing"));
+                      // BASIC 요금제는 최소 4시간(240분) 주기부터 선택 가능 - backend/test_policy.py의
+                      // BASIC_MIN_SWAP_INTERVAL_MINUTES와 동일한 기준
+                      if (parseInt(e.target.value) < 240 && !userProfile.is_pro) {
+                        showAlert("Plan Restriction", "Swap intervals shorter than 4 hours are a PRO feature.\nPlease upgrade to PRO to use this.", "warning", () => router.push("/pricing"));
                         return;
                       }
                       setSwapInterval(e.target.value);
                     }}
                     className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 appearance-none"
                   >
-                    <option value="60">Swap every 1 hour (Recommended)</option>
-                    <option value="120">Swap every 2 hours</option>
+                    <option value="240">Swap every 4 hours (Recommended)</option>
+                    <option value="720">Swap every 12 hours</option>
+                    <option value="1440">Swap every 24 hours</option>
+                    <option value="120" disabled={!userProfile.is_pro} className="text-orange-500 font-bold">
+                      🔑 Swap every 2 hours (PRO Only)
+                    </option>
+                    <option value="60" disabled={!userProfile.is_pro} className="text-orange-500 font-bold">
+                      🔑 Swap every 1 hour (PRO Only)
+                    </option>
                     <option value="30" disabled={!userProfile.is_pro} className="text-orange-500 font-bold">
                       🔑 Swap every 30 mins (PRO Only)
                     </option>
                   </select>
-                  <p className="text-xs text-zinc-500 mt-2">Candidates are rotated on YouTube to measure CTR.</p>
+                  <p className="text-xs text-zinc-400 mt-2">Candidates are rotated on YouTube and compared by views gained per hour (VPH).</p>
                 </div>
-              
+
               <div className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
                 <label className="block text-sm font-bold text-zinc-300 mb-2">Total Optimization Duration</label>
                 <select 
@@ -459,36 +587,50 @@ function NewTestContent() {
                   <option value="48">Apply best thumbnail permanently after 48 hours</option>
                   <option value="72">Apply best thumbnail permanently after 72 hours</option>
                 </select>
-                <p className="text-xs text-zinc-500 mt-2">테스트가 끝나면 승리한 썸네일로 고정됩니다.</p>
+                <p className="text-xs text-zinc-400 mt-2">테스트가 끝나면 승리한 썸네일로 고정됩니다.</p>
               </div>
             </div>
           </div>
 
-          <div className="pt-6 border-t border-zinc-800 flex justify-end">
-            <button 
+          <div className="pt-6 border-t border-zinc-800 flex flex-col items-end gap-2">
+            <button
               onClick={handleStartTest}
-              className="px-10 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-xl font-black text-white shadow-lg hover:shadow-cyan-500/25 transition-all flex items-center gap-3 cursor-pointer"
+              disabled={isSubmittingTest}
+              className="px-10 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-xl font-black text-white shadow-lg hover:shadow-cyan-500/25 transition-all flex items-center gap-3 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:from-cyan-600 disabled:hover:to-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
             >
-              <Play size={20} className="fill-white" />
-              Start Real-time Optimization Campaign
+              {isSubmittingTest ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" aria-hidden="true" />
+                  Applying to YouTube...
+                </>
+              ) : (
+                <>
+                  <Play size={20} className="fill-white" aria-hidden="true" />
+                  Start Real-time Optimization Campaign
+                </>
+              )}
             </button>
+            {isSubmittingTest && (
+              <p className="text-xs text-zinc-400" role="status">테스트를 생성하는 중입니다...</p>
+            )}
           </div>
         </div>
       )}
 
       {step === 3 && (
         <div className="py-20 flex flex-col items-center justify-center text-center animate-fade-in-up">
-          <div className="w-24 h-24 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mb-8">
+          <div className="w-24 h-24 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mb-8" aria-hidden="true">
             <CheckCircle2 size={48} className="text-emerald-400" />
           </div>
           <h2 className="text-4xl font-black mb-4">Optimization Campaign Started!</h2>
           <p className="text-xl text-zinc-400 max-w-lg mb-10">
-            CREATORFLOW system is connected to YouTube, automatically swapping thumbnails and analyzing real-time data.
+            Your first candidate is being applied to YouTube right now — it may take a few seconds
+            to show up on your video. From here, CreatorFlow rotates candidates automatically.
           </p>
-          
+
           <div className="flex gap-4">
-            <Link href="/" className="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-bold border border-zinc-800 transition-colors flex items-center gap-2">
-              <LayoutDashboard size={18} /> View Status on Dashboard
+            <Link href="/" className="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-bold border border-zinc-800 transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+              <LayoutDashboard size={18} aria-hidden="true" /> View Status on Dashboard
             </Link>
           </div>
         </div>
@@ -501,7 +643,7 @@ function NewTestContent() {
 
 export default function NewTestPage() {
   return (
-    <Suspense fallback={<div className="p-12 text-center text-zinc-500">Loading...</div>}>
+    <Suspense fallback={<div className="p-12 text-center text-zinc-400" role="status">Loading...</div>}>
       <NewTestContent />
     </Suspense>
   );

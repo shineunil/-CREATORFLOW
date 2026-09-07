@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { FolderOpen, Sparkles, MonitorPlay, PlayCircle, Plus, Activity } from "lucide-react";
+import { FolderOpen, Sparkles, MonitorPlay, PlayCircle, Activity } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 
@@ -13,8 +13,14 @@ export default function VideosPage() {
   useEffect(() => {
     // 영상 목록과 현재 진행중인 테스트 목록을 동시에 가져옵니다.
     Promise.all([
-      apiFetch("/api/videos").then(res => res.json()),
-      apiFetch("/api/tests").then(res => res.json())
+      apiFetch("/api/videos").then(res => {
+        if (!res.ok) throw new Error(`Failed to load videos (${res.status})`);
+        return res.json();
+      }),
+      apiFetch("/api/tests").then(res => {
+        if (!res.ok) throw new Error(`Failed to load tests (${res.status})`);
+        return res.json();
+      })
     ])
     .then(([videosData, testsData]) => {
       if (videosData.videos) {
@@ -44,7 +50,7 @@ export default function VideosPage() {
       <div className="mb-10 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
-            <MonitorPlay className="text-red-500" size={32} /> 내 영상 목록
+            <MonitorPlay className="text-red-500" size={32} aria-hidden="true" /> 내 영상 목록
           </h1>
           <p className="text-zinc-400">연동된 유튜브 채널의 최근 업로드 영상들을 확인하고 바로 최적화를 시작하세요.</p>
         </div>
@@ -52,11 +58,11 @@ export default function VideosPage() {
         </div>
 
       {isLoading ? (
-        <div className="text-center py-20 text-zinc-400 animate-pulse">유튜브에서 영상을 불러오는 중입니다...</div>
+        <div className="text-center py-20 text-zinc-400 animate-pulse" role="status">유튜브에서 영상을 불러오는 중입니다...</div>
       ) : videos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 text-center bg-zinc-900/30 rounded-3xl border border-zinc-800/50 border-dashed">
-          <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mb-6">
-            <FolderOpen size={32} className="text-zinc-500" />
+          <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mb-6" aria-hidden="true">
+            <FolderOpen size={32} className="text-zinc-400" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">업로드된 영상이 없습니다</h2>
           <p className="text-zinc-400">채널에 아직 영상이 없거나, 불러올 수 없습니다.</p>
@@ -86,11 +92,11 @@ export default function VideosPage() {
                   
                   {isTesting ? (
                     <div className="absolute top-3 left-3 px-2 py-1 bg-cyan-500/20 border border-cyan-500/40 rounded text-xs font-bold text-cyan-400 flex items-center gap-1 backdrop-blur-md">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" /> 최적화 중
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" aria-hidden="true" /> 최적화 중
                     </div>
                   ) : (
                     <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/80 rounded text-xs font-bold text-white flex items-center gap-1 backdrop-blur-sm">
-                      <PlayCircle size={12} /> 영상
+                      <PlayCircle size={12} aria-hidden="true" /> 영상
                     </div>
                   )}
                 </div>
@@ -110,18 +116,18 @@ export default function VideosPage() {
 
                   <div className="pt-4 border-t border-zinc-800/50">
                     {isTesting ? (
-                      <Link 
-                        href="/" 
-                        className="w-full py-2.5 bg-cyan-900/30 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-900/50 hover:border-cyan-500/50 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
+                      <Link
+                        href="/"
+                        className="w-full py-2.5 bg-cyan-900/30 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-900/50 hover:border-cyan-500/50 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                       >
-                        <Activity size={16} className="animate-pulse" /> ⏳ 최적화 진행 현황 보기
+                        <Activity size={16} className="animate-pulse" aria-hidden="true" /> ⏳ 최적화 진행 현황 보기
                       </Link>
                     ) : (
-                      <Link 
-                        href={`/new?videoId=${v.id}`} 
-                        className="w-full py-2.5 bg-zinc-800/80 hover:bg-cyan-500/10 text-zinc-300 hover:text-cyan-400 border border-transparent hover:border-cyan-500/30 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
+                      <Link
+                        href={`/new?videoId=${v.id}`}
+                        className="w-full py-2.5 bg-zinc-800/80 hover:bg-cyan-500/10 text-zinc-300 hover:text-cyan-400 border border-transparent hover:border-cyan-500/30 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                       >
-                        <Sparkles size={16} /> 썸네일 테스트 생성
+                        <Sparkles size={16} aria-hidden="true" /> 썸네일 테스트 생성
                       </Link>
                     )}
                   </div>

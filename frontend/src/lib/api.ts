@@ -1,21 +1,27 @@
 import { API_BASE_URL } from "./config";
 
-export async function apiFetch(endpoint: string, options: RequestInit = {}) {
-  let token = typeof window !== "undefined" ? localStorage.getItem("jwt_token") : null;
-  
-  if (typeof window !== "undefined") {
-    const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get("token");
-    if (urlToken) {
-      token = urlToken;
-      localStorage.setItem("jwt_token", urlToken);
-      
-      const channelFromUrl = params.get("connected_channel");
-      if (channelFromUrl) {
-        localStorage.setItem("connectedChannel", channelFromUrl);
-      }
-    }
+function captureAuthFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+
+  const url = new URL(window.location.href);
+  const urlToken = url.searchParams.get("token");
+  if (!urlToken) return localStorage.getItem("jwt_token");
+
+  localStorage.setItem("jwt_token", urlToken);
+  const channelFromUrl = url.searchParams.get("connected_channel");
+  if (channelFromUrl) {
+    localStorage.setItem("connectedChannel", channelFromUrl);
   }
+
+  url.searchParams.delete("token");
+  url.searchParams.delete("connected_channel");
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState({}, "", next);
+  return urlToken;
+}
+
+export async function apiFetch(endpoint: string, options: RequestInit = {}) {
+  const token = captureAuthFromUrl();
 
   const headers = {
     ...options.headers,

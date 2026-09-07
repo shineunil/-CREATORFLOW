@@ -1,15 +1,33 @@
 "use client";
 
-import React, { useState } from "react";
-import { ArrowLeft, Settings, Mail, Bell, Shield, LogOut } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Settings, Mail, Bell, Shield, LogOut, PlaySquare, Plus, AlertTriangle, CreditCard, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
+import { apiFetch } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
+
+type ChannelSummary = {
+  id: number;
+  channel_title: string;
+  youtube_channel_id: string;
+  needs_reconnect: boolean;
+  is_active: boolean;
+};
 
 export default function SettingsPage() {
   const router = useRouter();
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [userEmail, setUserEmail] = useState<string>("로딩 중...");
+  const [isPro, setIsPro] = useState(false);
+  const [plan, setPlan] = useState<string>("BASIC");
+  const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [channels, setChannels] = useState<ChannelSummary[]>([]);
+  const [maxChannels, setMaxChannels] = useState(1);
+  const [isSwitching, setIsSwitching] = useState(false);
+  // state만으로 중복 클릭을 막으면 리렌더 반영 전 짧은 틈에 두 번째 클릭이 통과할 수 있어 ref로 보강한다.
+  const isSwitchingRef = useRef(false);
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     type?: "alert" | "confirm";
@@ -55,21 +73,77 @@ export default function SettingsPage() {
   };
 
   React.useEffect(() => {
-    fetch("http://localhost:8000/api/user/me")
-      .then((res) => res.json())
+    apiFetch("/api/user/me")
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load profile (${res.status})`);
+        return res.json();
+      })
       .then((data) => {
         if (data.email) setUserEmail(data.email);
         else setUserEmail("연동된 채널 이메일 없음");
+        setIsPro(!!data.is_pro);
+        setPlan(data.plan || "BASIC");
       })
       .catch((err) => {
         console.error(err);
-        setUserEmail("godlove3854@gmail.com");
+        setUserEmail("연동된 채널 이메일 없음");
       });
+
+    apiFetch("/api/channels")
+      .then((res) => res.json())
+      .then((data) => {
+        setChannels(data.channels || []);
+        setMaxChannels(data.max_channels ?? 1);
+      })
+      .catch((err) => console.error(err));
   }, []);
+
+  const handleSwitchChannel = async (channelId: number) => {
+    if (isSwitchingRef.current) return;
+    isSwitchingRef.current = true;
+    setIsSwitching(true);
+    try {
+      const res = await apiFetch(`/api/channels/${channelId}/switch`, { method: "POST" });
+      if (!res.ok) throw new Error("switch failed");
+      const data = await res.json();
+      localStorage.setItem("jwt_token", data.token);
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+      showAlert("오류 발생", "채널 전환 중 오류가 발생했습니다.", "error");
+      isSwitchingRef.current = false;
+      setIsSwitching(false);
+    }
+  };
+
+  const handleConnectAnotherChannel = () => {
+    window.location.href = `${API_BASE_URL}/api/auth/login`;
+  };
+
+  const handleOpenBillingPortal = async () => {
+    if (isOpeningPortal) return;
+    setIsOpeningPortal(true);
+    try {
+      const res = await apiFetch("/api/billing/portal");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showAlert("결제 관리 페이지를 열 수 없습니다", err.detail || "잠시 후 다시 시도해주세요.", "error");
+        return;
+      }
+      const data = await res.json();
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      console.error(e);
+      showAlert("오류 발생", "결제 관리 페이지를 여는 중 오류가 발생했습니다.", "error");
+    } finally {
+      setIsOpeningPortal(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
-      await fetch("http://localhost:8000/api/auth/logout", { method: "POST" });
+      await apiFetch("/api/auth/logout", { method: "POST" });
+      localStorage.removeItem("jwt_token");
       localStorage.removeItem("connectedChannel");
       showAlert(
         "🔑 로그아웃 완료",
@@ -81,6 +155,7 @@ export default function SettingsPage() {
       );
     } catch (e) {
       console.error(e);
+      localStorage.removeItem("jwt_token");
       localStorage.removeItem("connectedChannel");
       window.location.href = "/";
     }
@@ -92,7 +167,8 @@ export default function SettingsPage() {
       "정말로 YouTube 채널 연동을 완전 해제하시겠습니까?\n채널 연동 해제 시 진행 중인 모든 A/B 테스트 순환 및 측정이 즉시 중단됩니다.",
       async () => {
         try {
-          await fetch("http://localhost:8000/api/auth/disconnect-channel", { method: "POST" });
+          await apiFetch("/api/auth/disconnect-channel", { method: "POST" });
+          localStorage.removeItem("jwt_token");
           localStorage.removeItem("connectedChannel");
           showAlert(
             "🔒 채널 연동 해제 완료",
@@ -104,6 +180,7 @@ export default function SettingsPage() {
           );
         } catch (e) {
           console.error(e);
+          localStorage.removeItem("jwt_token");
           localStorage.removeItem("connectedChannel");
           window.location.href = "/";
         }
@@ -114,13 +191,15 @@ export default function SettingsPage() {
 
   const handleSendTestEmail = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/settings/test-email", { method: "POST" });
+      const res = await apiFetch("/api/settings/test-email", { method: "POST" });
       const data = await res.json();
-      showAlert(
-        "📧 이메일 알림 발송 완료",
-        `A/B 테스트 승자 리포트 알림 발송 테스트가 성공적으로 수행되었습니다!\n\n수신 이메일: ${data.target_email}\n(백엔드 서버 로그에 완벽한 HTML 이메일 알림 리포트가 정상 수신 기록되었습니다!)`,
-        "success"
-      );
+      if (data.simulated) {
+        showAlert("📧 시뮬레이션 모드 (실제 미발송)", data.message, "warning");
+      } else if (data.status === "ok") {
+        showAlert("📧 이메일 발송 완료", data.message, "success");
+      } else {
+        showAlert("오류 발생", data.message || "이메일 알림 발송 중 오류가 발생했습니다.", "error");
+      }
     } catch (e) {
       console.error(e);
       showAlert("오류 발생", "이메일 알림 발송 중 오류가 발생했습니다.", "error");
@@ -133,41 +212,117 @@ export default function SettingsPage() {
       <div className="max-w-7xl w-full mx-auto p-8 pb-20">
         <div className="mb-10">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Settings className="text-zinc-400" /> 설정
+            <Settings className="text-zinc-400" aria-hidden="true" /> 설정
           </h1>
-          <p className="text-zinc-500 mt-2">계정 및 알림 환경을 설정합니다.</p>
+          <p className="text-zinc-400 mt-2">계정 및 알림 환경을 설정합니다.</p>
         </div>
 
         <div className="space-y-6">
           {/* Account Settings */}
           <section className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Shield size={18} className="text-cyan-400"/> 계정 정보
+              <Shield size={18} className="text-cyan-400" aria-hidden="true" /> 계정 정보
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-500 mb-1">연동된 구글 이메일</label>
+                <label className="block text-sm text-zinc-400 mb-1">연동된 구글 이메일</label>
                 <input type="text" disabled value={userEmail} className="w-full bg-zinc-900/50 border border-zinc-800 text-cyan-400 font-semibold rounded-lg p-3 text-sm cursor-not-allowed" />
               </div>
               <div className="pt-2">
-                <button 
+                <button
                   onClick={handleLogout}
-                  className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold rounded-xl transition-colors cursor-pointer border border-zinc-700"
+                  className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold rounded-xl transition-colors cursor-pointer border border-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                 >
-                  <LogOut size={16} />
+                  <LogOut size={16} aria-hidden="true" />
                   <span>로그아웃 (세션만 종료)</span>
                 </button>
-                <p className="text-[12px] text-zinc-500 mt-1.5">
+                <p className="text-[12px] text-zinc-400 mt-1.5">
                   ※ 단순 로그아웃 시 진행 중인 백그라운드 A/B 테스트는 멈추지 않고 계속 작동합니다.
                 </p>
               </div>
             </div>
           </section>
 
+          {/* Connected Channels */}
+          <section className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <PlaySquare size={18} className="text-cyan-400" aria-hidden="true" /> 연동된 채널 ({channels.length}/{maxChannels})
+            </h2>
+            <p className="text-xs text-zinc-400 mb-4">한 계정으로 여러 YouTube 채널을 연동하고 전환할 수 있습니다. PRO/AGENCY 요금제는 더 많은 채널을 연동할 수 있습니다.</p>
+            <div className="space-y-2">
+              {channels.map((c) => (
+                <div key={c.id} className={`flex items-center gap-3 p-3 rounded-xl border ${c.is_active ? "bg-cyan-500/5 border-cyan-500/30" : "bg-zinc-900/40 border-zinc-800"}`}>
+                  <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center text-sm font-bold text-zinc-300 flex-shrink-0" aria-hidden="true">
+                    {c.channel_title ? c.channel_title.substring(0, 1).toUpperCase() : "?"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-white truncate">{c.channel_title || "이름 없음"}</div>
+                    {c.needs_reconnect && (
+                      <div className="text-xs text-amber-400 flex items-center gap-1"><AlertTriangle size={11} aria-hidden="true" /> 재연동 필요</div>
+                    )}
+                  </div>
+                  {c.is_active ? (
+                    <span className="text-xs font-bold text-cyan-400 px-2.5 py-1">사용 중</span>
+                  ) : (
+                    <button
+                      onClick={() => handleSwitchChannel(c.id)}
+                      disabled={isSwitching}
+                      className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                    >
+                      전환
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={handleConnectAnotherChannel}
+              disabled={channels.length >= maxChannels}
+              className="mt-3 flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold rounded-xl transition-colors cursor-pointer border border-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              title={channels.length >= maxChannels ? "요금제의 채널 연동 한도에 도달했습니다" : ""}
+            >
+              <Plus size={16} aria-hidden="true" />
+              <span>{channels.length >= maxChannels ? "채널 한도 도달 (업그레이드 필요)" : "다른 채널 연동하기"}</span>
+            </button>
+          </section>
+
+          {/* Billing */}
+          <section className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <CreditCard size={18} className="text-cyan-400" aria-hidden="true" /> 결제 관리
+            </h2>
+            <p className="text-xs text-zinc-400 mb-4">
+              현재 요금제: <span className="font-bold text-zinc-200">{plan}</span>
+              {isPro && " — 구독 취소, 결제수단 변경, 결제 내역/영수증 조회는 Paddle의 결제 관리 페이지에서 처리합니다."}
+            </p>
+            {isPro ? (
+              <button
+                onClick={handleOpenBillingPortal}
+                disabled={isOpeningPortal}
+                className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold rounded-xl transition-colors cursor-pointer border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              >
+                {isOpeningPortal ? (
+                  <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <CreditCard size={16} aria-hidden="true" />
+                )}
+                <span>구독 취소 / 결제 내역 관리 (Paddle)</span>
+              </button>
+            ) : (
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-sm font-semibold rounded-xl transition-colors border border-cyan-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              >
+                <CreditCard size={16} aria-hidden="true" />
+                <span>PRO로 업그레이드</span>
+              </Link>
+            )}
+          </section>
+
           {/* Notification Settings */}
           <section className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Bell size={18} className="text-violet-400"/> 알림 설정
+              <Bell size={18} className="text-violet-400" aria-hidden="true" /> 알림 설정
             </h2>
             <div className="flex items-center justify-between py-2 border-b border-zinc-800/50 pb-4">
               <div>
@@ -177,7 +332,7 @@ export default function SettingsPage() {
                     🟢 실시간 작동 중
                   </span>
                 </div>
-                <div className="text-sm text-zinc-500 mt-1">테스트가 완료되고 승리 변인이 결정되면 연동된 이메일({userEmail})로 리포트를 자동 전송합니다.</div>
+                <div className="text-sm text-zinc-400 mt-1">테스트가 완료되고 승리 변인이 결정되면 연동된 이메일({userEmail})로 리포트를 자동 전송합니다.</div>
               </div>
               <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4" htmlFor="email-alert-toggle">
                 <span className="sr-only">A/B 테스트 종료 이메일 알림 토글</span>
@@ -199,24 +354,24 @@ export default function SettingsPage() {
               <span className="text-xs text-zinc-400">이메일 알림 템플릿 및 발송 기능 동작 확인:</span>
               <button
                 onClick={handleSendTestEmail}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/40 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/40 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
               >
-                <Mail size={14} />
+                <Mail size={14} aria-hidden="true" />
                 <span>🧪 테스트 이메일 발송해보기</span>
               </button>
             </div>
           </section>
-          
+
           {/* Danger Zone */}
           <section className="glass-panel p-6 rounded-2xl border border-red-900/30">
             <h2 className="text-lg font-bold mb-1 text-red-500">위험 구역</h2>
-            <p className="text-xs text-zinc-500 mb-4">YouTube 채널 인증을 완전 해제하고 진행 중인 모든 자동 테스트를 중단합니다.</p>
-            <button 
+            <p className="text-xs text-zinc-400 mb-4">현재 사용 중인 채널({userEmail})의 YouTube 인증을 완전 해제하고 진행 중인 모든 자동 테스트를 중단합니다. 다른 연동 채널에는 영향이 없습니다.</p>
+            <button
               onClick={handleDisconnectChannel}
-              className="flex items-center gap-2 text-red-400 hover:text-red-300 bg-red-950/30 hover:bg-red-900/40 px-4 py-2.5 rounded-xl transition-colors cursor-pointer border border-red-500/30 font-semibold text-sm"
+              className="flex items-center gap-2 text-red-400 hover:text-red-300 bg-red-950/30 hover:bg-red-900/40 px-4 py-2.5 rounded-xl transition-colors cursor-pointer border border-red-500/30 font-semibold text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
             >
-              <LogOut size={16} />
-              <span>YouTube 채널 연동 해제 (테스트 전면 중단)</span>
+              <LogOut size={16} aria-hidden="true" />
+              <span>현재 채널 연동 해제 (테스트 전면 중단)</span>
             </button>
           </section>
         </div>
