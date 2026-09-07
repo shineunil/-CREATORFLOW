@@ -13,7 +13,9 @@ SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./youtube_ab_test
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
     engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 else:
-    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+    # Neon 등 서버리스 Postgres는 유휴 커넥션을 서버 쪽에서 먼저 끊는 경우가 있어,
+    # pool_pre_ping으로 사용 전 헬스체크 후 죽은 커넥션이면 투명하게 재연결한다.
+    engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

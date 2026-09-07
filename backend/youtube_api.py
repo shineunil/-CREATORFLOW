@@ -2,6 +2,7 @@ import os
 import logging
 import asyncio
 from google.oauth2.credentials import Credentials
+from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
@@ -10,6 +11,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+class TokenRevokedError(Exception):
+    """저장된 refresh_token이 만료되었거나 유저가 연동을 철회해 더 이상 사용할 수 없을 때 발생합니다."""
+    pass
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
@@ -28,6 +34,17 @@ def get_youtube_client(refresh_token: str):
     # 이미 모든 호출이 asyncio.to_thread로 감싸져 있어 메인 루프 데드락은 발생하지 않습니다.
     return build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, credentials=credentials)
 
+def get_youtube_analytics_client(refresh_token: str):
+    """YouTube Analytics API(v2) 클라이언트 - yt-analytics.readonly 스코프 필요."""
+    credentials = Credentials(
+        token=None,
+        refresh_token=refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET
+    )
+    return build('youtubeAnalytics', 'v2', credentials=credentials)
+
 async def get_video_views(youtube_video_id: str, refresh_token: str) -> int:
     try:
         youtube = get_youtube_client(refresh_token)
@@ -41,7 +58,9 @@ async def get_video_views(youtube_video_id: str, refresh_token: str) -> int:
             
         view_count = int(response['items'][0]['statistics'].get('viewCount', 0))
         return view_count
-        
+
+    except RefreshError as e:
+        raise TokenRevokedError(str(e))
     except Exception as e:
         logger.error(f"YouTube API Error (get_video_views): {e}")
         return 0
@@ -58,7 +77,9 @@ async def update_youtube_thumbnail(youtube_video_id: str, image_file_path: str, 
         
         logger.info(f"Thumbnail updated: {response['items'][0].get('default', {}).get('url')}")
         return True
-        
+
+    except RefreshError as e:
+        raise TokenRevokedError(str(e))
     except Exception as e:
         logger.error(f"YouTube API Error (update_youtube_thumbnail): {e}")
         return False
@@ -91,7 +112,9 @@ async def update_youtube_title(youtube_video_id: str, new_title: str, refresh_to
         
         logger.info(f"Title updated: {new_title}")
         return True
-        
+
+    except RefreshError as e:
+        raise TokenRevokedError(str(e))
     except Exception as e:
         logger.error(f"YouTube API Error (update_youtube_title): {e}")
         return False
@@ -124,7 +147,43 @@ async def get_recent_videos(refresh_token: str, max_results: int = 15) -> list:
             })
             
         return videos
-        
+
+    except RefreshError as e:
+        raise TokenRevokedError(str(e))
     except Exception as e:
         logger.error(f"YouTube API Error (get_recent_videos): {e}")
+        return []
+
+async def get_daily_video_analytics(youtube_video_id: str, refresh_token: str, start_date: str, end_date: str) -> list:
+    """
+    지정 기간(start_date~end_date, "YYYY-MM-DD") 동안의 영상별 일 단위 impressions/CTR을 가져옵니다.
+    YouTube Analytics API는 실측 데이터가 채워지기까지 최대 하루 정도 지연될 수 있어,
+    최근 1~2일치는 비어있거나 0으로 나올 수 있습니다. (변인 단위가 아닌 영상 전체 단위 지표)
+    """
+    try:
+        client = get_youtube_analytics_client(refresh_token)
+        request = client.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            metrics="impressions,impressionsClickThroughRate",
+            dimensions="day",
+            filters=f"video=={youtube_video_id}"
+        )
+        response = await asyncio.to_thread(request.execute)
+
+        results = []
+        for row in response.get("rows", []):
+            # columnHeaders 순서: day, impressions, impressionsClickThroughRate
+            results.append({
+                "date": row[0],
+                "impressions": int(row[1]),
+                "impressions_ctr": float(row[2]),
+            })
+        return results
+
+    except RefreshError as e:
+        raise TokenRevokedError(str(e))
+    except Exception as e:
+        logger.error(f"YouTube Analytics API Error (get_daily_video_analytics): {e}")
         return []
