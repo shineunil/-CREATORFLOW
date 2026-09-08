@@ -64,19 +64,21 @@ export default function Dashboard() {
     onConfirm: () => {},
   });
 
-  const showAlert = (title: string, message: string, variant: "info" | "success" | "warning" | "error" = "info") => {
+  const showAlert = (title: string, message: string, variant: "info" | "success" | "warning" | "error" = "info", confirmText?: string) => {
     setModalConfig({
       isOpen: true,
       type: "alert",
       variant,
       title,
       message,
+      ...(confirmText ? { confirmText } : {}),
       onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
     });
   };
 
   useEffect(() => {
     const errorFromUrl = searchParams.get("error");
+    const upgradedFromUrl = searchParams.get("upgraded");
 
     if (errorFromUrl === "channel_limit_reached") {
       showAlert(
@@ -93,10 +95,32 @@ export default function Dashboard() {
     // Next의 useSearchParams는 갱신되지 않아 이 페이지가 그 뒤에도 계속 예전 값을 보고 재실행됨),
     // connectedChannel 상태값도 실제로는 화면 어디에도 쓰이지 않아 제거했다.
 
-    apiFetch("/api/user/me")
-      .then(res => res.json())
-      .then(data => setUserProfile(data))
-      .catch(err => console.error(err));
+    if (upgradedFromUrl === "true") {
+      // 결제 웹훅이 비동기로 처리되어서, 결제 직후 바로 조회하면 아직 PRO로 안 바뀐 상태일 수
+      // 있다. 몇 초 간격으로 최대 5번 재시도해서, 웹훅이 늦게 처리돼도 화면이 정확히 반영되게 한다.
+      router.replace("/dashboard");
+      let attempts = 0;
+      const pollForPro = () => {
+        apiFetch("/api/user/me")
+          .then(res => res.json())
+          .then(data => {
+            setUserProfile(data);
+            attempts += 1;
+            if (data.is_pro) {
+              showAlert("Welcome to PRO!", "Your account has been upgraded to PRO. Enjoy unlimited active tests and faster swap intervals.", "success", "OK");
+            } else if (attempts < 5) {
+              setTimeout(pollForPro, 2000);
+            }
+          })
+          .catch(err => console.error(err));
+      };
+      pollForPro();
+    } else {
+      apiFetch("/api/user/me")
+        .then(res => res.json())
+        .then(data => setUserProfile(data))
+        .catch(err => console.error(err));
+    }
 
     apiFetch("/api/tests")
       .then(res => res.json())

@@ -27,20 +27,16 @@ export default function PricingPage() {
   }, [isCheckoutModalOpen]);
 
   useEffect(() => {
-    initializePaddle({ 
-      environment: PADDLE_CONFIG.environment, 
+    initializePaddle({
+      environment: PADDLE_CONFIG.environment,
       token: PADDLE_CONFIG.clientToken,
       eventCallback: async function(data) {
         if (data.name === "checkout.completed") {
+          // Paddle이 결제 성공 시 settings.successUrl로 즉시 이동시켜주므로(아래 handlePaddleCheckout),
+          // 대부분 이 콜백이 실행되기 전에 페이지가 이미 이동한다. successUrl 이동이 지연되는 극히
+          // 드문 경우를 대비한 보험용 폴백일 뿐이라 별도 모달 없이 조용히 이동만 시킨다.
           setIsCheckoutModalOpen(false);
-          showAlert(
-            "🚀 PRO Plan Upgraded!",
-            "Payment successful! Welcome to CreatorFlow PRO.\nYour account will be upgraded shortly.",
-            "success",
-            () => {
-              window.location.href = "/dashboard";
-            }
-          );
+          window.location.href = "/dashboard?upgraded=true";
         }
       }
     }).then(
@@ -119,6 +115,11 @@ export default function PricingPage() {
           quantity: 1
         }
       ],
+      // Paddle의 자체 결제 완료 화면(브라우저 언어에 따라 한국어로 뜸)을 건너뛰고, 결제 성공 즉시
+      // 우리 대시보드로 바로 이동시킨다.
+      settings: {
+        successUrl: `${window.location.origin}/dashboard?upgraded=true`,
+      },
       ...(userProfile.email ? {
         customer: { email: userProfile.email },
         customData: { email: userProfile.email }
