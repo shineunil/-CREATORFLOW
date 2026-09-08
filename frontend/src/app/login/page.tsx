@@ -1,11 +1,23 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import Link from "next/link";
-import { FlaskConical, PlaySquare, ArrowLeft } from "lucide-react";
+import { FlaskConical, PlaySquare, ArrowLeft, AlertTriangle } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { API_BASE_URL } from "@/lib/config";
 
-export default function LoginPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  youtube_permission_denied:
+    "구글 로그인 동의 화면에서 YouTube 관련 권한이 빠진 것 같아요. 다시 로그인하시면서 모든 권한을 허용해주세요.",
+  no_youtube_channel:
+    "이 구글 계정에 연결된 YouTube 채널을 찾지 못했어요. 채널이 있는 계정으로 다시 시도해주세요.",
+};
+
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const errorCode = searchParams.get("error");
+  const errorMessage = errorCode ? ERROR_MESSAGES[errorCode] : null;
+
   const handleGoogleLogin = () => {
     window.location.href = `${API_BASE_URL}/api/auth/login`;
   };
@@ -33,6 +45,13 @@ export default function LoginPage() {
             Sign in and connect your YouTube channel to start optimizing your thumbnails.
           </p>
         </div>
+
+        {errorMessage && (
+          <div role="alert" className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 text-amber-200 text-sm">
+            <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
         {/* Login Card */}
         <div className="glass-panel p-8 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 backdrop-blur-xl shadow-2xl">
@@ -70,5 +89,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#09090b]" />}>
+      <LoginContent />
+    </Suspense>
   );
 }

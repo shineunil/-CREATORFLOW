@@ -22,3 +22,6 @@ frontend/.vercel/
 .DS_Store
 Thumbs.db
 *.pem
+
+.vercel
+.env*

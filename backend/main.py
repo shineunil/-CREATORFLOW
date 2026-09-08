@@ -217,32 +217,52 @@ async def google_auth_callback(code: str, db: Session = Depends(get_db)):
         
         headers = {"Authorization": f"Bearer {access_token}"}
         
-        # 2. 이메일 정보 가져오기
+        # 2. 사용자 정보 가져오기
         userinfo_res = await client.get("https://www.googleapis.com/oauth2/v2/userinfo", headers=headers)
         if userinfo_res.status_code != 200:
             logger.error(f"Userinfo error: {userinfo_res.text}")
             raise HTTPException(status_code=400, detail="구글 사용자 정보 조회 실패")
-        email = userinfo_res.json().get("email")
+        userinfo_json = userinfo_res.json()
+        # 🔒 유저 식별은 반드시 이 "id"(OIDC sub와 동일, 계정당 고유·불변) 기준으로 해야 한다.
+        # email은 브랜드 계정(유튜브 채널) 컨텍스트로 로그인하면 실제 이메일 대신
+        # "...@pages.plusgoogle.com" 같은 그 채널 전용 가짜 이메일을 돌려주는 경우가 있어서,
+        # email로 유저를 찾으면 같은 사람인데도 채널 연동할 때마다 별개 계정이 새로 생겨버린다.
+        google_user_id = userinfo_json.get("id")
+        email = userinfo_json.get("email")
+        if not google_user_id:
+            logger.error("구글 userinfo 응답에 id(sub)가 없습니다.")
+            raise HTTPException(status_code=400, detail="구글 계정 정보를 가져오지 못했습니다.")
         if not email:
             # User.email은 nullable=False라서, None인 채로 User를 만들면 여기서 잡지 않으면
             # DB commit 시점에 처리되지 않은 IntegrityError로 500이 난다.
             logger.error("구글 userinfo 응답에 email이 없습니다.")
             raise HTTPException(status_code=400, detail="구글 계정에서 이메일 정보를 가져오지 못했습니다.")
-        
+
         # 3. 유튜브 채널 정보 가져오기
         yt_res = await client.get("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", headers=headers)
+        if yt_res.status_code == 403:
+            # 스코프 동의 화면에서 YouTube 권한이 빠지면(브랜드 계정 로그인 시 간소화된 동의 화면이
+            # 뜨는 경우 등) 여기서 403이 난다. "채널이 없다"는 것과는 다른 원인이라 별도 에러로 구분한다.
+            logger.error(f"YouTube API 403: {yt_res.text}")
+            return RedirectResponse(f"{FRONTEND_URL}/login?error=youtube_permission_denied")
         yt_data = yt_res.json()
-        
+
         if not yt_data.get("items"):
             return RedirectResponse(f"{FRONTEND_URL}/?error=no_youtube_channel")
-            
+
         channel_id = yt_data["items"][0]["id"]
         channel_title = yt_data["items"][0]["snippet"]["title"]
-        
+
     # 4. DB 저장 로직 (유저 및 채널)
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(User.google_user_id == google_user_id).first()
     if not user:
-        user = User(email=email)
+        # 레거시 브릿지: google_user_id 도입 이전에 이메일만으로 저장된 유저가 있으면 그쪽에 채워
+        # 넣는다 (단, 이번 로그인의 email이 진짜 자기 이메일일 때만 유효한 매칭이므로 그대로 사용).
+        user = db.query(User).filter(User.email == email).first()
+        if user and not user.google_user_id:
+            user.google_user_id = google_user_id
+    if not user:
+        user = User(google_user_id=google_user_id, email=email)
         db.add(user)
         db.commit()
         db.refresh(user)

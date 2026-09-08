@@ -23,6 +23,11 @@ class User(Base):
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True, index=True)
+    # 구글 계정의 고유하고 절대 안 변하는 ID(OAuth userinfo의 "id"/OIDC의 "sub"). 유저 식별은
+    # 반드시 이걸 기준으로 해야 한다 - email은 브랜드 계정(유튜브 채널) 컨텍스트로 로그인하면
+    # 실제 이메일 대신 "...@pages.plusgoogle.com" 같은 그 채널 고유의 가짜 이메일을 돌려주는
+    # 경우가 있어서, email로 유저를 찾으면 같은 사람인데도 매번 새 계정이 생겨버린다.
+    google_user_id = Column(String, unique=True, index=True, nullable=True)
     email = Column(String, unique=True, index=True, nullable=False)
     plan = Column(Enum(PlanType), default=PlanType.BASIC)
     created_at = Column(DateTime, default=datetime.utcnow)
