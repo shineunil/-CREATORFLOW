@@ -106,7 +106,12 @@ export default function TopHeader({ showLogo = false }: { showLogo?: boolean }) 
   };
 
   const handleConnectAnother = () => {
-    window.location.href = `${API_BASE_URL}/api/auth/login`;
+    // 지금 로그인된 유저의 JWT를 state로 실어 보내야, 콜백에서 새 채널을
+    // (구글 로그인이 다른 계정/브랜드 계정으로 이뤄지더라도) 지금 이 유저 소유로 붙일 수 있다.
+    // 안 실어 보내면 완전히 새로운 유저가 생겨서 기존 계정이 사라진 것처럼 보이는 버그가 생긴다.
+    const currentToken = localStorage.getItem("jwt_token");
+    const stateParam = currentToken ? `?state=${encodeURIComponent(currentToken)}` : "";
+    window.location.href = `${API_BASE_URL}/api/auth/login${stateParam}`;
   };
 
   if (!isMounted) return <header className="shrink-0 h-20 border-b border-zinc-800/50 bg-[#09090b]/80 backdrop-blur-md fixed top-0 left-0 right-0 z-40"></header>;

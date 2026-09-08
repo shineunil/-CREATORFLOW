@@ -173,8 +173,13 @@ def get_system_status(db: Session = Depends(get_db)):
 
 # --- Google OAuth 로직 ---
 @app.get("/api/auth/login")
-def login_via_google():
-    """구글 로그인 페이지로 리다이렉트합니다."""
+def login_via_google(state: str | None = None):
+    """
+    구글 로그인 페이지로 리다이렉트합니다.
+    이미 로그인된 상태에서 "채널 추가"로 들어온 경우, 프론트가 현재 JWT를 state로 실어 보낸다.
+    구글은 이 state 값을 그대로 콜백에 돌려주므로, 콜백에서 그걸로 "새로 로그인하는 구글
+    계정과 무관하게 지금 로그인된 유저 소유로 채널을 붙여야 한다"는 걸 알 수 있다.
+    """
     scope = "openid email profile https://www.googleapis.com/auth/youtube.force-ssl https://www.googleapis.com/auth/yt-analytics.readonly"
     auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
@@ -185,11 +190,23 @@ def login_via_google():
         f"access_type=offline&"
         f"prompt=consent"
     )
+    if state:
+        auth_url += f"&state={urllib.parse.quote(state)}"
     return RedirectResponse(auth_url)
 
 @app.get("/api/auth/callback")
-async def google_auth_callback(code: str, db: Session = Depends(get_db)):
+async def google_auth_callback(code: str, state: str | None = None, db: Session = Depends(get_db)):
     """구글 로그인 성공 시 되돌아오는 콜백 엔드포인트"""
+
+    # "채널 추가" 흐름이면 state에 기존 로그인 유저의 JWT가 실려있다. 유효하면 이 흐름 전체에서
+    # 그 유저를 채널 소유자로 쓴다 (아래 4번 DB 저장 로직에서 google_user_id 기준 조회/생성을 건너뜀).
+    linking_user_id: int | None = None
+    if state:
+        try:
+            state_payload = jwt.decode(state, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            linking_user_id = int(state_payload["sub"])
+        except (jwt.PyJWTError, KeyError, ValueError):
+            logger.warning("채널 추가 시 전달된 state 토큰이 유효하지 않습니다. 신규 로그인으로 처리합니다.")
     
     # 1. code를 이용해 access_token과 refresh_token 발급
     token_url = "https://oauth2.googleapis.com/token"
@@ -254,18 +271,21 @@ async def google_auth_callback(code: str, db: Session = Depends(get_db)):
         channel_title = yt_data["items"][0]["snippet"]["title"]
 
     # 4. DB 저장 로직 (유저 및 채널)
-    user = db.query(User).filter(User.google_user_id == google_user_id).first()
+    user = db.query(User).filter(User.id == linking_user_id).first() if linking_user_id else None
     if not user:
-        # 레거시 브릿지: google_user_id 도입 이전에 이메일만으로 저장된 유저가 있으면 그쪽에 채워
-        # 넣는다 (단, 이번 로그인의 email이 진짜 자기 이메일일 때만 유효한 매칭이므로 그대로 사용).
-        user = db.query(User).filter(User.email == email).first()
-        if user and not user.google_user_id:
-            user.google_user_id = google_user_id
-    if not user:
-        user = User(google_user_id=google_user_id, email=email)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        # "채널 추가"로 들어온 게 아니거나 state가 무효했던 경우의 일반 로그인 흐름.
+        user = db.query(User).filter(User.google_user_id == google_user_id).first()
+        if not user:
+            # 레거시 브릿지: google_user_id 도입 이전에 이메일만으로 저장된 유저가 있으면 그쪽에
+            # 채워 넣는다 (단, 이번 로그인의 email이 진짜 자기 이메일일 때만 유효한 매칭이므로 그대로 사용).
+            user = db.query(User).filter(User.email == email).first()
+            if user and not user.google_user_id:
+                user.google_user_id = google_user_id
+        if not user:
+            user = User(google_user_id=google_user_id, email=email)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
 
     channel = db.query(Channel).filter(Channel.youtube_channel_id == channel_id).first()
     if not channel:
