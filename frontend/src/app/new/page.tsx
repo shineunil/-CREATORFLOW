@@ -4,8 +4,10 @@ import React, { useState, useRef, Suspense } from "react";
 import { ArrowLeft, UploadCloud, Upload, Plus, Play, CheckCircle2, Sparkles, Trash2, LayoutDashboard, RefreshCcw, Wand2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 import { useRouter, useSearchParams } from "next/navigation";
 import Modal from "@/components/Modal";
+import ChannelSelect from "@/components/layout/ChannelSelect";
 
 function NewTestContent() {
   const router = useRouter();
@@ -100,6 +102,38 @@ function NewTestContent() {
       })
       .catch(err => console.error("Failed to fetch video list:", err));
   }, [videoIdFromUrl]);
+
+  // 좌측 상단 select box(또는 우측 상단 헤더)에서 다른 채널로 전환하면, 그 채널 기준
+  // 영상/테스트 목록으로 다시 불러온다. 지금 고르던 영상은 다른 채널 것일 수 있으니 1단계로 되돌린다.
+  React.useEffect(() => {
+    const handleChannelSwitched = () => {
+      setStep(1);
+      setSelectedVideo(null);
+
+      apiFetch("/api/user/me")
+        .then(res => res.json())
+        .then(data => setUserProfile(data))
+        .catch(err => console.error("Failed to fetch profile:", err));
+
+      apiFetch("/api/tests")
+        .then(res => res.json())
+        .then(data => {
+          const activeIds = new Set<string>();
+          (data.tests || []).forEach((t: any) => {
+            if (t.status === "RUNNING") activeIds.add(t.video_id);
+          });
+          setActiveTestVideoIds(activeIds);
+        })
+        .catch(err => console.error("Failed to fetch active tests:", err));
+
+      apiFetch("/api/videos")
+        .then(res => res.json())
+        .then(data => setVideos(data.videos || []))
+        .catch(err => console.error("Failed to fetch video list:", err));
+    };
+    window.addEventListener(CHANNEL_SWITCHED_EVENT, handleChannelSwitched);
+    return () => window.removeEventListener(CHANNEL_SWITCHED_EVENT, handleChannelSwitched);
+  }, []);
 
   const handleTitleChange = (id: string, newTitle: string) => {
     setVariations(prev => prev.map(v => v.id === id ? { ...v, title_text: newTitle } : v));
@@ -328,6 +362,9 @@ function NewTestContent() {
 
   return (
     <div className="w-full p-8 animate-fade-in-up">
+      <div className="mb-4">
+        <ChannelSelect />
+      </div>
       <Link href="/" className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors mb-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
         <ArrowLeft size={20} aria-hidden="true" />
         <span className="font-semibold">Back to Dashboard</span>

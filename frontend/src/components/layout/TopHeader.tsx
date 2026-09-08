@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/config";
+import { switchChannel, CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 
 type ChannelSummary = {
   id: number;
@@ -58,6 +59,14 @@ export default function TopHeader({ showLogo = false }: { showLogo?: boolean }) 
     loadAccountInfo();
   }, []);
 
+  // 채널 전환은 이 컴포넌트의 드롭다운뿐 아니라 각 페이지의 좌측 상단 select box에서도 일어날 수
+  // 있으므로, 전환 이벤트를 구독해서 헤더에 표시되는 계정 정보(이름/PRO 여부/채널 목록)를 갱신한다.
+  useEffect(() => {
+    const handleChannelSwitched = () => loadAccountInfo();
+    window.addEventListener(CHANNEL_SWITCHED_EVENT, handleChannelSwitched);
+    return () => window.removeEventListener(CHANNEL_SWITCHED_EVENT, handleChannelSwitched);
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -91,18 +100,12 @@ export default function TopHeader({ showLogo = false }: { showLogo?: boolean }) 
     if (isSwitchingRef.current) return;
     isSwitchingRef.current = true;
     setIsSwitching(true);
-    try {
-      const res = await apiFetch(`/api/channels/${channelId}/switch`, { method: "POST" });
-      if (!res.ok) throw new Error("switch failed");
-      const data = await res.json();
-      localStorage.setItem("jwt_token", data.token);
-      // 여러 페이지가 각자 /api/user/me, /api/tests 등을 독립적으로 불러오므로,
-      // 상태를 일일이 무효화하는 대신 새로고침으로 전체를 새 채널 기준으로 다시 불러온다.
-      window.location.reload();
-    } catch {
-      isSwitchingRef.current = false;
-      setIsSwitching(false);
-    }
+    const ok = await switchChannel(channelId);
+    // 성공/실패 관계없이 여기서 끝난다 - 성공 시 CHANNEL_SWITCHED_EVENT를 구독 중인 이 컴포넌트와
+    // 각 페이지가 알아서 최신 데이터를 다시 불러온다 (더 이상 페이지 새로고침 없음).
+    if (ok) setIsMenuOpen(false);
+    isSwitchingRef.current = false;
+    setIsSwitching(false);
   };
 
   const handleConnectAnother = () => {

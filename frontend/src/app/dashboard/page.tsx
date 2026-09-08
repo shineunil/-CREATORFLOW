@@ -19,7 +19,9 @@ import {
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
+import ChannelSelect from "@/components/layout/ChannelSelect";
 import { apiFetch } from "@/lib/api";
+import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 
 const formatTestDuration = (startIso: string | null | undefined, endIso: string | null | undefined, status: string) => {
   if (!startIso) return "Not started";
@@ -134,6 +136,31 @@ export default function Dashboard() {
       });
   }, [searchParams, router]);
 
+  // 좌측 상단 select box(또는 우측 상단 헤더)에서 다른 채널로 전환하면, 새로고침 없이 그
+  // 채널 기준 데이터로 다시 불러온다.
+  useEffect(() => {
+    const handleChannelSwitched = () => {
+      setIsLoading(true);
+      apiFetch("/api/user/me")
+        .then(res => res.json())
+        .then(data => setUserProfile(data))
+        .catch(err => console.error(err));
+
+      apiFetch("/api/tests")
+        .then(res => res.json())
+        .then(data => {
+          setTestData(data.tests || []);
+          setIsLoading(false);
+        })
+        .catch(err => {
+          console.error(err);
+          setIsLoading(false);
+        });
+    };
+    window.addEventListener(CHANNEL_SWITCHED_EVENT, handleChannelSwitched);
+    return () => window.removeEventListener(CHANNEL_SWITCHED_EVENT, handleChannelSwitched);
+  }, []);
+
   const handleDeleteTest = (testId: string) => {
     setModalConfig({
       isOpen: true,
@@ -223,6 +250,9 @@ export default function Dashboard() {
   return (
     <>
       <div className="px-8 pt-8 pb-4">
+        <div className="mb-4">
+          <ChannelSelect />
+        </div>
         <div>
           <h1 className="text-3xl font-black text-white tracking-tight">Optimization Dashboard</h1>
           <p className="text-sm text-zinc-400 mt-2">
