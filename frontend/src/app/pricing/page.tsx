@@ -109,13 +109,20 @@ export default function PricingPage() {
     }
     
     setIsCheckoutModalOpen(false);
+    // customer.email과 customData.email 둘 다 명시적으로 실어 보낸다: 백엔드 웹훅(webhook.py)이
+    // "이 결제가 누구 것인지" 이 이메일로 유저를 찾아서 PRO로 업그레이드하는데, 이걸 안 보내면
+    // Paddle 쪽 체크아웃 폼에서 입력한 값에만 의존하게 되어 업그레이드가 조용히 실패할 수 있다.
     const checkoutOptions: any = {
       items: [
         {
           priceId: PADDLE_CONFIG.proPriceId,
           quantity: 1
         }
-      ]
+      ],
+      ...(userProfile.email ? {
+        customer: { email: userProfile.email },
+        customData: { email: userProfile.email }
+      } : {})
     };
 
     try {
