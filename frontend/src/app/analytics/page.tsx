@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, CartesianGrid, Tooltip as RechartsTooltip, LineChart, Line } from "recharts";
 import { apiFetch } from "@/lib/api";
+import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
+import ChannelSelect from "@/components/layout/ChannelSelect";
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<{ total_tests: number, active_tests: number, total_views_gained: number, trend: any[] }>({
@@ -12,7 +14,7 @@ export default function AnalyticsPage() {
     trend: []
   });
 
-  useEffect(() => {
+  const loadAnalytics = () => {
     apiFetch("/api/analytics")
       .then(res => {
         if (!res.ok) throw new Error(`Failed to load analytics (${res.status})`);
@@ -20,10 +22,22 @@ export default function AnalyticsPage() {
       })
       .then(d => setData(d))
       .catch(console.error);
+  };
+
+  useEffect(() => {
+    loadAnalytics();
+
+    // 좌측 상단 select box(또는 우측 상단 헤더)에서 다른 채널로 전환하면, 그 채널 기준
+    // 통계로 새로고침 없이 다시 불러온다.
+    window.addEventListener(CHANNEL_SWITCHED_EVENT, loadAnalytics);
+    return () => window.removeEventListener(CHANNEL_SWITCHED_EVENT, loadAnalytics);
   }, []);
 
   return (
     <div className="w-full p-8 animate-fade-in-up">
+      <div className="mb-4">
+        <ChannelSelect />
+      </div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Channel Analytics Overview</h1>
         <p className="text-zinc-400">Statistics of data optimized by CREATORFLOW.</p>
