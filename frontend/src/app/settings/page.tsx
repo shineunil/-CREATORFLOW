@@ -279,9 +279,10 @@ export default function SettingsPage() {
                       onClick={() => handleDisconnectChannel(c.id, c.channel_title)}
                       title="이 채널 연동 해제"
                       aria-label={`${c.channel_title || "이 채널"} 연동 해제`}
-                      className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                      className="flex items-center gap-1.5 text-xs font-bold text-red-400/80 hover:text-red-300 bg-red-950/20 hover:bg-red-950/40 border border-red-500/20 hover:border-red-500/40 px-3 py-1.5 rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                     >
-                      <LogOut size={15} aria-hidden="true" />
+                      <LogOut size={14} aria-hidden="true" />
+                      해제
                     </button>
                   )}
                 </div>

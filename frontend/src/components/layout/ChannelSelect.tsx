@@ -7,6 +7,7 @@ import { switchChannel, CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 type ChannelSummary = {
   id: number;
   channel_title: string;
+  is_connected: boolean;
   is_active: boolean;
 };
 
@@ -64,7 +65,7 @@ export default function ChannelSelect() {
       >
         {channels.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.channel_title || "이름 없음"}
+            {c.channel_title || "이름 없음"}{!c.is_connected ? " (연동 해제됨)" : ""}
           </option>
         ))}
       </select>

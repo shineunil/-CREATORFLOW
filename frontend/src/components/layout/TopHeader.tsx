@@ -13,6 +13,7 @@ type ChannelSummary = {
   channel_title: string;
   youtube_channel_id: string;
   needs_reconnect: boolean;
+  is_connected: boolean;
   is_active: boolean;
 };
 
@@ -185,9 +186,11 @@ export default function TopHeader({ showLogo = false }: { showLogo?: boolean }) 
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold text-white truncate">{c.channel_title || "이름 없음"}</div>
-                          {c.needs_reconnect && (
+                          {!c.is_connected ? (
+                            <div className="text-xs text-zinc-500">연동 해제됨</div>
+                          ) : c.needs_reconnect ? (
                             <div className="text-xs text-amber-400 flex items-center gap-1"><AlertTriangle size={11} aria-hidden="true" /> 재연동 필요</div>
-                          )}
+                          ) : null}
                         </div>
                         {c.is_active && <span className="text-xs font-bold text-cyan-400">사용 중</span>}
                       </button>
