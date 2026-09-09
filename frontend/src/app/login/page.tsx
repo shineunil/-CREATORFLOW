@@ -2,7 +2,7 @@
 
 import React, { Suspense } from "react";
 import Link from "next/link";
-import { FlaskConical, PlaySquare, ArrowLeft, AlertTriangle } from "lucide-react";
+import { FlaskConical, ArrowLeft, AlertTriangle } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { API_BASE_URL } from "@/lib/config";
 
@@ -67,20 +67,6 @@ function LoginContent() {
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
             Continue with Google
-          </button>
-
-          <div className="mt-6 flex items-center justify-between text-xs text-zinc-400" role="separator" aria-orientation="horizontal">
-            <div className="flex-1 h-px bg-zinc-800" aria-hidden="true" />
-            <span className="px-4">OR</span>
-            <div className="flex-1 h-px bg-zinc-800" aria-hidden="true" />
-          </div>
-
-          <button
-            onClick={handleGoogleLogin}
-            className="w-full mt-6 flex items-center justify-center gap-3 px-6 py-4 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
-          >
-            <PlaySquare size={20} className="text-red-500" aria-hidden="true" />
-            Connect YouTube Directly
           </button>
 
           <p className="mt-8 text-center text-xs text-zinc-400 leading-relaxed">
