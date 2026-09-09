@@ -804,7 +804,7 @@ from sqlalchemy import func
 def get_analytics(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """채널의 전체 통계 데이터를 반환합니다."""
     if not channel:
-        return {"total_tests": 0, "total_views_gained": 0, "active_tests": 0}
+        return {"total_tests": 0, "total_views_gained": 0, "active_tests": 0, "trend": [], "best_variation": None}
         
     tests = db.query(ABTest).join(Video).filter(Video.channel_id == channel.id).all()
     total_tests = len(tests)
@@ -821,10 +821,55 @@ def get_analytics(db: Session = Depends(get_db), channel: Channel = Depends(get_
     )
     total_views_gained = total_views_query or 0
 
+    # 일별 누적 추가 조회수 추이 (Analytics 페이지 트렌드 차트용). SQLite/Postgres 양쪽에서
+    # 동일하게 동작하도록 DB 윈도우 함수 대신 Python에서 날짜별로 합산 후 누적합을 계산한다.
+    logs = (
+        db.query(MetricLog.measured_at, MetricLog.views_gained)
+        .join(Variation)
+        .join(ABTest, Variation.ab_test_id == ABTest.id)
+        .join(Video, ABTest.video_id == Video.id)
+        .filter(Video.channel_id == channel.id)
+        .all()
+    )
+    daily_totals: dict = {}
+    for measured_at, views_gained in logs:
+        day = measured_at.date()
+        daily_totals[day] = daily_totals.get(day, 0) + (views_gained or 0)
+
+    trend = []
+    cumulative = 0
+    for day in sorted(daily_totals.keys()):
+        cumulative += daily_totals[day]
+        trend.append({"day": day.strftime("%m-%d"), "views_gained": cumulative})
+
+    # 지금까지 가장 성과 좋았던 썸네일 후보 (전체 채널 기준, variation 단위 누적 조회수 최고)
+    best = (
+        db.query(Variation, func.sum(MetricLog.views_gained).label("total_views"))
+        .join(MetricLog, MetricLog.variation_id == Variation.id)
+        .join(ABTest, Variation.ab_test_id == ABTest.id)
+        .join(Video, ABTest.video_id == Video.id)
+        .filter(Video.channel_id == channel.id)
+        .group_by(Variation.id)
+        .order_by(func.sum(MetricLog.views_gained).desc())
+        .first()
+    )
+    best_variation = None
+    if best:
+        var, total_views = best
+        best_variation = {
+            "name": var.name,
+            "title_text": var.title_text,
+            "thumbnail_image_url": var.thumbnail_image_url,
+            "total_views_gained": int(total_views or 0),
+            "youtube_video_id": var.ab_test.video.youtube_video_id,
+        }
+
     return {
         "total_tests": total_tests,
         "active_tests": active_tests,
-        "total_views_gained": total_views_gained
+        "total_views_gained": total_views_gained,
+        "trend": trend,
+        "best_variation": best_variation,
     }
 
 @app.get("/api/history")
