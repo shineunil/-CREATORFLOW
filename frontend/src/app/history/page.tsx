@@ -2,24 +2,35 @@
 
 import React, { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
+import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
+import ChannelSelect from "@/components/layout/ChannelSelect";
 
 export default function HistoryPage() {
   const [tests, setTests] = useState<any[]>([]);
 
-  useEffect(() => {
+  const loadHistory = () => {
     apiFetch("/api/history")
       .then(res => {
         if (!res.ok) throw new Error(`Failed to load history (${res.status})`);
         return res.json();
       })
       .then(data => {
-        if (data.tests) setTests(data.tests);
+        setTests(data.tests || []);
       })
       .catch(console.error);
+  };
+
+  useEffect(() => {
+    loadHistory();
+    window.addEventListener(CHANNEL_SWITCHED_EVENT, loadHistory);
+    return () => window.removeEventListener(CHANNEL_SWITCHED_EVENT, loadHistory);
   }, []);
 
   return (
     <div className="w-full p-8 animate-fade-in-up">
+      <div className="mb-4">
+        <ChannelSelect />
+      </div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Optimization History</h1>
         <p className="text-zinc-400">Past optimization campaign results.</p>
