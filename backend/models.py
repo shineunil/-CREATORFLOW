@@ -61,7 +61,6 @@ class Video(Base):
     
     channel = relationship("Channel", back_populates="videos")
     ab_tests = relationship("ABTest", back_populates="video", cascade="all, delete-orphan")
-    daily_analytics = relationship("DailyAnalytics", back_populates="video", cascade="all, delete-orphan")
 
 class ABTest(Base):
     __tablename__ = 'ab_tests'
@@ -109,24 +108,6 @@ class MetricLog(Base):
     hours_exposed = Column(Float, default=0) # 이 구간 동안 실제 노출된 시간(시간 단위) - VPH 계산용
 
     variation = relationship("Variation", back_populates="metric_logs")
-
-class DailyAnalytics(Base):
-    """
-    YouTube Analytics API(yt-analytics.readonly)로 수집한 영상 단위 일별 실측 CTR.
-    Data API의 viewCount 델타(VPH)와 달리 실제 노출(impressions) 대비 클릭률이지만,
-    최대 하루 정도 지연되어 채워지고 변인(Variation) 단위가 아닌 영상 전체 단위로만 제공된다.
-    승자 판정에는 쓰지 않고(VPH가 즉시 확정), 대시보드에 참고 지표로만 노출한다.
-    """
-    __tablename__ = 'daily_analytics'
-
-    id = Column(Integer, primary_key=True, index=True)
-    video_id = Column(Integer, ForeignKey('videos.id', ondelete="CASCADE"), nullable=False)
-    date = Column(String, nullable=False, index=True)  # "YYYY-MM-DD" (YouTube Analytics의 day 차원 그대로 저장)
-    impressions = Column(Integer, default=0)
-    impressions_ctr = Column(Float, default=0)  # percentage (0~100)
-    collected_at = Column(DateTime, default=datetime.utcnow)
-
-    video = relationship("Video", back_populates="daily_analytics")
 
 class ApiQuotaUsage(Base):
     """

@@ -4,12 +4,11 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # Import models and APIs safely
-from models import ABTest, TestStatus, Variation, MetricLog, Channel, Video, DailyAnalytics
+from models import ABTest, TestStatus, Variation, MetricLog
 from youtube_api import (
     get_video_views,
     update_youtube_thumbnail,
     update_youtube_title,
-    get_daily_video_analytics,
     TokenRevokedError,
 )
 from metrics_utils import compute_variation_vph
@@ -33,11 +32,6 @@ class AVSchedulerEngine:
         
         # 10분마다 실행하며, 교체 주기가 도달한 테스트만 처리합니다.
         self.scheduler.add_job(self.check_and_swap_variations, 'interval', minutes=10)
-
-        # 6시간마다 실행하며, YouTube Analytics의 실제 CTR(impressions 기준)을 수집합니다.
-        # Analytics 데이터는 최대 하루 정도 지연되어 채워지므로 자주 돌 필요는 없지만,
-        # 하루 한 번보다 자주 체크해 지연분을 놓치지 않고 따라잡는다.
-        self.scheduler.add_job(self.collect_daily_analytics, 'interval', hours=6)
 
     def start(self):
         logger.info("🚀 A/B Test Scheduler Engine Started...")
@@ -67,65 +61,6 @@ class AVSchedulerEngine:
         except Exception as e:
             Session.rollback()
             logger.error(f"스케줄러 에러 발생: {e}")
-        finally:
-            Session.close()
-
-    async def collect_daily_analytics(self):
-        """진행 중이거나 최근에 끝난 테스트가 있는 영상들의 YouTube Analytics 일 단위 CTR을 수집합니다."""
-        logger.info(f"[{datetime.utcnow()}] 📊 Analytics 수집 작업 시작...")
-
-        Session = self.db_session_maker()
-        try:
-            # 최소 하나 이상의 A/B 테스트가 있었던 영상만 대상으로 한다 (불필요한 API 호출/쿼터 절약)
-            videos = (
-                Session.query(Video)
-                .join(Channel)
-                .join(ABTest)
-                .filter(Channel.oauth_refresh_token.isnot(None), Channel.needs_reconnect == False)
-                .distinct()
-                .all()
-            )
-
-            # Analytics는 최대 하루 정도 지연되므로, 지연분을 놓치지 않도록 최근 4일 구간을 매번 다시 덮어쓴다.
-            end_date = datetime.utcnow().date()
-            start_date = end_date - timedelta(days=4)
-
-            for video in videos:
-                channel = video.channel
-                try:
-                    rows = await get_daily_video_analytics(
-                        video.youtube_video_id,
-                        channel.oauth_refresh_token,
-                        start_date.isoformat(),
-                        end_date.isoformat(),
-                    )
-                except TokenRevokedError:
-                    channel.needs_reconnect = True
-                    logger.warning(f"⚠️ 채널 [{channel.id}] YouTube 연동이 만료/철회되어 재연동이 필요합니다.")
-                    continue
-
-                for row in rows:
-                    existing = (
-                        Session.query(DailyAnalytics)
-                        .filter(DailyAnalytics.video_id == video.id, DailyAnalytics.date == row["date"])
-                        .first()
-                    )
-                    if existing:
-                        existing.impressions = row["impressions"]
-                        existing.impressions_ctr = row["impressions_ctr"]
-                        existing.collected_at = datetime.utcnow()
-                    else:
-                        Session.add(DailyAnalytics(
-                            video_id=video.id,
-                            date=row["date"],
-                            impressions=row["impressions"],
-                            impressions_ctr=row["impressions_ctr"],
-                        ))
-
-            Session.commit()
-        except Exception as e:
-            Session.rollback()
-            logger.error(f"Analytics 수집 작업 에러: {e}")
         finally:
             Session.close()
 

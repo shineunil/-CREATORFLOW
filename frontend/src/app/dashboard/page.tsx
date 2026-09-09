@@ -312,12 +312,6 @@ export default function Dashboard() {
                 <div className="flex gap-10 text-right">
                   <Stat label="Extra Views Gained" value={`+${test.variations.length > 0 ? Math.max(...test.variations.map((v: any) => v.total_views_gained || 0)) : 0}  views`} highlight />
                   <Stat label="Total Candidates" value={`${test.variations.length}`} />
-                  {test.daily_analytics && test.daily_analytics.length > 0 && test.daily_analytics[test.daily_analytics.length - 1].impressions_ctr != null && (
-                    <Stat
-                      label="Analytics CTR (참고용, 최대 1일 지연)"
-                      value={`${test.daily_analytics[test.daily_analytics.length - 1].impressions_ctr.toFixed(1)}%`}
-                    />
-                  )}
                 </div>
 
                 {test.status === "RUNNING" && (

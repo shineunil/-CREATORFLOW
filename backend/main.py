@@ -180,7 +180,7 @@ def login_via_google(state: str | None = None):
     구글은 이 state 값을 그대로 콜백에 돌려주므로, 콜백에서 그걸로 "새로 로그인하는 구글
     계정과 무관하게 지금 로그인된 유저 소유로 채널을 붙여야 한다"는 걸 알 수 있다.
     """
-    scope = "openid email profile https://www.googleapis.com/auth/youtube.force-ssl https://www.googleapis.com/auth/yt-analytics.readonly"
+    scope = "openid email profile https://www.googleapis.com/auth/youtube.force-ssl"
     auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
         f"client_id={GOOGLE_CLIENT_ID}&"
@@ -901,11 +901,6 @@ def get_history(db: Session = Depends(get_db), channel: Channel = Depends(get_cu
             "swap_interval": test.swap_interval_minutes,
             "end_time": test.end_time.isoformat() if test.end_time else None,
             "variations": vars_data,
-            # 참고용 실측 CTR (YouTube Analytics, 영상 전체 단위, 최대 하루 지연). 승자 판정에는 쓰이지 않음.
-            "daily_analytics": sorted(
-                [{"date": d.date, "impressions": d.impressions, "impressions_ctr": d.impressions_ctr} for d in test.video.daily_analytics],
-                key=lambda d: d["date"]
-            )
         })
 
     return {"tests": result}
@@ -953,11 +948,6 @@ def get_ab_tests(db: Session = Depends(get_db), channel: Channel = Depends(get_c
             "start_time": test.start_time.isoformat() if test.start_time else None,
             "end_time": test.end_time.isoformat() if test.end_time else None,
             "variations": vars_data,
-            # 참고용 실측 CTR (YouTube Analytics, 영상 전체 단위, 최대 하루 지연). 승자 판정에는 쓰이지 않음.
-            "daily_analytics": sorted(
-                [{"date": d.date, "impressions": d.impressions, "impressions_ctr": d.impressions_ctr} for d in test.video.daily_analytics],
-                key=lambda d: d["date"]
-            )
         })
 
     return {"tests": result}
