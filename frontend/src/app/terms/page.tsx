@@ -64,7 +64,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-bold text-white mb-3">7. Contact</h2>
             <p className="text-zinc-400">
-              For questions about using the Service, please contact us at support@creatorflow.io.
+              For questions about using the Service, please contact us at kising26903854@gmail.com.
             </p>
           </section>
         </div>
