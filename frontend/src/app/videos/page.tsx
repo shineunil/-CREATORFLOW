@@ -4,13 +4,16 @@ import React, { useState, useEffect } from "react";
 import { FolderOpen, Sparkles, MonitorPlay, PlayCircle, Activity } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
+import ChannelSelect from "@/components/layout/ChannelSelect";
 
 export default function VideosPage() {
   const [videos, setVideos] = useState<any[]>([]);
   const [activeTestVideoIds, setActiveTestVideoIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const loadVideosAndTests = () => {
+    setIsLoading(true);
     // 영상 목록과 현재 진행중인 테스트 목록을 동시에 가져옵니다.
     Promise.all([
       apiFetch("/api/videos").then(res => {
@@ -23,10 +26,8 @@ export default function VideosPage() {
       })
     ])
     .then(([videosData, testsData]) => {
-      if (videosData.videos) {
-        setVideos(videosData.videos);
-      }
-      
+      setVideos(videosData.videos || []);
+
       if (testsData.tests) {
         // RUNNING 상태인 테스트들의 유튜브 비디오 ID만 추출하여 Set으로 저장
         const activeIds = new Set<string>(
@@ -35,18 +36,31 @@ export default function VideosPage() {
             .map((t: any) => t.video_id)
         );
         setActiveTestVideoIds(activeIds);
+      } else {
+        setActiveTestVideoIds(new Set());
       }
-      
+
       setIsLoading(false);
     })
     .catch(err => {
       console.error("데이터 조회 실패:", err);
       setIsLoading(false);
     });
+  };
+
+  useEffect(() => {
+    loadVideosAndTests();
+    // 좌측 상단 select box(또는 우측 상단 헤더)에서 다른 채널로 전환하면, 그 채널 기준
+    // 영상 목록으로 새로고침 없이 다시 불러온다.
+    window.addEventListener(CHANNEL_SWITCHED_EVENT, loadVideosAndTests);
+    return () => window.removeEventListener(CHANNEL_SWITCHED_EVENT, loadVideosAndTests);
   }, []);
 
   return (
     <div className="w-full p-8 animate-fade-in-up">
+      <div className="mb-4">
+        <ChannelSelect />
+      </div>
       <div className="mb-10 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
@@ -54,7 +68,7 @@ export default function VideosPage() {
           </h1>
           <p className="text-zinc-400">연동된 유튜브 채널의 최근 업로드 영상들을 확인하고 바로 최적화를 시작하세요.</p>
         </div>
-        
+
         </div>
 
       {isLoading ? (
