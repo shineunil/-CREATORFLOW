@@ -13,7 +13,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const router = useRouter();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isNoSidebarPage = PUBLIC_PATHS.includes(pathname);
+
+  // 페이지를 이동할 때마다(모바일 메뉴에서 링크 클릭 등) 열려있던 모바일 사이드바를 자동으로 닫는다.
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     // 1. URL에 새로 발급받은 토큰이 있다면 먼저 저장소에 저장
@@ -66,9 +72,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="flex h-screen w-full bg-[#09090b] text-zinc-100 overflow-hidden font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col relative overflow-y-auto">
-        <TopHeader />
+      <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+      <div className="flex-1 flex flex-col relative overflow-y-auto min-w-0">
+        <TopHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
         <main>{children}</main>
       </div>
     </div>

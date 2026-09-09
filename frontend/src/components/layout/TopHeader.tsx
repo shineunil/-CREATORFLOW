@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { LogOut, ChevronDown, Plus, AlertTriangle } from "lucide-react";
+import { LogOut, ChevronDown, Plus, AlertTriangle, Menu } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -17,7 +17,7 @@ type ChannelSummary = {
   is_active: boolean;
 };
 
-export default function TopHeader({ showLogo = false }: { showLogo?: boolean }) {
+export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?: boolean; onMenuClick?: () => void }) {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<{ email: string; channel_title: string; is_pro: boolean; plan: string } | null>(null);
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
@@ -123,36 +123,45 @@ export default function TopHeader({ showLogo = false }: { showLogo?: boolean }) 
   const atChannelLimit = channels.length >= maxChannels;
 
   return (
-    <header className={`shrink-0 h-20 border-b border-zinc-800/50 bg-black/50 backdrop-blur-md flex items-center justify-between px-8 ${showLogo ? "fixed top-0 left-0 right-0" : "sticky top-0"} z-50`}>
-      <div className="flex items-center">
+    <header className={`shrink-0 h-16 md:h-20 border-b border-zinc-800/50 bg-black/50 backdrop-blur-md flex items-center justify-between px-3 md:px-8 gap-2 ${showLogo ? "fixed top-0 left-0 right-0" : "sticky top-0"} z-50`}>
+      <div className="flex items-center min-w-0">
+        {!showLogo && onMenuClick && (
+          <button
+            onClick={onMenuClick}
+            aria-label="메뉴 열기"
+            className="md:hidden mr-2 p-2 text-zinc-300 hover:text-white hover:bg-zinc-800/50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 flex-shrink-0"
+          >
+            <Menu size={22} aria-hidden="true" />
+          </button>
+        )}
         {showLogo && (
-          <Link href="/" className="flex items-center gap-3 group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(6,182,212,0.5)] group-hover:shadow-[0_0_20px_rgba(6,182,212,0.8)] transition-all" aria-hidden="true">
+          <Link href="/" className="flex items-center gap-2 md:gap-3 group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(6,182,212,0.5)] group-hover:shadow-[0_0_20px_rgba(6,182,212,0.8)] transition-all flex-shrink-0" aria-hidden="true">
               CF
             </div>
-            <span className="text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400 group-hover:text-white transition-colors">
+            <span className="text-lg md:text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400 group-hover:text-white transition-colors">
               CREATORFLOW
             </span>
           </Link>
         )}
       </div>
 
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end min-w-0">
         {userProfile ? (
-          <div className="flex items-center gap-6">
-            <div className="relative" ref={menuRef}>
+          <div className="flex items-center gap-2 md:gap-6 min-w-0">
+            <div className="relative min-w-0" ref={menuRef}>
               <button
                 ref={menuButtonRef}
                 onClick={() => setIsMenuOpen((v) => !v)}
                 aria-haspopup="menu"
                 aria-expanded={isMenuOpen}
                 aria-controls="channel-switcher-menu"
-                className="flex items-center gap-3 cursor-pointer group rounded-xl px-2 py-1.5 hover:bg-zinc-800/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                className="flex items-center gap-2 md:gap-3 cursor-pointer group rounded-xl px-1 md:px-2 py-1.5 hover:bg-zinc-800/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 min-w-0"
               >
-                <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center text-base font-bold text-white shadow-inner flex-shrink-0" aria-hidden="true">
+                <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center text-sm md:text-base font-bold text-white shadow-inner flex-shrink-0" aria-hidden="true">
                   {userProfile.channel_title ? userProfile.channel_title.substring(0, 1).toUpperCase() : "U"}
                 </div>
-                <div className="flex flex-col items-start">
+                <div className="hidden sm:flex flex-col items-start min-w-0">
                   <span className="text-base font-black text-white flex items-center gap-2">
                     {userProfile.channel_title || "User"}
                     {userProfile.plan === "PRO" && (
@@ -161,13 +170,13 @@ export default function TopHeader({ showLogo = false }: { showLogo?: boolean }) 
                       </span>
                     )}
                   </span>
-                  <span className="text-sm font-medium text-zinc-300">{userProfile.email}</span>
+                  <span className="text-sm font-medium text-zinc-300 truncate max-w-[180px]">{userProfile.email}</span>
                 </div>
-                <ChevronDown size={18} aria-hidden="true" className={`text-zinc-400 transition-transform ${isMenuOpen ? "rotate-180" : ""}`} />
+                <ChevronDown size={18} aria-hidden="true" className={`text-zinc-400 transition-transform flex-shrink-0 ${isMenuOpen ? "rotate-180" : ""}`} />
               </button>
 
               {isMenuOpen && (
-                <div id="channel-switcher-menu" role="menu" aria-label="연동된 채널 전환" className="absolute right-0 top-full mt-2 w-80 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-50">
+                <div id="channel-switcher-menu" role="menu" aria-label="연동된 채널 전환" className="absolute right-0 top-full mt-2 w-[calc(100vw-1.5rem)] max-w-80 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-50">
                   <div className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-400 border-b border-zinc-800">
                     연동된 채널 ({channels.length}/{maxChannels})
                   </div>
@@ -210,13 +219,14 @@ export default function TopHeader({ showLogo = false }: { showLogo?: boolean }) 
               )}
             </div>
 
-            <div className="w-px h-8 bg-zinc-700/50" aria-hidden="true"></div>
+            <div className="hidden sm:block w-px h-8 bg-zinc-700/50" aria-hidden="true"></div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2.5 bg-zinc-800/40 hover:bg-zinc-700 hover:text-white rounded-xl text-base font-bold text-zinc-200 transition-all shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="flex items-center gap-2 px-2.5 md:px-4 py-2.5 bg-zinc-800/40 hover:bg-zinc-700 hover:text-white rounded-xl text-base font-bold text-zinc-200 transition-all shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 flex-shrink-0"
+              aria-label="Log out"
             >
               <LogOut size={18} aria-hidden="true" />
-              <span>Log out</span>
+              <span className="hidden md:inline">Log out</span>
             </button>
             {showLogo && (
               <button onClick={() => router.push("/dashboard")} className="ml-2 text-base font-black bg-white text-black px-6 py-2.5 rounded-full hover:bg-zinc-200 transition-colors shadow-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black">
@@ -225,11 +235,11 @@ export default function TopHeader({ showLogo = false }: { showLogo?: boolean }) 
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.push("/login")} className="text-base font-bold text-zinc-200 hover:text-white transition-colors px-4 py-2 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+          <div className="flex items-center gap-1.5 md:gap-4">
+            <button onClick={() => router.push("/login")} className="hidden sm:inline-block text-base font-bold text-zinc-200 hover:text-white transition-colors px-4 py-2 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
               Log in
             </button>
-            <button onClick={() => router.push("/login")} className="text-base font-black bg-white text-black px-6 py-2.5 rounded-full hover:bg-zinc-200 transition-colors shadow-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black">
+            <button onClick={() => router.push("/login")} className="text-sm md:text-base font-black bg-white text-black px-4 md:px-6 py-2 md:py-2.5 rounded-full hover:bg-zinc-200 transition-colors shadow-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black whitespace-nowrap">
               Start for Free
             </button>
           </div>
