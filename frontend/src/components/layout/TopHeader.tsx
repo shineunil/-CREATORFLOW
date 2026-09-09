@@ -187,7 +187,7 @@ export default function TopHeader({ showLogo = false }: { showLogo?: boolean }) 
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold text-white truncate">{c.channel_title || "이름 없음"}</div>
                           {!c.is_connected ? (
-                            <div className="text-xs text-zinc-500">연동 해제됨</div>
+                            <span className="inline-flex text-[11px] font-bold text-zinc-300 bg-zinc-700/80 px-2 py-0.5 rounded-full">연동 해제됨</span>
                           ) : c.needs_reconnect ? (
                             <div className="text-xs text-amber-400 flex items-center gap-1"><AlertTriangle size={11} aria-hidden="true" /> 재연동 필요</div>
                           ) : null}
