@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
 import { apiFetch } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/config";
+import { switchChannel, CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 
 type ChannelSummary = {
   id: number;
@@ -72,7 +73,7 @@ export default function SettingsPage() {
     });
   };
 
-  React.useEffect(() => {
+  const loadAccountInfo = () => {
     apiFetch("/api/user/me")
       .then((res) => {
         if (!res.ok) throw new Error(`Failed to load profile (${res.status})`);
@@ -96,28 +97,32 @@ export default function SettingsPage() {
         setMaxChannels(data.max_channels ?? 1);
       })
       .catch((err) => console.error(err));
+  };
+
+  React.useEffect(() => {
+    loadAccountInfo();
+    // 다른 곳(우측 상단 헤더, 다른 페이지의 좌측 상단 select box)에서 채널을 전환해도
+    // 이 페이지에 표시되는 계정/채널 정보가 새로고침 없이 최신 상태로 갱신되도록 한다.
+    window.addEventListener(CHANNEL_SWITCHED_EVENT, loadAccountInfo);
+    return () => window.removeEventListener(CHANNEL_SWITCHED_EVENT, loadAccountInfo);
   }, []);
 
   const handleSwitchChannel = async (channelId: number) => {
     if (isSwitchingRef.current) return;
     isSwitchingRef.current = true;
     setIsSwitching(true);
-    try {
-      const res = await apiFetch(`/api/channels/${channelId}/switch`, { method: "POST" });
-      if (!res.ok) throw new Error("switch failed");
-      const data = await res.json();
-      localStorage.setItem("jwt_token", data.token);
-      window.location.reload();
-    } catch (e) {
-      console.error(e);
-      showAlert("오류 발생", "채널 전환 중 오류가 발생했습니다.", "error");
-      isSwitchingRef.current = false;
-      setIsSwitching(false);
-    }
+    const ok = await switchChannel(channelId);
+    if (!ok) showAlert("오류 발생", "채널 전환 중 오류가 발생했습니다.", "error");
+    isSwitchingRef.current = false;
+    setIsSwitching(false);
   };
 
   const handleConnectAnotherChannel = () => {
-    window.location.href = `${API_BASE_URL}/api/auth/login`;
+    // 지금 로그인된 유저의 JWT를 state로 실어 보내야, 콜백에서 새 채널을 (구글 로그인이
+    // 다른 계정/브랜드 계정으로 이뤄지더라도) 지금 이 유저 소유로 붙일 수 있다.
+    const currentToken = localStorage.getItem("jwt_token");
+    const stateParam = currentToken ? `?state=${encodeURIComponent(currentToken)}` : "";
+    window.location.href = `${API_BASE_URL}/api/auth/login${stateParam}`;
   };
 
   const handleOpenBillingPortal = async () => {

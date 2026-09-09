@@ -7,6 +7,7 @@ import {
   BarChart3,
   History,
   Settings,
+  CreditCard,
   Bell,
   MoreHorizontal,
   LogOut,
@@ -21,7 +22,8 @@ const MENUS = [
   { name: "New Test", icon: FolderOpen, href: "/new" },
   { name: "Analytics", icon: BarChart3, href: "/analytics" },
   { name: "History", icon: History, href: "/history" },
-  { name: "Pricing", icon: Settings, href: "/pricing" },
+  { name: "Pricing", icon: CreditCard, href: "/pricing" },
+  { name: "Settings", icon: Settings, href: "/settings" },
 ];
 
 export default function Sidebar() {
