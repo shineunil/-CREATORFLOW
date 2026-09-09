@@ -322,13 +322,22 @@ def logout_user():
     """유저 단순 세션 로그아웃 엔드포인트 (채널 연동 토큰은 유지되어 백그라운드 A/B 테스트가 계속 실행됩니다)"""
     return {"message": "성공적으로 로그아웃되었습니다."}
 
-@app.post("/api/auth/disconnect-channel")
-def disconnect_channel(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
-    """YouTube 채널 연동 해제 엔드포인트 (현재 활성화된 채널의 OAuth 리프레시 토큰만 삭제)"""
-    channel.oauth_refresh_token = None
-    channel.needs_reconnect = False  # 완전히 연동 해제된 상태이므로 "재연동 필요" 배너와는 구분
+@app.post("/api/channels/{target_channel_id}/disconnect")
+def disconnect_channel(target_channel_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+    """
+    지정한 채널의 YouTube 연동을 해제합니다 (OAuth 리프레시 토큰만 삭제).
+    switch_channel과 동일하게 같은 계정 소유 채널이면 지금 활성 채널이 아니어도 해제할 수 있다.
+    채널 row/테스트 기록 자체는 지우지 않는다 - 재연동하면 다시 쓸 수 있어야 하고, cascade 삭제로
+    과거 A/B 테스트 데이터까지 날아가면 안 되기 때문.
+    """
+    target = db.query(Channel).filter(Channel.id == target_channel_id).first()
+    if not target or target.user_id != channel.user_id:
+        raise HTTPException(status_code=404, detail="채널을 찾을 수 없거나 이 계정 소유가 아닙니다.")
+
+    target.oauth_refresh_token = None
+    target.needs_reconnect = False  # 완전히 연동 해제된 상태이므로 "재연동 필요" 배너와는 구분
     db.commit()
-    return {"message": "YouTube 채널 연동이 완벽하게 해제되었습니다."}
+    return {"message": "YouTube 채널 연동이 해제되었습니다."}
 
 @app.get("/api/channels")
 def list_channels(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
@@ -346,6 +355,7 @@ def list_channels(db: Session = Depends(get_db), channel: Channel = Depends(get_
                 "channel_title": c.channel_title,
                 "youtube_channel_id": c.youtube_channel_id,
                 "needs_reconnect": c.needs_reconnect,
+                "is_connected": bool(c.oauth_refresh_token),
                 "is_active": c.id == channel.id,
             }
             for c in channels

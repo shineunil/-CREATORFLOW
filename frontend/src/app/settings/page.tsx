@@ -14,6 +14,7 @@ type ChannelSummary = {
   channel_title: string;
   youtube_channel_id: string;
   needs_reconnect: boolean;
+  is_connected: boolean;
   is_active: boolean;
 };
 
@@ -166,28 +167,21 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDisconnectChannel = () => {
+  const handleDisconnectChannel = (channelId: number, channelTitle: string) => {
     showConfirm(
       "⚠️ YouTube 채널 연동 해제",
-      "정말로 YouTube 채널 연동을 완전 해제하시겠습니까?\n채널 연동 해제 시 진행 중인 모든 A/B 테스트 순환 및 측정이 즉시 중단됩니다.",
+      `"${channelTitle || "이 채널"}" 연동을 해제하시겠습니까?\n이 채널에서 진행 중인 모든 A/B 테스트 순환 및 측정이 즉시 중단됩니다. 다른 연동 채널이나 계정 로그인에는 영향이 없습니다.`,
       async () => {
         try {
-          await apiFetch("/api/auth/disconnect-channel", { method: "POST" });
-          localStorage.removeItem("jwt_token");
-          localStorage.removeItem("connectedChannel");
-          showAlert(
-            "🔒 채널 연동 해제 완료",
-            "유튜브 채널 연동 및 OAuth 인증 토큰이 안전하게 삭제되었습니다.",
-            "success",
-            () => {
-              window.location.href = "/";
-            }
-          );
+          const res = await apiFetch(`/api/channels/${channelId}/disconnect`, { method: "POST" });
+          if (!res.ok) throw new Error("disconnect failed");
+          // 로그아웃하지 않고 채널 목록만 새로고침한다 - 해제된 건 이 채널 하나뿐이고
+          // 계정·다른 채널 연동은 그대로 유지되므로 세션을 끊을 이유가 없다.
+          loadAccountInfo();
+          showAlert("🔒 채널 연동 해제 완료", "YouTube 연동이 해제되었습니다. 다시 연동하려면 목록에서 재연동해주세요.", "success");
         } catch (e) {
           console.error(e);
-          localStorage.removeItem("jwt_token");
-          localStorage.removeItem("connectedChannel");
-          window.location.href = "/";
+          showAlert("오류 발생", "채널 연동 해제 중 오류가 발생했습니다.", "error");
         }
       },
       "error"
@@ -262,19 +256,32 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold text-white truncate">{c.channel_title || "이름 없음"}</div>
-                    {c.needs_reconnect && (
+                    {!c.is_connected ? (
+                      <div className="text-xs text-zinc-500">연동 해제됨 · "다른 채널 연동하기"로 다시 연동 가능</div>
+                    ) : c.needs_reconnect ? (
                       <div className="text-xs text-amber-400 flex items-center gap-1"><AlertTriangle size={11} aria-hidden="true" /> 재연동 필요</div>
-                    )}
+                    ) : null}
                   </div>
-                  {c.is_active ? (
+                  {c.is_active && (
                     <span className="text-xs font-bold text-cyan-400 px-2.5 py-1">사용 중</span>
-                  ) : (
+                  )}
+                  {!c.is_active && c.is_connected && (
                     <button
                       onClick={() => handleSwitchChannel(c.id)}
                       disabled={isSwitching}
                       className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                     >
                       전환
+                    </button>
+                  )}
+                  {c.is_connected && (
+                    <button
+                      onClick={() => handleDisconnectChannel(c.id, c.channel_title)}
+                      title="이 채널 연동 해제"
+                      aria-label={`${c.channel_title || "이 채널"} 연동 해제`}
+                      className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                    >
+                      <LogOut size={15} aria-hidden="true" />
                     </button>
                   )}
                 </div>
@@ -365,19 +372,6 @@ export default function SettingsPage() {
                 <span>🧪 테스트 이메일 발송해보기</span>
               </button>
             </div>
-          </section>
-
-          {/* Danger Zone */}
-          <section className="glass-panel p-6 rounded-2xl border border-red-900/30">
-            <h2 className="text-lg font-bold mb-1 text-red-500">위험 구역</h2>
-            <p className="text-xs text-zinc-400 mb-4">현재 사용 중인 채널({userEmail})의 YouTube 인증을 완전 해제하고 진행 중인 모든 자동 테스트를 중단합니다. 다른 연동 채널에는 영향이 없습니다.</p>
-            <button
-              onClick={handleDisconnectChannel}
-              className="flex items-center gap-2 text-red-400 hover:text-red-300 bg-red-950/30 hover:bg-red-900/40 px-4 py-2.5 rounded-xl transition-colors cursor-pointer border border-red-500/30 font-semibold text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-            >
-              <LogOut size={16} aria-hidden="true" />
-              <span>현재 채널 연동 해제 (테스트 전면 중단)</span>
-            </button>
           </section>
         </div>
       </div>
