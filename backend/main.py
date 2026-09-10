@@ -161,8 +161,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
+    """
+    UptimeRobot 등 업타임 모니터링 서비스가 Render 무료 플랜의 슬립을 막으려고 주기적으로
+    핑을 보내는 엔드포인트. GET만 등록하면 HEAD 요청에 405를 반환해서(모니터링 서비스는
+    보통 HEAD를 먼저 시도함) "다운"으로 오탐되므로 HEAD도 명시적으로 허용한다.
+    """
     return {"message": "CreatorFlow API 서버 정상 동작 중 🚀"}
 
 @app.get("/api/status")
