@@ -181,6 +181,16 @@ export default function LandingPage() {
               desc="Once every variant has had a fair, full rotation and enough views to be meaningful, the highest-VPH candidate is applied permanently — and stays there."
             />
           </div>
+
+          <div className="mt-16 flex justify-center">
+            <Link
+              href="/login"
+              className="group inline-flex items-center gap-2 px-7 py-3.5 bg-zinc-100 text-black font-bold rounded-full transition-transform hover:scale-[1.03] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+            >
+              Try it on your own video
+              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -219,6 +229,16 @@ export default function LandingPage() {
             enforces its own minimum cycles and sample size before calling a winner, rather than
             declaring one on the first lucky swap.
           </p>
+
+          <div className="mt-12">
+            <Link
+              href="/login"
+              className="group inline-flex items-center gap-2 px-7 py-3.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20 font-bold rounded-full transition-all hover:scale-[1.03] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            >
+              Run your first test
+              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </section>
 
