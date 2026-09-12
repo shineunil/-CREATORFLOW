@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CreatorFlow — Thumbnail A/B Testing for YouTube",
-  description: "Upload thumbnail and title variants, let CreatorFlow rotate them on your live video, and keep the one with the highest views per hour.",
+  title: "ThumbnailFlow — Thumbnail A/B Testing for YouTube",
+  description: "Upload thumbnail and title variants, let ThumbnailFlow rotate them on your live video, and keep the one with the highest views per hour.",
 };
 
 import ClientLayout from "@/components/layout/ClientLayout";

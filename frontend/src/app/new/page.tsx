@@ -662,7 +662,7 @@ function NewTestContent() {
           <h2 className="text-4xl font-black mb-4">Optimization Campaign Started!</h2>
           <p className="text-xl text-zinc-400 max-w-lg mb-10">
             Your first candidate is being applied to YouTube right now — it may take a few seconds
-            to show up on your video. From here, CreatorFlow rotates candidates automatically.
+            to show up on your video. From here, ThumbnailFlow rotates candidates automatically.
           </p>
 
           <div className="flex gap-4">

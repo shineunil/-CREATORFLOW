@@ -147,7 +147,7 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("🛑 서버 및 스케줄러 종료...")
 
-app = FastAPI(title="CreatorFlow API", lifespan=lifespan)
+app = FastAPI(title="ThumbnailFlow API", lifespan=lifespan)
 
 # 💥 Render 배포 시 uploads 폴더가 없으면 에러가 나므로, 마운트하기 전에 미리 폴더를 강제로 생성해 줍니다.
 os.makedirs("uploads", exist_ok=True)
@@ -168,7 +168,7 @@ def read_root():
     핑을 보내는 엔드포인트. GET만 등록하면 HEAD 요청에 405를 반환해서(모니터링 서비스는
     보통 HEAD를 먼저 시도함) "다운"으로 오탐되므로 HEAD도 명시적으로 허용한다.
     """
-    return {"message": "CreatorFlow API 서버 정상 동작 중 🚀"}
+    return {"message": "ThumbnailFlow API 서버 정상 동작 중 🚀"}
 
 @app.get("/api/status")
 def get_system_status(db: Session = Depends(get_db)):

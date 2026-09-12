@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 # 로컬에서는 일반 인터넷이라 SMTP가 멀쩡히 되어서 이 문제를 못 잡아냈었다 - 실제로 라이브에서만
 # 재현됐다. HTTPS로 통신하는 Resend API로 바꿔서 이 포트 차단 자체를 우회한다.
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "CreatorFlow <onboarding@resend.dev>")
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "ThumbnailFlow <onboarding@resend.dev>")
 
 def send_test_completion_email(user_email: str, video_title: str, winner_name: str, views_gained: int) -> dict:
     """
@@ -21,7 +21,7 @@ def send_test_completion_email(user_email: str, video_title: str, winner_name: s
         logger.warning("Email missing")
         return {"sent": False, "simulated": False}
 
-    subject = f"[CreatorFlow] A/B Test Completed! Winner: {winner_name}"
+    subject = f"[ThumbnailFlow] A/B Test Completed! Winner: {winner_name}"
     html_content = f"""<div style="font-family: Arial, sans-serif; background-color: #0909b2; color: #f4f4f5; padding: 40px; border-radius: 16px;"><h2 style="color: #06b6d4;">A/B Experiment Completed</h2><p>Video: <strong>{video_title}</strong></p><hr style="border-color: #2727a;" /><div style="background-color: #18181b; padding: 20px; border-radius: 12px; border: 1px solid #06b6d4;"><h3 style="color: #22c5e;">Winner: {winner_name}</h3><p>Highest Views: +{views_gained} views</p></div></div>"""
     logger.info(f"[Email Notification] To: {user_email} winner={winner_name}")
     if not RESEND_API_KEY:

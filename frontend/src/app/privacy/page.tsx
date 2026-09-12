@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata = {
-  title: "Privacy Policy | CreatorFlow",
+  title: "Privacy Policy | ThumbnailFlow",
 };
 
 export default function PrivacyPolicyPage() {
@@ -19,20 +19,20 @@ export default function PrivacyPolicyPage() {
         <div className="space-y-8 text-sm leading-relaxed">
           <section>
             <h2 className="text-lg font-bold text-white mb-3">1. Information We Collect</h2>
-            <p className="mb-2">CreatorFlow collects and processes the following information through Google Sign-In:</p>
+            <p className="mb-2">ThumbnailFlow collects and processes the following information through Google Sign-In:</p>
             <ul className="list-disc list-inside space-y-1 text-zinc-400">
               <li>Your Google account email address and name (used for login and sending notifications)</li>
               <li>Connected YouTube channel information (channel ID, channel name)</li>
               <li>Titles, thumbnails, and view counts of connected YouTube videos (used to run A/B tests and measure performance)</li>
               <li>YouTube Analytics data per video — impressions and impressions click-through rate (CTR) — collected to more accurately measure the real-world performance of the thumbnails/titles the service automatically swaps</li>
-              <li>Payment-related information (processed via Paddle; raw payment method details such as card numbers are never stored on CreatorFlow&apos;s servers)</li>
+              <li>Payment-related information (processed via Paddle; raw payment method details such as card numbers are never stored on ThumbnailFlow&apos;s servers)</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-lg font-bold text-white mb-3">2. Use of YouTube API Services</h2>
             <p className="mb-2">
-              CreatorFlow uses YouTube API Services. By using CreatorFlow, you agree to be bound by the{" "}
+              ThumbnailFlow uses YouTube API Services. By using ThumbnailFlow, you agree to be bound by the{" "}
               <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
                 YouTube Terms of Service
               </a>
@@ -43,7 +43,7 @@ export default function PrivacyPolicyPage() {
               .
             </p>
             <p>
-              CreatorFlow&apos;s access to, and use of, information received from Google APIs adheres to the{" "}
+              ThumbnailFlow&apos;s access to, and use of, information received from Google APIs adheres to the{" "}
               <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
                 Google API Services User Data Policy
               </a>
@@ -72,7 +72,7 @@ export default function PrivacyPolicyPage() {
               We use the information we collect solely to provide the service, and we do not sell or share it with third parties except where required by law.
             </p>
             <p className="mb-2">
-              If you disconnect a channel from the Settings page, the stored OAuth refresh token for that channel is deleted immediately, and CreatorFlow permanently loses the ability to access that YouTube account.
+              If you disconnect a channel from the Settings page, the stored OAuth refresh token for that channel is deleted immediately, and ThumbnailFlow permanently loses the ability to access that YouTube account.
             </p>
             <p>
               To request deletion of your entire account and all associated data (including video, test, and analytics records), contact us at the email address below. We will complete the deletion within 30 days of a verified request.

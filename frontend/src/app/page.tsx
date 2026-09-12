@@ -51,7 +51,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto mb-11 leading-relaxed">
-            Upload a few thumbnail and title variants. CreatorFlow rotates them on your
+            Upload a few thumbnail and title variants. ThumbnailFlow rotates them on your
             live video and ranks each by views earned per hour — not raw view count —
             so a slow afternoon slot never gets mistaken for a loser.
           </p>
@@ -171,7 +171,7 @@ export default function LandingPage() {
               number="02"
               icon={<RefreshCw size={16} />}
               title="It rotates on its own"
-              desc="CreatorFlow swaps the live thumbnail and title on a schedule — every 4+ hours on the free plan, as often as every 30 minutes on PRO — and discards the first few minutes after each swap so leftover exposure can't skew the count."
+              desc="ThumbnailFlow swaps the live thumbnail and title on a schedule — every 4+ hours on the free plan, as often as every 30 minutes on PRO — and discards the first few minutes after each swap so leftover exposure can't skew the count."
             />
             <StepCard
               delay={0.25}
@@ -201,7 +201,7 @@ export default function LandingPage() {
             <h2 className="text-3xl md:text-4xl font-black mb-4">Doesn&apos;t YouTube already do this?</h2>
             <p className="text-zinc-400 text-lg">
               Yes — Test and Compare is a real, free, native feature. It&apos;s built for a slower, more
-              conservative rollout. CreatorFlow is built for creators who want to iterate faster and
+              conservative rollout. ThumbnailFlow is built for creators who want to iterate faster and
               run more than one channel.
             </p>
           </div>
@@ -216,7 +216,7 @@ export default function LandingPage() {
             </div>
 
             <div className="rounded-2xl border border-cyan-500/40 bg-cyan-500/5 p-8 shadow-[0_0_30px_rgba(6,182,212,0.08)]">
-              <h3 className="text-base font-bold uppercase tracking-wider text-cyan-400 mb-6">CreatorFlow</h3>
+              <h3 className="text-base font-bold uppercase tracking-wider text-cyan-400 mb-6">ThumbnailFlow</h3>
               <ComparisonRow label="Candidates per test" value="Up to 5" />
               <ComparisonRow label="Time to a result" value="As fast as 30 minutes per swap" />
               <ComparisonRow label="Manual override" value="Force a swap or lock a winner anytime" />
@@ -225,7 +225,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-base text-zinc-400 mt-6 max-w-2xl">
-            Faster iteration trades some statistical patience for speed — that&apos;s why CreatorFlow
+            Faster iteration trades some statistical patience for speed — that&apos;s why ThumbnailFlow
             enforces its own minimum cycles and sample size before calling a winner, rather than
             declaring one on the first lucky swap.
           </p>
@@ -268,7 +268,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="py-10 text-center border-t border-zinc-900 bg-zinc-950 relative z-10">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm text-zinc-400">
-          <span>© 2026 CreatorFlow</span>
+          <span>© 2026 ThumbnailFlow</span>
           <a href="mailto:kising26903854@gmail.com" className="hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Support: kising26903854@gmail.com</a>
           <Link href="/privacy" className="hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Privacy Policy</Link>
           <Link href="/terms" className="hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Terms of Service</Link>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata = {
-  title: "Terms of Service | CreatorFlow",
+  title: "Terms of Service | ThumbnailFlow",
 };
 
 export default function TermsPage() {
@@ -20,7 +20,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-bold text-white mb-3">1. Overview of the Service</h2>
             <p className="text-zinc-400">
-              CreatorFlow (the &quot;Service&quot;) is an A/B testing tool that automatically rotates thumbnail and title candidates on a user&apos;s connected YouTube video, measures their performance (view count, views-per-hour (VPH), and actual YouTube Analytics CTR), and identifies the best-performing combination.
+              ThumbnailFlow (the &quot;Service&quot;) is an A/B testing tool that automatically rotates thumbnail and title candidates on a user&apos;s connected YouTube video, measures their performance (view count, views-per-hour (VPH), and actual YouTube Analytics CTR), and identifies the best-performing combination.
             </p>
           </section>
 
