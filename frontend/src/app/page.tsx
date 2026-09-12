@@ -89,11 +89,21 @@ export default function LandingPage() {
                 </div>
 
                 <div className="flex flex-col">
-                  <div className="relative rounded-xl overflow-hidden aspect-video">
-                     <img src="/hero-control.png" alt="Original thumbnail" className="w-full h-full object-cover opacity-75 grayscale-[40%]" />
-                     <div className="absolute bottom-1.5 right-1.5 bg-black/90 text-white text-xs font-medium px-1.5 py-0.5 rounded">
-                       12:45
-                     </div>
+                  <div className="relative rounded-xl overflow-hidden aspect-video bg-[#131316] border border-zinc-800/50">
+                     <svg viewBox="0 0 300 169" className="w-full h-full" preserveAspectRatio="none">
+                       <line x1="0" y1="20" x2="300" y2="20" stroke="#27272a" strokeWidth="1" />
+                       <line x1="0" y1="80" x2="300" y2="80" stroke="#27272a" strokeWidth="1" />
+                       <line x1="0" y1="140" x2="300" y2="140" stroke="#27272a" strokeWidth="1" />
+                       <polyline
+                         points="0,120 40,116 80,122 120,114 160,119 200,111 240,117 300,112"
+                         fill="none"
+                         stroke="#71717a"
+                         strokeWidth="3"
+                         strokeLinecap="round"
+                         strokeLinejoin="round"
+                       />
+                     </svg>
+                     <div className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Views per hour</div>
                   </div>
                   <div className="flex gap-3 mt-3">
                     <div className="w-9 h-9 rounded-full bg-zinc-800 flex-shrink-0 mt-0.5">
@@ -121,11 +131,29 @@ export default function LandingPage() {
                 </div>
 
                 <div className="flex flex-col relative z-10">
-                  <div className="relative rounded-xl overflow-hidden aspect-video">
-                     <img src="/hero-leading.png" alt="Variant thumbnail" className="w-full h-full object-cover transition-transform duration-500" />
-                     <div className="absolute bottom-1.5 right-1.5 bg-black/90 text-white text-xs font-medium px-1.5 py-0.5 rounded">
-                       12:45
-                     </div>
+                  <div className="relative rounded-xl overflow-hidden aspect-video bg-[#0a1418] border border-cyan-500/20">
+                     <svg viewBox="0 0 300 169" className="w-full h-full" preserveAspectRatio="none">
+                       <defs>
+                         <linearGradient id="vphFill" x1="0" y1="0" x2="0" y2="1">
+                           <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.4" />
+                           <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
+                         </linearGradient>
+                       </defs>
+                       <line x1="0" y1="20" x2="300" y2="20" stroke="#164e5c" strokeWidth="1" />
+                       <line x1="0" y1="80" x2="300" y2="80" stroke="#164e5c" strokeWidth="1" />
+                       <line x1="0" y1="140" x2="300" y2="140" stroke="#164e5c" strokeWidth="1" />
+                       <polygon points="0,124 40,108 80,90 120,72 160,55 200,42 240,30 300,18 300,169 0,169" fill="url(#vphFill)" />
+                       <polyline
+                         points="0,124 40,108 80,90 120,72 160,55 200,42 240,30 300,18"
+                         fill="none"
+                         stroke="#22d3ee"
+                         strokeWidth="3.5"
+                         strokeLinecap="round"
+                         strokeLinejoin="round"
+                       />
+                       <circle cx="300" cy="18" r="5" fill="#22d3ee" />
+                     </svg>
+                     <div className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-wide text-cyan-400">Views per hour</div>
                   </div>
                   <div className="flex gap-3 mt-3">
                     <div className="w-9 h-9 rounded-full bg-zinc-800 flex-shrink-0 mt-0.5">
