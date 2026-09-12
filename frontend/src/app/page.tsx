@@ -37,7 +37,7 @@ export default function LandingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
         >
-          <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-[0.15em] uppercase text-cyan-400/90 mb-7">
+          <div className="inline-flex items-center gap-2 text-base font-semibold tracking-[0.12em] uppercase text-cyan-400/90 mb-7">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" aria-hidden="true" />
             Thumbnail testing for YouTube creators
           </div>
