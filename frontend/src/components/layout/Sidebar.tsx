@@ -79,9 +79,9 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
         <div className="flex items-center justify-between mb-10">
           <Link href="/" className="flex items-center gap-2 px-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
             <div className="w-8 h-8 rounded bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(6,182,212,0.5)]" aria-hidden="true">
-              CF
+              TF
             </div>
-            <span className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">CREATORFLOW</span>
+            <span className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">THUMBNAILFLOW</span>
           </Link>
           <button
             onClick={onClose}
