@@ -50,7 +50,7 @@ export default function AnalyticsPage() {
       </div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Channel Analytics Overview</h1>
-        <p className="text-zinc-400">Statistics of data optimized by CREATORFLOW.</p>
+        <p className="text-zinc-400">Statistics of data optimized by THUMBNAILFLOW.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

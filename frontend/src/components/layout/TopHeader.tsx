@@ -137,10 +137,10 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
         {showLogo && (
           <Link href="/" className="flex items-center gap-2 md:gap-3 group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(6,182,212,0.5)] group-hover:shadow-[0_0_20px_rgba(6,182,212,0.8)] transition-all flex-shrink-0" aria-hidden="true">
-              CF
+              TF
             </div>
             <span className="text-lg md:text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400 group-hover:text-white transition-colors">
-              CREATORFLOW
+              THUMBNAILFLOW
             </span>
           </Link>
         )}
