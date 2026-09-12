@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@paddle/paddle-js": "^1.6.5",
+    "@vercel/analytics": "^2.0.1",
     "clsx": "^2.1.1",
     "framer-motion": "^13.2.0",
     "lucide-react": "^1.37.0",
