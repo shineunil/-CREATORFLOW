@@ -18,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 import ClientLayout from "@/components/layout/ClientLayout";
+import { Analytics } from "@vercel/analytics/react";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ClientLayout>
           {children}
         </ClientLayout>
+        <Analytics />
       </body>
     </html>
   );
