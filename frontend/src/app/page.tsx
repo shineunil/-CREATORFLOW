@@ -89,34 +89,18 @@ export default function LandingPage() {
                 </div>
 
                 <div className="flex flex-col">
-                  <div className="relative rounded-xl overflow-hidden aspect-video bg-[#131316] border border-zinc-800/50 flex">
-                     <div className="flex flex-col justify-between py-3 pl-2 pr-1 text-right">
-                       <span className="text-[9px] font-bold text-zinc-600">60</span>
-                       <span className="text-[9px] font-bold text-zinc-600">30</span>
-                       <span className="text-[9px] font-bold text-zinc-600">0</span>
+                  <div className="relative rounded-xl overflow-hidden aspect-video">
+                     <img src="/hero-control.jpg" alt="Original thumbnail" className="w-full h-full object-cover opacity-75 grayscale-[35%]" />
+                     <div className="absolute bottom-1.5 right-1.5 bg-black/90 text-white text-xs font-medium px-1.5 py-0.5 rounded">
+                       12:45
                      </div>
-                     <svg viewBox="0 0 280 169" className="flex-1 h-full" preserveAspectRatio="none">
-                       <line x1="0" y1="20" x2="280" y2="20" stroke="#27272a" strokeWidth="1" />
-                       <line x1="0" y1="80" x2="280" y2="80" stroke="#27272a" strokeWidth="1" />
-                       <line x1="0" y1="140" x2="280" y2="140" stroke="#27272a" strokeWidth="1" />
-                       <polygon points="0,120 40,116 80,122 120,114 160,119 200,111 240,117 280,112 280,169 0,169" fill="#71717a" opacity="0.12" />
-                       <polyline
-                         points="0,120 40,116 80,122 120,114 160,119 200,111 240,117 280,112"
-                         fill="none"
-                         stroke="#a1a1aa"
-                         strokeWidth="3"
-                         strokeLinecap="round"
-                         strokeLinejoin="round"
-                       />
-                     </svg>
-                     <div className="absolute top-2 left-9 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Views per hour</div>
                   </div>
                   <div className="flex gap-3 mt-3">
                     <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-zinc-700 to-zinc-600 flex items-center justify-center text-sm font-bold text-zinc-300 flex-shrink-0 mt-0.5">
                        Y
                     </div>
                     <div className="flex flex-col text-left">
-                      <h3 className="text-zinc-300 text-[15px] font-semibold leading-tight line-clamp-2">How I Built My Gaming PC</h3>
+                      <h3 className="text-zinc-300 text-[15px] font-semibold leading-tight line-clamp-2">Under the Stars: I Saw You</h3>
                       <span className="text-zinc-500 text-[13px] mt-1">Your Channel</span>
                       <span className="text-zinc-500 text-[13px]">Swapped 2h ago</span>
                     </div>
@@ -137,42 +121,18 @@ export default function LandingPage() {
                 </div>
 
                 <div className="flex flex-col relative z-10">
-                  <div className="relative rounded-xl overflow-hidden aspect-video bg-[#0a1418] border border-cyan-500/20 flex">
-                     <div className="flex flex-col justify-between py-3 pl-2 pr-1 text-right">
-                       <span className="text-[9px] font-bold text-cyan-700">150</span>
-                       <span className="text-[9px] font-bold text-cyan-700">75</span>
-                       <span className="text-[9px] font-bold text-cyan-700">0</span>
+                  <div className="relative rounded-xl overflow-hidden aspect-video">
+                     <img src="/hero-leading.jpg" alt="Variant thumbnail" className="w-full h-full object-cover transition-transform duration-500" />
+                     <div className="absolute bottom-1.5 right-1.5 bg-black/90 text-white text-xs font-medium px-1.5 py-0.5 rounded">
+                       12:45
                      </div>
-                     <svg viewBox="0 0 280 169" className="flex-1 h-full" preserveAspectRatio="none">
-                       <defs>
-                         <linearGradient id="vphFill" x1="0" y1="0" x2="0" y2="1">
-                           <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.45" />
-                           <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
-                         </linearGradient>
-                       </defs>
-                       <line x1="0" y1="20" x2="280" y2="20" stroke="#164e5c" strokeWidth="1" />
-                       <line x1="0" y1="80" x2="280" y2="80" stroke="#164e5c" strokeWidth="1" />
-                       <line x1="0" y1="140" x2="280" y2="140" stroke="#164e5c" strokeWidth="1" />
-                       <polygon points="0,124 40,108 80,90 120,72 160,55 200,42 240,30 280,18 280,169 0,169" fill="url(#vphFill)" />
-                       <polyline
-                         points="0,124 40,108 80,90 120,72 160,55 200,42 240,30 280,18"
-                         fill="none"
-                         stroke="#22d3ee"
-                         strokeWidth="3.5"
-                         strokeLinecap="round"
-                         strokeLinejoin="round"
-                       />
-                       <circle cx="280" cy="18" r="5" fill="#22d3ee" />
-                     </svg>
-                     <div className="absolute top-2 left-9 text-[10px] font-bold uppercase tracking-wide text-cyan-400">Views per hour</div>
-                     <div className="absolute bottom-2 right-3 bg-cyan-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full">+181%</div>
                   </div>
                   <div className="flex gap-3 mt-3">
                     <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center text-sm font-bold text-white flex-shrink-0 mt-0.5">
                        Y
                     </div>
                     <div className="flex flex-col text-left">
-                      <h3 className="text-white text-[15px] font-semibold leading-tight line-clamp-2">I Built The Ultimate Gaming PC</h3>
+                      <h3 className="text-white text-[15px] font-semibold leading-tight line-clamp-2">Under the Stars: I Saw You</h3>
                       <span className="text-zinc-400 text-[13px] mt-1">Your Channel</span>
                       <span className="text-zinc-400 text-[13px]">Swapped 14m ago</span>
                     </div>
