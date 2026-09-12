@@ -208,7 +208,7 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-8">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-6">YouTube Test and Compare</h3>
+              <h3 className="text-base font-bold uppercase tracking-wider text-zinc-400 mb-6">YouTube Test and Compare</h3>
               <ComparisonRow label="Candidates per test" value="Up to 3" muted />
               <ComparisonRow label="Time to a result" value="2+ weeks, 1–5K views/variant" muted />
               <ComparisonRow label="Manual override" value="Not available" negative />
@@ -216,7 +216,7 @@ export default function LandingPage() {
             </div>
 
             <div className="rounded-2xl border border-cyan-500/40 bg-cyan-500/5 p-8 shadow-[0_0_30px_rgba(6,182,212,0.08)]">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-400 mb-6">CreatorFlow</h3>
+              <h3 className="text-base font-bold uppercase tracking-wider text-cyan-400 mb-6">CreatorFlow</h3>
               <ComparisonRow label="Candidates per test" value="Up to 5" />
               <ComparisonRow label="Time to a result" value="As fast as 30 minutes per swap" />
               <ComparisonRow label="Manual override" value="Force a swap or lock a winner anytime" />
@@ -224,7 +224,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <p className="text-sm text-zinc-400 mt-6 max-w-2xl">
+          <p className="text-base text-zinc-400 mt-6 max-w-2xl">
             Faster iteration trades some statistical patience for speed — that&apos;s why CreatorFlow
             enforces its own minimum cycles and sample size before calling a winner, rather than
             declaring one on the first lucky swap.
@@ -286,8 +286,8 @@ function ComparisonRow({ label, value, muted, negative }: { label: string, value
         <Check size={16} className={`mt-0.5 flex-shrink-0 ${muted ? "text-zinc-400" : "text-cyan-400"}`} aria-hidden="true" />
       )}
       <div>
-        <div className="text-xs text-zinc-400 uppercase tracking-wide mb-0.5">{label}</div>
-        <div className={`text-sm font-semibold ${muted || negative ? "text-zinc-400" : "text-zinc-100"}`}>{value}</div>
+        <div className="text-sm text-zinc-400 uppercase tracking-wide mb-1">{label}</div>
+        <div className={`text-base font-semibold ${muted || negative ? "text-zinc-400" : "text-zinc-100"}`}>{value}</div>
       </div>
     </div>
   );
