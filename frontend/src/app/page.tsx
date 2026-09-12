@@ -83,7 +83,7 @@ export default function LandingPage() {
                 <div className="flex justify-between items-center mb-5">
                    <span className="bg-zinc-800 text-zinc-300 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">Control</span>
                    <div className="text-right">
-                     <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-wide">Current VPH</div>
+                     <div className="text-[10px] text-zinc-400 uppercase font-bold tracking-wide">Current VPH</div>
                      <div className="text-xl font-black text-zinc-400">42</div>
                    </div>
                 </div>
@@ -101,8 +101,8 @@ export default function LandingPage() {
                     </div>
                     <div className="flex flex-col text-left">
                       <h3 className="text-zinc-300 text-[15px] font-semibold leading-tight line-clamp-2">Under the Stars: I Saw You</h3>
-                      <span className="text-zinc-500 text-[13px] mt-1">Your Channel</span>
-                      <span className="text-zinc-500 text-[13px]">Swapped 2h ago</span>
+                      <span className="text-zinc-400 text-[13px] mt-1">Your Channel</span>
+                      <span className="text-zinc-400 text-[13px]">Swapped 2h ago</span>
                     </div>
                   </div>
                 </div>
@@ -141,7 +141,7 @@ export default function LandingPage() {
               </div>
 
               <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-zinc-950 border border-zinc-700 rounded-full items-center justify-center z-20 shadow-2xl">
-                <span className="text-lg font-black italic text-zinc-500">VS</span>
+                <span className="text-lg font-black italic text-zinc-300">VS</span>
               </div>
             </div>
           </div>

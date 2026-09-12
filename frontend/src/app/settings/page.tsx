@@ -259,7 +259,7 @@ export default function SettingsPage() {
                     {!c.is_connected ? (
                       <div className="mt-1 flex items-center gap-1.5">
                         <span className="inline-flex text-[11px] font-bold text-zinc-300 bg-zinc-700/80 px-2 py-0.5 rounded-full">Disconnected</span>
-                        <span className="text-xs text-zinc-500">Reconnect anytime below</span>
+                        <span className="text-xs text-zinc-400">Reconnect anytime below</span>
                       </div>
                     ) : c.needs_reconnect ? (
                       <div className="text-xs text-amber-400 flex items-center gap-1"><AlertTriangle size={11} aria-hidden="true" /> Reconnect needed</div>

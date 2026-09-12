@@ -53,7 +53,7 @@ export default function ChannelSelect() {
 
   return (
     <div className="inline-flex items-center gap-2">
-      <label htmlFor="channel-select" className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+      <label htmlFor="channel-select" className="text-xs font-bold uppercase tracking-wider text-zinc-400">
         Channel
       </label>
       <select

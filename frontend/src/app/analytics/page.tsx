@@ -108,7 +108,7 @@ export default function AnalyticsPage() {
                 {data.best_variation.thumbnail_image_url ? (
                   <img src={data.best_variation.thumbnail_image_url} alt={data.best_variation.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-zinc-500 text-xs">No image</div>
+                  <div className="w-full h-full flex items-center justify-center text-zinc-400 text-xs">No image</div>
                 )}
               </div>
               <div>
