@@ -269,6 +269,7 @@ export default function LandingPage() {
       <footer className="py-10 text-center border-t border-zinc-900 bg-zinc-950 relative z-10">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm text-zinc-400">
           <span>© 2026 CreatorFlow</span>
+          <a href="mailto:kising26903854@gmail.com" className="hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Support: kising26903854@gmail.com</a>
           <Link href="/privacy" className="hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Privacy Policy</Link>
           <Link href="/terms" className="hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Terms of Service</Link>
         </div>
