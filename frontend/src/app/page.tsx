@@ -90,7 +90,7 @@ export default function LandingPage() {
 
                 <div className="flex flex-col">
                   <div className="relative rounded-xl overflow-hidden aspect-video">
-                     <img src="https://images.unsplash.com/photo-1616469829581-73993eb86b02?q=80&w=800&auto=format&fit=crop" alt="Original thumbnail" className="w-full h-full object-cover opacity-75 grayscale-[40%]" />
+                     <img src="/hero-control.png" alt="Original thumbnail" className="w-full h-full object-cover opacity-75 grayscale-[40%]" />
                      <div className="absolute bottom-1.5 right-1.5 bg-black/90 text-white text-xs font-medium px-1.5 py-0.5 rounded">
                        12:45
                      </div>
@@ -122,7 +122,7 @@ export default function LandingPage() {
 
                 <div className="flex flex-col relative z-10">
                   <div className="relative rounded-xl overflow-hidden aspect-video">
-                     <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop" alt="Variant thumbnail" className="w-full h-full object-cover transition-transform duration-500" />
+                     <img src="/hero-leading.png" alt="Variant thumbnail" className="w-full h-full object-cover transition-transform duration-500" />
                      <div className="absolute bottom-1.5 right-1.5 bg-black/90 text-white text-xs font-medium px-1.5 py-0.5 rounded">
                        12:45
                      </div>
