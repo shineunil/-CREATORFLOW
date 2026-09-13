@@ -35,8 +35,7 @@ export default function PrivacyPolicyPage() {
               To provide the Service, ThumbnailFlow requests the following OAuth permissions (scopes) from your Google account:
             </p>
             <ul className="list-disc list-inside space-y-1 text-zinc-400">
-              <li><strong className="text-zinc-300">https://www.googleapis.com/auth/youtube</strong> — Read and update YouTube video metadata (thumbnails and titles) to run A/B test swaps on your behalf.</li>
-              <li><strong className="text-zinc-300">https://www.googleapis.com/auth/youtube.readonly</strong> — Read video information and statistics (view counts, etc.) to measure performance.</li>
+              <li><strong className="text-zinc-300">https://www.googleapis.com/auth/youtube.force-ssl</strong> — Read and update YouTube video metadata (thumbnails and titles) to run A/B test swaps on your behalf.</li>
               <li><strong className="text-zinc-300">https://www.googleapis.com/auth/yt-analytics.readonly</strong> — Read YouTube Analytics data (impressions, CTR) to evaluate thumbnail effectiveness.</li>
               <li><strong className="text-zinc-300">https://www.googleapis.com/auth/userinfo.email</strong> — Identify your account and send service notifications.</li>
               <li><strong className="text-zinc-300">https://www.googleapis.com/auth/userinfo.profile</strong> — Display your name within the app.</li>
