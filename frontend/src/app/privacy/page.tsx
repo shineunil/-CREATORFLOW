@@ -24,7 +24,7 @@ export default function PrivacyPolicyPage() {
               <li>Your Google account email address and name (used for login and sending notifications)</li>
               <li>Connected YouTube channel information (channel ID, channel name)</li>
               <li>Titles, thumbnails, and view counts of connected YouTube videos (used to run A/B tests and measure performance)</li>
-              <li>YouTube Analytics data per video — impressions and impressions click-through rate (CTR) — collected to more accurately measure the real-world performance of the thumbnails/titles the service automatically swaps</li>
+              <li>View counts and performance data of connected YouTube videos (used to measure A/B test results)</li>
               <li>Payment-related information (processed via Paddle; raw payment method details such as card numbers are never stored on ThumbnailFlow&apos;s servers)</li>
             </ul>
           </section>
@@ -36,8 +36,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <ul className="list-disc list-inside space-y-1 text-zinc-400">
               <li><strong className="text-zinc-300">https://www.googleapis.com/auth/youtube.force-ssl</strong> — Read and update YouTube video metadata (thumbnails and titles) to run A/B test swaps on your behalf.</li>
-              <li><strong className="text-zinc-300">https://www.googleapis.com/auth/yt-analytics.readonly</strong> — Read YouTube Analytics data (impressions, CTR) to evaluate thumbnail effectiveness.</li>
-              <li><strong className="text-zinc-300">https://www.googleapis.com/auth/userinfo.email</strong> — Identify your account and send service notifications.</li>
+<li><strong className="text-zinc-300">https://www.googleapis.com/auth/userinfo.email</strong> — Identify your account and send service notifications.</li>
               <li><strong className="text-zinc-300">https://www.googleapis.com/auth/userinfo.profile</strong> — Display your name within the app.</li>
             </ul>
             <p className="mt-2 text-zinc-400">
@@ -81,7 +80,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-lg font-bold text-white mb-3">4. How We Use Your Information</h2>
             <ul className="list-disc list-inside space-y-1 text-zinc-400">
               <li>Running automated thumbnail/title A/B test swaps</li>
-              <li>Comparing candidate performance (view counts, VPH, YouTube Analytics CTR) and determining a winner</li>
+              <li>Comparing candidate performance (view counts, VPH) and determining a winner</li>
               <li>Sending email notifications about test completion and plan/billing status</li>
               <li>Preventing abuse of the service and enforcing per-plan usage limits</li>
             </ul>
