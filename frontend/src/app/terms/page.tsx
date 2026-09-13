@@ -14,7 +14,7 @@ export default function TermsPage() {
         </Link>
 
         <h1 className="text-3xl font-black text-white mb-2">Terms of Service</h1>
-        <p className="text-sm text-zinc-400 mb-10">Last updated: 2026-09-08</p>
+        <p className="text-sm text-zinc-400 mb-10">Last updated: 2026-09-14</p>
 
         <div className="space-y-8 text-sm leading-relaxed">
           <section>
@@ -34,35 +34,54 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">3. Plans</h2>
+            <h2 className="text-lg font-bold text-white mb-3">3. Use of YouTube and Google API Services</h2>
+            <p className="mb-2 text-zinc-400">
+              The Service accesses YouTube and Google API Services on your behalf to read and update video metadata (thumbnails and titles) and retrieve YouTube Analytics data. By using the Service, you agree to be bound by the{" "}
+              <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+                YouTube Terms of Service
+              </a>
+              {" "}and acknowledge the{" "}
+              <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+                Google Privacy Policy
+              </a>
+              . You are responsible for ensuring that any thumbnails or titles automatically applied by the Service comply with YouTube&apos;s policies and Community Guidelines. You can revoke the Service&apos;s access to your Google account at any time via{" "}
+              <a href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+                Google Account Permissions
+              </a>
+              .
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold text-white mb-3">4. Plans</h2>
             <p className="text-zinc-400">
               We offer a BASIC (free) plan and a PRO plan. Limits on concurrent tests, swap interval, and candidate count for each plan are described in the app. Payments are processed via Paddle, and you can change or cancel your plan from the Settings page.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">4. Refunds</h2>
+            <h2 className="text-lg font-bold text-white mb-3">5. Refunds</h2>
             <p className="text-zinc-400">
               You may request a full refund of your PRO plan payment within 7 days of the payment date, provided you have not used the Service during that period (i.e., you have not created any A/B test). Once you have created at least one test, or once 7 days have passed since payment, that payment becomes non-refundable, except where a refund is required by applicable law. To request a refund, contact us at the email address below; refunds are reviewed and processed through Paddle, our payment provider.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">5. Limitation of Liability</h2>
+            <h2 className="text-lg font-bold text-white mb-3">6. Limitation of Liability</h2>
             <p className="text-zinc-400">
-              The Service estimates performance based on data provided by the YouTube Data API and YouTube Analytics API. Due to the nature of these APIs (reporting delay, sample size, etc.), measured view counts and click-through rates may differ from YouTube&apos;s own statistics, and the Service does not guarantee any specific performance improvement. You are responsible for ensuring that any thumbnails or titles automatically applied by the Service comply with YouTube&apos;s policies and Community Guidelines.
+              The Service estimates performance based on data provided by the YouTube Data API and YouTube Analytics API. Due to the nature of these APIs (reporting delay, sample size, etc.), measured view counts and click-through rates may differ from YouTube&apos;s own statistics, and the Service does not guarantee any specific performance improvement.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">6. Changes to and Discontinuation of the Service</h2>
+            <h2 className="text-lg font-bold text-white mb-3">7. Changes to and Discontinuation of the Service</h2>
             <p className="text-zinc-400">
               We may modify features of the Service for operational or legal reasons, or discontinue it after providing prior notice.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">7. Contact</h2>
+            <h2 className="text-lg font-bold text-white mb-3">8. Contact</h2>
             <p className="text-zinc-400">
               For questions about using the Service, please contact us at kising26903854@gmail.com.
             </p>

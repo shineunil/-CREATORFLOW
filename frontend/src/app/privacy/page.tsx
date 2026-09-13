@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
         </Link>
 
         <h1 className="text-3xl font-black text-white mb-2">Privacy Policy</h1>
-        <p className="text-sm text-zinc-400 mb-10">Last updated: 2026-09-07</p>
+        <p className="text-sm text-zinc-400 mb-10">Last updated: 2026-09-14</p>
 
         <div className="space-y-8 text-sm leading-relaxed">
           <section>
@@ -30,7 +30,28 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">2. Use of YouTube API Services</h2>
+            <h2 className="text-lg font-bold text-white mb-3">2. Google OAuth Permissions We Request</h2>
+            <p className="mb-2">
+              To provide the Service, ThumbnailFlow requests the following OAuth permissions (scopes) from your Google account:
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-zinc-400">
+              <li><strong className="text-zinc-300">https://www.googleapis.com/auth/youtube</strong> — Read and update YouTube video metadata (thumbnails and titles) to run A/B test swaps on your behalf.</li>
+              <li><strong className="text-zinc-300">https://www.googleapis.com/auth/youtube.readonly</strong> — Read video information and statistics (view counts, etc.) to measure performance.</li>
+              <li><strong className="text-zinc-300">https://www.googleapis.com/auth/yt-analytics.readonly</strong> — Read YouTube Analytics data (impressions, CTR) to evaluate thumbnail effectiveness.</li>
+              <li><strong className="text-zinc-300">https://www.googleapis.com/auth/userinfo.email</strong> — Identify your account and send service notifications.</li>
+              <li><strong className="text-zinc-300">https://www.googleapis.com/auth/userinfo.profile</strong> — Display your name within the app.</li>
+            </ul>
+            <p className="mt-2 text-zinc-400">
+              We request only the permissions necessary to deliver the Service. You can revoke these permissions at any time via{" "}
+              <a href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+                Google Account Permissions
+              </a>
+              .
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold text-white mb-3">3. Use of YouTube API Services</h2>
             <p className="mb-2">
               ThumbnailFlow uses YouTube API Services. By using ThumbnailFlow, you agree to be bound by the{" "}
               <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
@@ -42,7 +63,7 @@ export default function PrivacyPolicyPage() {
               </a>
               .
             </p>
-            <p>
+            <p className="mb-2">
               ThumbnailFlow&apos;s access to, and use of, information received from Google APIs adheres to the{" "}
               <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
                 Google API Services User Data Policy
@@ -53,11 +74,12 @@ export default function PrivacyPolicyPage() {
               <li>YouTube data is used only to provide and improve the thumbnail/title A/B testing features described in this policy — never to serve ads.</li>
               <li>We do not sell YouTube API data, and we do not transfer it to third parties except as needed to provide our service (e.g., our cloud image storage provider) or as required by law.</li>
               <li>No human reads your YouTube data except: with your explicit consent, for security purposes (e.g., investigating abuse), to comply with applicable law, or where the data has been aggregated and anonymized.</li>
+              <li><strong className="text-zinc-300">Data obtained from Google APIs is never used to train AI or machine learning models.</strong></li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">3. How We Use Your Information</h2>
+            <h2 className="text-lg font-bold text-white mb-3">4. How We Use Your Information</h2>
             <ul className="list-disc list-inside space-y-1 text-zinc-400">
               <li>Running automated thumbnail/title A/B test swaps</li>
               <li>Comparing candidate performance (view counts, VPH, YouTube Analytics CTR) and determining a winner</li>
@@ -67,7 +89,14 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">4. Data Retention, Deletion, and Third-Party Sharing</h2>
+            <h2 className="text-lg font-bold text-white mb-3">5. Data Security</h2>
+            <p className="text-zinc-400">
+              We take reasonable technical and organizational measures to protect your information against unauthorized access, disclosure, or destruction. OAuth refresh tokens are stored encrypted and are used exclusively to operate the Service on your behalf. We do not store raw payment method details (e.g., card numbers) on our servers — all payment data is handled directly by Paddle, our payment provider.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold text-white mb-3">6. Data Retention, Deletion, and Third-Party Sharing</h2>
             <p className="mb-2">
               We use the information we collect solely to provide the service, and we do not sell or share it with third parties except where required by law.
             </p>
@@ -80,7 +109,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">5. Contact</h2>
+            <h2 className="text-lg font-bold text-white mb-3">7. Contact</h2>
             <p className="text-zinc-400">
               For privacy-related inquiries, please contact us via the in-app Settings page or at kising26903854@gmail.com.
             </p>
