@@ -129,7 +129,7 @@
 - [x] 개인정보처리방침에 “채널 분석 데이터를 읽는다” 명시 (스코프 심사)
   - `#` placeholder였던 이용약관/개인정보처리방침 링크를 실제 페이지로 교체: [frontend/src/app/privacy/page.tsx](frontend/src/app/privacy/page.tsx), [frontend/src/app/terms/page.tsx](frontend/src/app/terms/page.tsx) 신규 작성, `/login` 페이지에서 연결.
   - 개인정보처리방침에 YouTube Analytics(impressions/CTR) 수집 사실 명시.
-  - ⚠️ 이메일 주소(support@creatorflow.io)는 플레이스홀더 — 실제 연락처로 교체 필요.
+  - ⚠️ 이메일 주소(support@trythumbnailflow.com)는 플레이스홀더 — 실제 연락처로 교체 필요.
   - ⚠️ **아직 남음**: 이 스코프는 구글이 “민감한 스코프(Sensitive scope)”로 분류하므로, 실제 배포 전 구글 OAuth 동의 화면 검증(재검토) 절차가 필요할 수 있음 — “그다음” 섹션의 “구글 클라우드 앱 검증”과 연결됨.
 
 ---
