@@ -450,13 +450,10 @@ function NewTestContent() {
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-4 border-b border-zinc-800 pb-4">
+            <div className="mb-4 border-b border-zinc-800 pb-4">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 2. Add Candidates
               </h2>
-              <button onClick={addVariation} className="flex items-center gap-2 text-sm font-bold text-cyan-400 hover:text-cyan-300 transition-colors bg-cyan-950/30 px-4 py-2 rounded-full border border-cyan-500/20 hover:border-cyan-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-                <Plus size={16} aria-hidden="true" /> Add Candidate (Max 5)
-              </button>
             </div>
 
             <div className="space-y-6">
@@ -576,6 +573,15 @@ function NewTestContent() {
                   </div>
                 </div>
               ))}
+
+              {variations.length < 4 && (
+                <button
+                  onClick={addVariation}
+                  className="w-full py-5 rounded-2xl border-2 border-dashed border-zinc-700 hover:border-cyan-500/50 bg-zinc-900/30 hover:bg-cyan-950/10 text-zinc-400 hover:text-cyan-400 font-bold flex items-center justify-center gap-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                >
+                  <Plus size={20} aria-hidden="true" /> Add Candidate <span className="text-xs font-normal opacity-60">({variations.length + 1} / 5)</span>
+                </button>
+              )}
             </div>
           </div>
 
