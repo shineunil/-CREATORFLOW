@@ -286,6 +286,7 @@ export default function LandingPage() {
                 <li className="flex items-center gap-3 text-sm text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> <span className="font-semibold text-cyan-300">Unlimited</span> concurrent tests</li>
                 <li className="flex items-center gap-3 text-sm text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> Up to 5 thumbnail variants (A~E)</li>
                 <li className="flex items-center gap-3 text-sm text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> <span className="font-semibold text-cyan-300">30-minute</span> swap interval</li>
+                <li className="flex items-center gap-3 text-sm text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> Test completion <span className="font-semibold text-cyan-300">email notification</span></li>
               </ul>
               <Link href="/login" className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-center transition-all shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
                 Get started

@@ -208,6 +208,10 @@ export default function PricingPage() {
                 <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
                 <span className="font-semibold text-cyan-300">Ultra-fast 30 mins</span> swap interval
               </li>
+              <li className="flex items-center gap-3 text-sm text-zinc-100">
+                <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
+                Test completion <span className="font-semibold text-cyan-300">email notification</span>
+              </li>
               </ul>
 
             {userProfile.is_pro ? (

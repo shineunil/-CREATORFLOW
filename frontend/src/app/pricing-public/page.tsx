@@ -85,6 +85,10 @@ export default function PricingPublicPage() {
                 <Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
                 <span className="font-semibold text-cyan-300">30-minute</span> swap interval
               </li>
+              <li className="flex items-center gap-3 text-sm text-zinc-100">
+                <Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
+                Test completion <span className="font-semibold text-cyan-300">email notification</span>
+              </li>
             </ul>
             <Link
               href="/login"
