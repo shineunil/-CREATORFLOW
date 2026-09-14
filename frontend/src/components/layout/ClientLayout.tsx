@@ -7,7 +7,7 @@ import TopHeader from "./TopHeader";
 
 // 로그인 없이 접근 가능한 공개 페이지 목록
 // (개인정보처리방침/이용약관은 로그인 여부와 무관하게 항상 접근 가능해야 함 - 구글 OAuth 심사 요건)
-const PUBLIC_PATHS = ["/", "/login", "/privacy", "/terms"];
+const PUBLIC_PATHS = ["/", "/login", "/privacy", "/terms", "/pricing-public"];
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
