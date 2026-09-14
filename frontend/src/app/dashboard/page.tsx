@@ -28,12 +28,12 @@ const formatTestDuration = (startIso: string | null | undefined, endIso: string 
   if (startIso && !startIso.endsWith('Z')) startIso += 'Z';
   const start = new Date(startIso);
   if (status === "STOPPED") {
-    return `완료된 최적화 (Started: ${start.toLocaleDateString()})`;
+    return `Optimization Finished (Started: ${start.toLocaleDateString()})`;
   }
   let end = endIso ? new Date(endIso.endsWith('Z') ? endIso : endIso + 'Z') : new Date(start.getTime() + 24 * 60 * 60 * 1000);
   const now = new Date();
   const diffHours = Math.max(0, Math.floor((end.getTime() - now.getTime()) / (1000 * 60 * 60)));
-  return `최적화 진행 중 • ${diffHours}시간 후 종료 및 영구 적용`;
+  return `Optimizing • Ends in ${diffHours}h and applies permanently`;
 };
 
 export default function Dashboard() {
@@ -84,8 +84,8 @@ export default function Dashboard() {
 
     if (errorFromUrl === "channel_limit_reached") {
       showAlert(
-        "채널 연동 한도 도달",
-        "현재 요금제에서 연동 가능한 채널 개수를 모두 사용했습니다. 더 많은 채널을 연동하려면 PRO/AGENCY로 업그레이드해주세요.",
+        "Channel Limit Reached",
+        "You've reached the channel limit for your current plan. Please upgrade to PRO to connect more channels.",
         "warning"
       );
       router.replace("/dashboard");
@@ -167,27 +167,27 @@ export default function Dashboard() {
       type: "confirm",
       variant: "error",
       title: "Cancel & Delete Test",
-      message: "진행 중인 테스트를 완전히 Cancel하고 삭제하시겠습니까?\n유튜브 영상의 Thumbnail은 안전하게 '원본(A)'으로 자동 복구되며 삭제된 테스트는 복구할 수 없습니다.",
-      confirmText: "네, 완전히 삭제합니다",
+      message: "Are you sure you want to cancel and delete this test?\nThe YouTube thumbnail will be safely restored to the original (A). This action cannot be undone.",
+      confirmText: "Yes, delete permanently",
       cancelText: "Cancel",
       onConfirm: async () => {
         setModalConfig(prev => ({ 
           ...prev, 
           type: "loading", 
-          title: "Deleting....", 
-          message: "유튜브 Thumbnail을 안전하게 원본으로 복구하고 테스트를 삭제 중입니다.\n잠시만 기다려주세요..." 
+          title: "Deleting....",
+          message: "Restoring the YouTube thumbnail to the original and deleting the test.\nPlease wait..."
         }));
         
         try {
           const res = await apiFetch(`/api/tests/${testId}`, { method: "DELETE" });
           if (res.ok) {
-            showAlert("Deleted", "테스트가 완전히 Cancel되고 원본 Thumbnail로 복구되었습니다.", "success");
+            showAlert("Deleted", "The test has been cancelled and the thumbnail has been restored to the original.", "success");
             setTestData(prevData => prevData.filter(t => t.test_id !== testId));
           } else {
             showAlert("Error", "An error occurred while deleting.", "error");
           }
         } catch(e) {
-          showAlert("Error", "네트워크 Error가 발생했습니다.", "error");
+          showAlert("Error", "A network error occurred.", "error");
         }
       },
       onCancel: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
@@ -200,7 +200,7 @@ export default function Dashboard() {
       type: "confirm",
       variant: "warning",
       title: "End Test Early",
-      message: "Currently까지 가장 높은 성과를 보인 Thumbnail로 영구 적용하고 최적화를 종료하시겠습니까?",
+      message: "Would you like to permanently apply the best-performing thumbnail so far and end the optimization?",
       confirmText: "Apply Now",
       cancelText: "Cancel",
       onConfirm: async () => {
@@ -208,18 +208,18 @@ export default function Dashboard() {
           ...prev, 
           type: "loading", 
           title: "Ending Test....", 
-          message: "유튜브 Thumbnail을 최종 승자로 확정하고 있습니다.\n잠시만 기다려주세요..." 
+          message: "Finalizing the winning thumbnail on YouTube.\nPlease wait..."
         }));
         try {
           const res = await apiFetch(`/api/tests/${testId}/stop`, { method: "POST" });
           if (res.ok) {
-            showAlert("Success", "테스트가 Success적으로 종료되었으며, 최고 효율의 Thumbnail이 유튜브에 반영되었습니다.", "success");
+            showAlert("Success", "The test has ended and the best-performing thumbnail has been applied to YouTube.", "success");
             setTestData(prevData => prevData.map(t => t.test_id === testId ? { ...t, status: "STOPPED" } : t));
           } else {
             showAlert("Error", "An error occurred while ending the test.", "error");
           }
         } catch(e) {
-          showAlert("Error", "네트워크 Error가 발생했습니다.", "error");
+          showAlert("Error", "A network error occurred.", "error");
         }
       },
       onCancel: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
@@ -231,14 +231,14 @@ export default function Dashboard() {
     try {
       const res = await apiFetch(`/api/tests/${testId}/swap`, { method: "POST" });
       if (res.ok) {
-        showAlert("수동 교체 Success", "Thumbnail swapped successfully.", "success");
+        showAlert("Swap Success", "Thumbnail swapped successfully.", "success");
         const myToken = ++testsRefreshTokenRef.current;
         apiFetch("/api/tests").then(r => r.json()).then(d => {
           if (testsRefreshTokenRef.current !== myToken) return; // 더 최신 새로고침이 이미 진행됨 - 이 응답은 버림
           setTestData(d.tests || []);
         });
       } else {
-        showAlert("Swap Failed", "수동 교체에 실패했습니다.", "error");
+        showAlert("Swap Failed", "Failed to swap thumbnail. Please try again.", "error");
       }
     } catch(e) {
       showAlert("Error", "A communication error occurred.", "error");
@@ -266,11 +266,11 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <AlertTriangle size={20} className="text-amber-400 flex-shrink-0" aria-hidden="true" />
             <p className="text-sm">
-              YouTube 채널 연동이 만료되어 자동 A/B 테스트가 일시 중지되었습니다. 다시 로그인해서 재연동해주세요.
+              Your YouTube channel connection has expired and A/B tests are paused. Please reconnect your channel.
             </p>
           </div>
           <Link href="/login" className="px-4 py-2 bg-amber-500 text-black text-sm font-bold rounded-lg hover:bg-amber-400 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-            채널 재연동하기
+            Reconnect Channel
           </Link>
         </div>
       )}
@@ -284,7 +284,7 @@ export default function Dashboard() {
               <FlaskConical size={32} className="text-zinc-400" />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">No active optimizations</h2>
-            <p className="text-zinc-400 mb-8 max-w-md">새로운 영상의 Thumbnail A/B 테스트를 만들어 조 views수를 극대화 해보세요.</p>
+            <p className="text-zinc-400 mb-8 max-w-md">Create a thumbnail A/B test for your video and maximize your views.</p>
             <Link href="/new" className="px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
               <Sparkles size={18} aria-hidden="true" /> Create New Test
             </Link>
@@ -328,19 +328,19 @@ export default function Dashboard() {
                           </>
                         ) : (
                           <>
-                            <Settings2 size={16} aria-hidden="true" /> Thumbnail 후보 이미지 즉시 교체
+                            <Settings2 size={16} aria-hidden="true" /> Swap Thumbnail Now
                           </>
                         )}
                       </button>
                       <button onClick={() => handleStopTest(test.test_id)} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-sm font-bold transition-colors cursor-pointer flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
                         <CheckCircle2 size={16} aria-hidden="true" /> Lock Winning Thumbnail
                       </button>
-                      <button onClick={() => handleDeleteTest(test.test_id)} className="ml-auto px-4 py-2 bg-zinc-700/50 hover:bg-red-900/40 text-zinc-200 hover:text-red-400 border border-zinc-500/50 hover:border-red-500/50 rounded-lg text-sm font-black transition-all cursor-pointer flex items-center gap-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" title="테스트를 즉시 Cancel하고 유튜브 Thumbnail을 원본으로 복구합니다">
-                        <Trash2 size={16} aria-hidden="true" /> 테스트 완전 Cancel 및 삭제
+                      <button onClick={() => handleDeleteTest(test.test_id)} className="ml-auto px-4 py-2 bg-zinc-700/50 hover:bg-red-900/40 text-zinc-200 hover:text-red-400 border border-zinc-500/50 hover:border-red-500/50 rounded-lg text-sm font-black transition-all cursor-pointer flex items-center gap-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" title="Cancel test and restore original thumbnail">
+                        <Trash2 size={16} aria-hidden="true" /> Cancel & Delete Test
                       </button>
                     </div>
                     <div className="bg-zinc-800/30 rounded-lg p-3 text-xs text-zinc-400 leading-relaxed border border-zinc-800/50">
-                      <strong className="text-zinc-300">💡 Thumbnail 즉시 교체란?</strong> 정해진 대기 시간을 무시하고 다음 Thumbnail 후보로 즉시 강제 교체해 보는 기능입니다.<br/>
+                      <strong className="text-zinc-300">💡 What is Swap Thumbnail Now?</strong> Skips the scheduled wait time and immediately forces a swap to the next thumbnail candidate.<br/>
                       (Note: Due to YouTube cache, it may take 1-2 minutes to reflect on YouTube after clicking the button.)
                     </div>
                   </div>
@@ -388,7 +388,7 @@ function VariationCard({ title, videoTitle, viewsGained, views, data, color, isW
     <div className={`relative glass-panel rounded-2xl p-5 flex flex-col transition-all duration-300 border ${isWinner ? "winner-glow transform -translate-y-1 border-cyan-500/50" : "border-zinc-800"}`}>
       {isWinner && (
         <div className="absolute -top-3 -right-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-bold px-3 py-1 rounded-full shadow-lg shadow-cyan-500/20 flex items-center gap-1 border border-cyan-400/50 z-20">
-          <CheckCircle2 size={16} aria-hidden="true" /> 1위 승리
+          <CheckCircle2 size={16} aria-hidden="true" /> Winner
         </div>
       )}
       
@@ -403,7 +403,7 @@ function VariationCard({ title, videoTitle, viewsGained, views, data, color, isW
          ) : (
            <>
              <div className="absolute inset-0 bg-gradient-to-tr from-zinc-800 to-zinc-700 group-hover:scale-105 transition-transform duration-500" />
-             <span className="relative z-10 text-zinc-400 font-medium">Thumbnail 이미지</span>
+             <span className="relative z-10 text-zinc-400 font-medium">No Image</span>
            </>
          )}
       </div>
@@ -414,7 +414,7 @@ function VariationCard({ title, videoTitle, viewsGained, views, data, color, isW
 
       <div className="mt-auto">
         <div className="flex justify-between items-end mb-2">
-          <span className="text-sm text-zinc-400 uppercase font-medium tracking-wide">누적 상승 조회수</span>
+          <span className="text-sm text-zinc-400 uppercase font-medium tracking-wide">Views Gained</span>
           <span className={`text-xl font-bold ${isWinner ? "text-cyan-400" : "text-zinc-200"}`}>{viewsGained}</span>
         </div>
         <div className="h-24 w-full">
@@ -435,7 +435,7 @@ function VariationCard({ title, videoTitle, viewsGained, views, data, color, isW
               <span className="text-lg font-bold text-zinc-100">{data[0]?.day || "-"}</span>
            </div>
            <div className="flex flex-col gap-1 text-right">
-              <span className="text-sm text-zinc-400 uppercase font-medium">총 획득 조 views수</span>
+              <span className="text-sm text-zinc-400 uppercase font-medium">Total Views</span>
               <span className="text-lg font-bold text-zinc-100">{views}</span>
            </div>
         </div>
