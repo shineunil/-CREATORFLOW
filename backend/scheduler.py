@@ -142,11 +142,14 @@ class AVSchedulerEngine:
                             channel.needs_reconnect = True
                             logger.warning(f"⚠️ 채널 [{channel.id}] YouTube 연동이 만료/철회되어 재연동이 필요합니다. (승자 확정은 정상 처리됨)")
 
-                # 유저에게 A/B 테스트 종료 및 승자 확정 이메일 발송
-                if channel.user and channel.user.email:
+                # 테스트 완료 이메일 알림 — PRO 유저 전용
+                from models import PlanType
+                if (
+                    channel.user
+                    and channel.user.email
+                    and channel.user.plan == PlanType.PRO
+                ):
                     from email_service import send_test_completion_email
-                    # 🔒 smtplib는 동기(blocking) 호출이라, 그대로 부르면 SMTP 서버가 응답 없을 때
-                    # 스케줄러의 이벤트 루프(다른 모든 테스트 처리 포함) 전체가 멈춘다.
                     await asyncio.to_thread(
                         send_test_completion_email,
                         user_email=channel.user.email,
