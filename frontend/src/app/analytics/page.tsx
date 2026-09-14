@@ -56,16 +56,16 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
           <p className="text-zinc-400 text-sm mb-1">Total Optimizations</p>
-          <div className="text-4xl font-bold">{data.total_tests}건</div>
+          <div className="text-4xl font-bold">{data.total_tests}</div>
         </div>
         <div className="glass-panel p-6 rounded-2xl border border-emerald-500/20 bg-emerald-950/10">
           <p className="text-emerald-400/80 text-sm mb-1">Active Optimizations</p>
-          <div className="text-4xl font-bold text-emerald-400">{data.active_tests}건</div>
+          <div className="text-4xl font-bold text-emerald-400">{data.active_tests}</div>
         </div>
         <div className="glass-panel p-6 rounded-2xl border border-cyan-500/20 bg-cyan-950/10">
           <p className="text-cyan-400/80 text-sm mb-1">Extra Views Gained from Optimization</p>
           <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
-            +{data.total_views_gained.toLocaleString()}회
+            +{data.total_views_gained.toLocaleString()}
           </div>
         </div>
       </div>
@@ -113,16 +113,16 @@ export default function AnalyticsPage() {
               </div>
               <div>
                 <div className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-1">{data.best_variation.name}</div>
-                <h3 className="text-sm font-semibold text-zinc-100 line-clamp-2">{data.best_variation.title_text || "제목 없음"}</h3>
+                <h3 className="text-sm font-semibold text-zinc-100 line-clamp-2">{data.best_variation.title_text || "No title"}</h3>
               </div>
               <div className="mt-auto pt-4 border-t border-zinc-800/50 flex justify-between items-end">
-                <span className="text-xs text-zinc-400 uppercase font-medium">누적 상승 조회수</span>
+                <span className="text-xs text-zinc-400 uppercase font-medium">Total Views Gained</span>
                 <span className="text-xl font-bold text-cyan-400">+{data.best_variation.total_views_gained.toLocaleString()}</span>
               </div>
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-center">
-              <p className="text-zinc-400 text-sm">아직 측정된 데이터가 없습니다.</p>
+              <p className="text-zinc-400 text-sm">No data yet.</p>
             </div>
           )}
         </div>

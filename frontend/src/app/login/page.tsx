@@ -8,9 +8,9 @@ import { API_BASE_URL } from "@/lib/config";
 
 const ERROR_MESSAGES: Record<string, string> = {
   youtube_permission_denied:
-    "구글 로그인 동의 화면에서 YouTube 관련 권한이 빠진 것 같아요. 다시 로그인하시면서 모든 권한을 허용해주세요.",
+    "It looks like YouTube permissions were not granted on the Google sign-in screen. Please sign in again and allow all requested permissions.",
   no_youtube_channel:
-    "이 구글 계정에 연결된 YouTube 채널을 찾지 못했어요. 채널이 있는 계정으로 다시 시도해주세요.",
+    "No YouTube channel was found for this Google account. Please try again with an account that has a channel.",
 };
 
 function LoginContent() {

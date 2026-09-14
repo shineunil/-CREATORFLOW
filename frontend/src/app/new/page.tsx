@@ -217,7 +217,7 @@ function NewTestContent() {
     const targetVar = variations.find(v => v.id === targetVarId);
     const headline = (targetVar?.generateHeadline || "").trim();
     if (!headline) {
-      showAlert("문구를 입력해주세요", "썸네일에 넣을 짧은 문구를 먼저 입력한 뒤 베이스 이미지를 선택해주세요.", "warning");
+      showAlert("Enter Text", "Please enter a short headline for the thumbnail before selecting a base image.", "warning");
       e.target.value = "";
       return;
     }
@@ -252,13 +252,13 @@ function NewTestContent() {
       } else {
         const err = await response.json().catch(() => ({}));
         if (isStale()) return;
-        showAlert("생성 실패", err.detail || "썸네일 생성에 실패했습니다.", "error");
+        showAlert("Generation Failed", err.detail || "Failed to generate thumbnail.", "error");
         setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: false } : v));
       }
     } catch (error) {
       console.error("Generate thumbnail error:", error);
       if (isStale()) return;
-      showAlert("오류 발생", "썸네일 생성 중 오류가 발생했습니다.", "error");
+      showAlert("Error", "An error occurred while generating the thumbnail.", "error");
       setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: false } : v));
     }
   };
@@ -267,7 +267,7 @@ function NewTestContent() {
     if (!userProfile.is_pro && variations.length >= 2) {
       showAlert(
         "Candidate Limit Reached", 
-        "BASIC 요금제는 최대 2개(B, C)까지만 추가 후보를 등록할 수 있습니다.\n더 많은 썸네일을 동시에 테스트하시려면 PRO 요금제로 업그레이드해주세요.", 
+        "BASIC plan allows up to 2 additional candidates (B, C).\nUpgrade to PRO to test more thumbnails simultaneously.",
         "warning",
         () => router.push("/pricing")
       );
@@ -337,7 +337,7 @@ function NewTestContent() {
            const errData = await response.json();
            showAlert(
              "Plan Limit Exceeded",
-             errData.detail || "BASIC Plan Restriction에 도달했습니다.\n무제한 최적화를 원하시면 PRO 요금제로 업그레이드해주세요.",
+             errData.detail || "You have reached the BASIC plan limit.\nUpgrade to PRO for unlimited optimizations.",
              "warning",
              () => router.push("/pricing")
            );
@@ -445,7 +445,7 @@ function NewTestContent() {
               aria-label="Change original video"
             >
               <RefreshCcw size={16} aria-hidden="true" />
-              <span>변경</span>
+              <span>Change</span>
             </button>
           </div>
 
@@ -499,7 +499,7 @@ function NewTestContent() {
                       ) : v.analyzing ? (
                         <div className="w-full aspect-video rounded-xl border-2 border-dashed border-zinc-700 bg-zinc-900/50 flex flex-col items-center justify-center" role="status">
                           <span className="w-8 h-8 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin mb-3" aria-hidden="true"></span>
-                          <span className="font-bold text-cyan-400">{v.showGenerator ? "썸네일 자동 생성 중..." : "업로드 및 분석 중..."}</span>
+                          <span className="font-bold text-cyan-400">{v.showGenerator ? "Generating thumbnail..." : "Uploading & analyzing..."}</span>
                         </div>
                       ) : v.showGenerator ? (
                         <div className="w-full aspect-video rounded-xl border-2 border-dashed border-violet-500/40 bg-violet-950/10 flex flex-col items-center justify-center p-5 gap-3">
@@ -510,7 +510,7 @@ function NewTestContent() {
                             type="text"
                             value={v.generateHeadline}
                             onChange={(e) => handleGenerateHeadlineChange(v.id, e.target.value)}
-                            placeholder="썸네일에 넣을 짧은 문구 (예: I BUILT THE ULTIMATE PC)"
+                            placeholder="Short headline for thumbnail (e.g. I BUILT THE ULTIMATE PC)"
                             maxLength={60}
                             className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
                           />
@@ -522,11 +522,11 @@ function NewTestContent() {
                               className="hidden"
                             />
                             <div className="flex items-center justify-center gap-2 w-full py-2.5 bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 rounded-lg text-sm font-bold text-violet-200 transition-colors">
-                              <UploadCloud size={16} aria-hidden="true" /> 베이스 사진 선택 &amp; 생성
+                              <UploadCloud size={16} aria-hidden="true" /> Select base image &amp; generate
                             </div>
                           </label>
                           <button onClick={() => toggleGenerator(v.id)} className="text-xs text-zinc-400 hover:text-zinc-300 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded">
-                            직접 업로드로 돌아가기
+                            Back to manual upload
                           </button>
                         </div>
                       ) : (
@@ -545,7 +545,7 @@ function NewTestContent() {
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleGenerator(v.id); }}
                             className="mt-3 flex items-center gap-1.5 text-xs font-bold text-violet-400 hover:text-violet-300 px-3 py-1.5 rounded-full bg-violet-950/40 border border-violet-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                           >
-                            <Wand2 size={12} aria-hidden="true" /> AI로 자동 생성해보기
+                            <Wand2 size={12} aria-hidden="true" /> Auto-generate with AI
                           </button>
                         </label>
                       )}
@@ -567,7 +567,7 @@ function NewTestContent() {
                         <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
                           <div className="flex items-center gap-2 mb-2">
                             <Sparkles size={16} className="text-emerald-400" aria-hidden="true" />
-                            <span className="font-bold text-emerald-400 text-sm">AI Thumbnail Analysis Complete (Score: {v.ml_score}점)</span>
+                            <span className="font-bold text-emerald-400 text-sm">AI Thumbnail Analysis Complete (Score: {v.ml_score})</span>
                           </div>
                           <p className="text-xs text-emerald-200/70">{v.ml_feedback}</p>
                         </div>
@@ -624,7 +624,7 @@ function NewTestContent() {
                   <option value="48">Apply best thumbnail permanently after 48 hours</option>
                   <option value="72">Apply best thumbnail permanently after 72 hours</option>
                 </select>
-                <p className="text-xs text-zinc-400 mt-2">테스트가 끝나면 승리한 썸네일로 고정됩니다.</p>
+                <p className="text-xs text-zinc-400 mt-2">When the test ends, the winning thumbnail will be applied permanently.</p>
               </div>
             </div>
           </div>
@@ -648,7 +648,7 @@ function NewTestContent() {
               )}
             </button>
             {isSubmittingTest && (
-              <p className="text-xs text-zinc-400" role="status">테스트를 생성하는 중입니다...</p>
+              <p className="text-xs text-zinc-400" role="status">Creating test...</p>
             )}
           </div>
         </div>

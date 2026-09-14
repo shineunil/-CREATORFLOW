@@ -71,7 +71,7 @@ export default function AdminPage() {
   if (status === "loading") {
     return (
       <div className="w-full p-8 flex items-center justify-center text-zinc-400" role="status">
-        불러오는 중...
+        Loading...
       </div>
     );
   }
@@ -80,8 +80,8 @@ export default function AdminPage() {
     return (
       <div className="w-full p-8 flex flex-col items-center justify-center text-center py-32">
         <ShieldAlert size={40} className="text-red-400 mb-4" aria-hidden="true" />
-        <h1 className="text-xl font-bold text-white mb-2">접근 권한이 없습니다</h1>
-        <p className="text-zinc-400 text-sm">이 페이지는 관리자 계정만 볼 수 있습니다.</p>
+        <h1 className="text-xl font-bold text-white mb-2">Access Denied</h1>
+        <p className="text-zinc-400 text-sm">This page is only accessible to admin accounts.</p>
       </div>
     );
   }
@@ -90,8 +90,8 @@ export default function AdminPage() {
     return (
       <div className="w-full p-8 flex flex-col items-center justify-center text-center py-32">
         <AlertTriangle size={40} className="text-amber-400 mb-4" aria-hidden="true" />
-        <h1 className="text-xl font-bold text-white mb-2">데이터를 불러오지 못했습니다</h1>
-        <p className="text-zinc-400 text-sm">잠시 후 새로고침 해주세요.</p>
+        <h1 className="text-xl font-bold text-white mb-2">Failed to Load Data</h1>
+        <p className="text-zinc-400 text-sm">Please refresh in a moment.</p>
       </div>
     );
   }
@@ -102,35 +102,35 @@ export default function AdminPage() {
     <div className="w-full p-8 animate-fade-in-up">
       <div className="mb-8">
         <h1 className="text-3xl font-black text-white flex items-center gap-3">
-          <ShieldAlert className="text-cyan-400" aria-hidden="true" /> 관리자 대시보드
+          <ShieldAlert className="text-cyan-400" aria-hidden="true" /> Admin Dashboard
         </h1>
-        <p className="text-zinc-400 mt-2">가입자, 채널, 테스트, API 쿼터 현황을 한눈에 확인합니다.</p>
+        <p className="text-zinc-400 mt-2">Overview of users, channels, tests, and API quota.</p>
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-        <StatCard icon={<Users size={18} aria-hidden="true" />} label="전체 가입자" value={`${stats.users.total}`} sub={`PRO ${stats.users.pro} / BASIC ${stats.users.basic}`} />
-        <StatCard icon={<PlaySquare size={18} aria-hidden="true" />} label="연동 채널" value={`${stats.channels.total}`} sub={stats.channels.needs_reconnect > 0 ? `재연동 필요 ${stats.channels.needs_reconnect}개` : "전부 정상"} warn={stats.channels.needs_reconnect > 0} />
-        <StatCard icon={<FlaskConical size={18} aria-hidden="true" />} label="진행 중 테스트" value={`${stats.tests.active}`} sub={`누적 ${stats.tests.total}개 (완료 ${stats.tests.completed})`} />
-        <StatCard icon={<Gauge size={18} aria-hidden="true" />} label="오늘 API 쿼터" value={`${quotaPct}%`} sub={`${stats.quota_today.used.toLocaleString()} / ${stats.quota_today.limit.toLocaleString()}`} warn={quotaPct >= 80} />
+        <StatCard icon={<Users size={18} aria-hidden="true" />} label="Total Users" value={`${stats.users.total}`} sub={`PRO ${stats.users.pro} / BASIC ${stats.users.basic}`} />
+        <StatCard icon={<PlaySquare size={18} aria-hidden="true" />} label="Connected Channels" value={`${stats.channels.total}`} sub={stats.channels.needs_reconnect > 0 ? `${stats.channels.needs_reconnect} need reconnect` : "All normal"} warn={stats.channels.needs_reconnect > 0} />
+        <StatCard icon={<FlaskConical size={18} aria-hidden="true" />} label="Active Tests" value={`${stats.tests.active}`} sub={`${stats.tests.total} total (${stats.tests.completed} completed)`} />
+        <StatCard icon={<Gauge size={18} aria-hidden="true" />} label="Today's API Quota" value={`${quotaPct}%`} sub={`${stats.quota_today.used.toLocaleString()} / ${stats.quota_today.limit.toLocaleString()}`} warn={quotaPct >= 80} />
       </div>
 
       {/* Running tests */}
       <section className="glass-panel rounded-2xl border border-zinc-800/50 p-6 mb-8">
-        <h2 className="text-lg font-bold mb-4">진행 중인 테스트 ({tests.length})</h2>
+        <h2 className="text-lg font-bold mb-4">Active Tests ({tests.length})</h2>
         {tests.length === 0 ? (
-          <p className="text-sm text-zinc-400">현재 진행 중인 테스트가 없습니다.</p>
+          <p className="text-sm text-zinc-400">No active tests.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="text-zinc-400 border-b border-zinc-800/50">
                 <tr>
-                  <th className="py-2 pr-4 font-medium">유저</th>
-                  <th className="py-2 pr-4 font-medium">채널</th>
-                  <th className="py-2 pr-4 font-medium">영상 ID</th>
-                  <th className="py-2 pr-4 font-medium">스왑 횟수</th>
-                  <th className="py-2 pr-4 font-medium">상태</th>
-                  <th className="py-2 pr-4 font-medium">시작일</th>
+                  <th className="py-2 pr-4 font-medium">User</th>
+                  <th className="py-2 pr-4 font-medium">Channel</th>
+                  <th className="py-2 pr-4 font-medium">Video ID</th>
+                  <th className="py-2 pr-4 font-medium">Swaps</th>
+                  <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2 pr-4 font-medium">Started</th>
                 </tr>
               </thead>
               <tbody>
@@ -142,11 +142,11 @@ export default function AdminPage() {
                     <td className="py-2 pr-4">{t.swap_count}</td>
                     <td className="py-2 pr-4">
                       {t.needs_reconnect ? (
-                        <span className="text-amber-400 text-xs font-bold">재연동 필요</span>
+                        <span className="text-amber-400 text-xs font-bold">Reconnect needed</span>
                       ) : t.swap_failed ? (
-                        <span className="text-red-400 text-xs font-bold">스왑 실패</span>
+                        <span className="text-red-400 text-xs font-bold">Swap failed</span>
                       ) : (
-                        <span className="text-emerald-400 text-xs font-bold">정상</span>
+                        <span className="text-emerald-400 text-xs font-bold">Normal</span>
                       )}
                     </td>
                     <td className="py-2 pr-4 text-zinc-400 text-xs">{t.start_time ? new Date(t.start_time).toLocaleString() : "-"}</td>
@@ -160,16 +160,16 @@ export default function AdminPage() {
 
       {/* Users */}
       <section className="glass-panel rounded-2xl border border-zinc-800/50 p-6">
-        <h2 className="text-lg font-bold mb-4">가입자 목록 ({users.length})</h2>
+        <h2 className="text-lg font-bold mb-4">User List ({users.length})</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-zinc-400 border-b border-zinc-800/50">
               <tr>
-                <th className="py-2 pr-4 font-medium">이메일</th>
-                <th className="py-2 pr-4 font-medium">플랜</th>
-                <th className="py-2 pr-4 font-medium">채널 수</th>
-                <th className="py-2 pr-4 font-medium">결제 이력</th>
-                <th className="py-2 pr-4 font-medium">가입일</th>
+                <th className="py-2 pr-4 font-medium">Email</th>
+                <th className="py-2 pr-4 font-medium">Plan</th>
+                <th className="py-2 pr-4 font-medium">Channels</th>
+                <th className="py-2 pr-4 font-medium">Payment History</th>
+                <th className="py-2 pr-4 font-medium">Joined</th>
               </tr>
             </thead>
             <tbody>
@@ -182,7 +182,7 @@ export default function AdminPage() {
                     </span>
                   </td>
                   <td className="py-2 pr-4">{u.channel_count}</td>
-                  <td className="py-2 pr-4">{u.has_paddle_customer ? "있음" : "-"}</td>
+                  <td className="py-2 pr-4">{u.has_paddle_customer ? "Yes" : "-"}</td>
                   <td className="py-2 pr-4 text-zinc-400 text-xs">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "-"}</td>
                 </tr>
               ))}
