@@ -4,6 +4,7 @@ backend/.venv/
 *.pyc
 backend/*.db
 backend/uploads/
+backend/backups/
 backend/.env
 
 # Local secrets / setup notes (never commit real credentials)
