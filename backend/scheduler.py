@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # Import models and APIs safely
@@ -38,7 +38,7 @@ class AVSchedulerEngine:
         self.scheduler.start()
 
     async def check_and_swap_variations(self):
-        logger.info(f"[{datetime.utcnow()}] 엔진 가동: 진행 중인 테스트 탐색 시작...")
+        logger.info(f"[{datetime.now(timezone.utc).isoformat()}] Scheduler tick: scanning active tests...")
         
         Session = self.db_session_maker()
         try:
@@ -70,7 +70,7 @@ class AVSchedulerEngine:
         channel = test.video.channel
 
         # 0. 테스트 기간(end_time)이 만료되었는지 확인
-        if test.end_time and datetime.utcnow() >= test.end_time:
+        if test.end_time and datetime.now(timezone.utc) >= test.end_time:
             all_vars = session.query(Variation).filter(Variation.ab_test_id == test.id).all()
             total_views_gained = sum(sum(l.views_gained for l in v.metric_logs) for v in all_vars)
 
@@ -165,7 +165,7 @@ class AVSchedulerEngine:
         # 0-1. 워밍업 구간(스왑 직후 SWAP_WARMUP_MINUTES) 종료 시점에 조회수 기준선을 다시 캡처한다.
         #      직전 썸네일의 잔상 노출로 인한 조회수가 새 변인의 점수에 섞이는 것을 막기 위함.
         if not test.warmup_captured:
-            minutes_since_swap = (datetime.utcnow() - test.last_swapped_at).total_seconds() / 60
+            minutes_since_swap = (datetime.now(timezone.utc) - test.last_swapped_at).total_seconds() / 60
             if minutes_since_swap >= SWAP_WARMUP_MINUTES:
                 refresh_token = channel.oauth_refresh_token
                 if refresh_token:
@@ -173,7 +173,7 @@ class AVSchedulerEngine:
                         baseline_views = await get_video_views(test.video.youtube_video_id, refresh_token)
                         record_usage(session, COST_VIDEOS_LIST)
                         test.last_views_snapshot = baseline_views
-                        test.exposure_start_at = datetime.utcnow()
+                        test.exposure_start_at = datetime.now(timezone.utc)
                         test.warmup_captured = True
                         logger.info(f" - [테스트 {test.id}] 워밍업 종료, 조회수 기준선 재캡처 ({baseline_views} views)")
                     except TokenRevokedError:
@@ -183,7 +183,7 @@ class AVSchedulerEngine:
 
         # 1. 교체 주기가 되었는지 확인 (ex. 120분이 지났는가?). 단, 직전 스왑이 실패했다면
         #    (swap_failed) 전체 주기를 기다리지 않고 다음 스케줄러 tick마다 재시도한다.
-        time_since_last_swap = datetime.utcnow() - test.last_swapped_at
+        time_since_last_swap = datetime.now(timezone.utc) - test.last_swapped_at
         interval_elapsed = time_since_last_swap >= timedelta(minutes=test.swap_interval_minutes)
         if not interval_elapsed and not test.swap_failed:
             return # 아직 교체 주기가 안 됨
@@ -223,7 +223,7 @@ class AVSchedulerEngine:
         all_vars = session.query(Variation).filter(Variation.ab_test_id == test.id).order_by(Variation.id).all()
         current_var = session.query(Variation).filter(Variation.id == test.current_variation_id).first() if test.current_variation_id else None
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # 2. YouTube API를 호출하여 현재 총 조회수 가져오기
         try:

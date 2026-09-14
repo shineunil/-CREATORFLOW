@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Enum, Float
 from sqlalchemy.orm import declarative_base, relationship
 import enum
@@ -30,7 +30,7 @@ class User(Base):
     google_user_id = Column(String, unique=True, index=True, nullable=True)
     email = Column(String, unique=True, index=True, nullable=False)
     plan = Column(Enum(PlanType), default=PlanType.BASIC)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     # Paddle 고객 포털(구독 취소/다운그레이드/결제 내역 조회)에 필요한 식별자.
     # 최초 결제(구독 생성) 웹훅을 받을 때 채워지며, 결제 이력이 없는 유저는 계속 null.
     paddle_customer_id = Column(String, nullable=True)
@@ -70,16 +70,16 @@ class ABTest(Base):
     status = Column(Enum(TestStatus), default=TestStatus.PENDING)
     swap_interval_minutes = Column(Integer, default=120) # e.g., swap every 2 hours
     current_variation_id = Column(Integer, ForeignKey('variations.id'), nullable=True) # Optimization/Cache
-    last_swapped_at = Column(DateTime, default=datetime.utcnow) # 마지막으로 썸네일을 교체한 시간
+    last_swapped_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_views_snapshot = Column(Integer, default=0) # 마지막 교체 시점의 총 조회수 스냅샷
-    start_time = Column(DateTime, nullable=True)
-    end_time = Column(DateTime, nullable=True)
+    start_time = Column(DateTime(timezone=True), nullable=True)
+    end_time = Column(DateTime(timezone=True), nullable=True)
     is_deleted = Column(Boolean, default=False) # 유저가 삭제 버튼을 누른 경우 (쿼터 계산용으로 보존)
     swap_failed = Column(Boolean, default=False) # 직전 스왑(썸네일/제목 교체) 시도가 실패해 재시도 대상인지 여부
     swap_count = Column(Integer, default=0) # 지금까지 성공적으로 반영된 스왑 횟수 (최소 사이클 판정용)
     extension_count = Column(Integer, default=0) # 사이클/표본 부족으로 자동 연장된 횟수 (무한 연장 방지)
     warmup_captured = Column(Boolean, default=True) # 스왑 직후 워밍업 구간이 지나 조회수 기준선을 다시 캡처했는지 여부
-    exposure_start_at = Column(DateTime, nullable=True) # 워밍업 이후 "진짜" 측정이 시작된 시각 (없으면 last_swapped_at 사용)
+    exposure_start_at = Column(DateTime(timezone=True), nullable=True)
 
     video = relationship("Video", back_populates="ab_tests")
     variations = relationship("Variation", back_populates="ab_test", foreign_keys="[Variation.ab_test_id]", cascade="all, delete-orphan")
@@ -103,7 +103,7 @@ class MetricLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     variation_id = Column(Integer, ForeignKey('variations.id', ondelete="CASCADE"), nullable=False)
-    measured_at = Column(DateTime, default=datetime.utcnow, index=True)
+    measured_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     views_gained = Column(Integer, default=0) # Delta views during this interval
     hours_exposed = Column(Float, default=0) # 이 구간 동안 실제 노출된 시간(시간 단위) - VPH 계산용
 

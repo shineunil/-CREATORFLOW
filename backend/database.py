@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from models import Base
 from dotenv import load_dotenv
@@ -20,8 +20,29 @@ else:
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
-    """모든 데이터베이스 테이블을 생성합니다."""
+    """모든 데이터베이스 테이블을 생성하고, datetime 컬럼을 TIMESTAMPTZ로 마이그레이션합니다."""
     Base.metadata.create_all(bind=engine)
+    if not SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+        _migrate_timestamps_to_utc()
+
+
+def _migrate_timestamps_to_utc():
+    """TIMESTAMP WITHOUT TIME ZONE 컬럼을 TIMESTAMPTZ로 일괄 변환합니다. (서버 시작 시 자동 실행, 멱등)"""
+    migrations = [
+        "ALTER TABLE users ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC'",
+        "ALTER TABLE ab_tests ALTER COLUMN last_swapped_at TYPE TIMESTAMPTZ USING last_swapped_at AT TIME ZONE 'UTC'",
+        "ALTER TABLE ab_tests ALTER COLUMN start_time TYPE TIMESTAMPTZ USING start_time AT TIME ZONE 'UTC'",
+        "ALTER TABLE ab_tests ALTER COLUMN end_time TYPE TIMESTAMPTZ USING end_time AT TIME ZONE 'UTC'",
+        "ALTER TABLE ab_tests ALTER COLUMN exposure_start_at TYPE TIMESTAMPTZ USING exposure_start_at AT TIME ZONE 'UTC'",
+        "ALTER TABLE metrics_logs ALTER COLUMN measured_at TYPE TIMESTAMPTZ USING measured_at AT TIME ZONE 'UTC'",
+    ]
+    with engine.connect() as conn:
+        for stmt in migrations:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # 이미 TIMESTAMPTZ면 무시하고 계속 진행
 
 def get_db():
     """요청(Request)마다 DB 세션을 생성하고 종료하는 제너레이터"""

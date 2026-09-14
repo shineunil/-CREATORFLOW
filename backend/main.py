@@ -459,7 +459,7 @@ async def create_ab_test(test_data: ABTestCreate, background_tasks: BackgroundTa
                 raise HTTPException(status_code=403, detail="BASIC 요금제는 동시에 1개의 테스트만 진행할 수 있습니다. PRO 요금제로 업그레이드해주세요.")
                 
             # 2. 월간 누적 테스트 생성 횟수 제한 (4회)
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             first_day_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             monthly_count = db.query(ABTest).join(Video).filter(
                 Video.channel_id == channel.id,
@@ -495,8 +495,8 @@ async def create_ab_test(test_data: ABTestCreate, background_tasks: BackgroundTa
         video_id=video.id,
         swap_interval_minutes=test_data.swap_interval_minutes,
         status=TestStatus.RUNNING,
-        start_time=datetime.utcnow(),
-        end_time=datetime.utcnow() + timedelta(hours=test_data.duration_hours)
+        start_time=datetime.now(timezone.utc),
+        end_time=datetime.now(timezone.utc) + timedelta(hours=test_data.duration_hours)
     )
     db.add(new_test)
     db.commit()
@@ -529,7 +529,7 @@ async def stop_ab_test(test_id: int, db: Session = Depends(get_db), channel: Cha
         raise HTTPException(status_code=400, detail="진행 중인 테스트만 중단할 수 있습니다.")
 
     test.status = TestStatus.COMPLETED
-    test.end_time = datetime.utcnow()
+    test.end_time = datetime.now(timezone.utc)
     
     # 승자 확정 (노출 시간당 조회수 = VPH가 가장 높은 변인. 오래 노출된 변인이 유리해지는 것을 방지)
     all_vars = db.query(Variation).filter(Variation.ab_test_id == test.id).all()
