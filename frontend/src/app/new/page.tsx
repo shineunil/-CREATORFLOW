@@ -672,7 +672,7 @@ function NewTestContent() {
           </p>
 
           <div className="flex gap-4">
-            <Link href="/" className="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-bold border border-zinc-800 transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            <Link href="/dashboard" className="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-bold border border-zinc-800 transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
               <LayoutDashboard size={18} aria-hidden="true" /> View Status on Dashboard
             </Link>
           </div>
