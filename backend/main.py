@@ -942,13 +942,13 @@ def get_ab_tests(db: Session = Depends(get_db), channel: Channel = Depends(get_c
             # 측정된 로그들로 차트 데이터 구성
             for log in var.metric_logs:
                 chart_data.append({
-                    "day": log.measured_at.strftime("%m-%d %H:%M"),
+                    "day": log.measured_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "views_gained": log.views_gained
                 })
 
             # 로그가 아직 없는 경우 (첫 측정 전) 실제 시작 시각을 표시
             if not chart_data:
-                start_label = test.start_time.strftime("%m-%d %H:%M") if test.start_time else "방금 전"
+                start_label = test.start_time.strftime("%Y-%m-%dT%H:%M:%SZ") if test.start_time else None
                 chart_data = [
                     {"day": start_label, "views_gained": 0}
                 ]

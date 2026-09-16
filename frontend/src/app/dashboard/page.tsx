@@ -23,6 +23,21 @@ import ChannelSelect from "@/components/layout/ChannelSelect";
 import { apiFetch } from "@/lib/api";
 import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 
+const formatLocalDateTime = (iso: string | null | undefined): string => {
+  if (!iso) return "-";
+  try {
+    const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
+    if (isNaN(d.getTime())) return iso;
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${mm}-${dd} ${hh}:${min}`;
+  } catch {
+    return iso;
+  }
+};
+
 const formatTestDuration = (startIso: string | null | undefined, endIso: string | null | undefined, status: string) => {
   if (!startIso) return "Not started";
   if (startIso && !startIso.endsWith('Z')) startIso += 'Z';
@@ -447,7 +462,7 @@ function VariationCard({ title, videoTitle, viewsGained, views, data, color, isW
         <div className="flex justify-between items-center mt-4 pt-4 border-t border-zinc-800/50">
            <div className="flex flex-col gap-1">
               <span className="text-sm text-zinc-400 uppercase font-medium">Started At</span>
-              <span className="text-lg font-bold text-zinc-100">{data[0]?.day || "-"}</span>
+              <span className="text-lg font-bold text-zinc-100">{formatLocalDateTime(data[0]?.day)}</span>
            </div>
            <div className="flex flex-col gap-1 text-right">
               <span className="text-sm text-zinc-400 uppercase font-medium">Total Views</span>
