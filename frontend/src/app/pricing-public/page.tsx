@@ -2,7 +2,23 @@ import Link from "next/link";
 import { ArrowLeft, Check, Crown, Zap } from "lucide-react";
 
 export const metadata = {
-  title: "Pricing | ThumbnailFlow",
+  title: "Pricing",
+  description:
+    "Start free with 4 tests per month. Upgrade to PRO for unlimited tests, faster swaps, and email notifications. No credit card required to start.",
+  alternates: {
+    canonical: "https://trythumbnailflow.com/pricing-public",
+  },
+  openGraph: {
+    title: "Pricing — ThumbnailFlow",
+    description:
+      "Start free with 4 tests per month. Upgrade to PRO for unlimited tests, faster swaps, and email notifications.",
+    url: "https://trythumbnailflow.com/pricing-public",
+  },
+  twitter: {
+    title: "Pricing — ThumbnailFlow",
+    description:
+      "Start free with 4 tests per month. Upgrade to PRO for unlimited tests, faster swaps, and email notifications.",
+  },
 };
 
 export default function PricingPublicPage() {

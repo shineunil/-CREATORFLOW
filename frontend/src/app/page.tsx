@@ -25,8 +25,38 @@ export default function LandingPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "ThumbnailFlow",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: "https://trythumbnailflow.com",
+    description:
+      "A/B testing tool that automatically rotates YouTube thumbnail and title variants on your live video and keeps the one with the highest views per hour.",
+    offers: [
+      {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+        name: "BASIC",
+      },
+      {
+        "@type": "Offer",
+        price: "29",
+        priceCurrency: "USD",
+        name: "PRO Premium",
+        billingIncrement: "P1M",
+      },
+    ],
+  };
+
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 selection:bg-cyan-500/30 overflow-x-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Background */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[520px] bg-gradient-to-br from-cyan-600/10 via-transparent to-violet-600/10 blur-[130px] rounded-full pointer-events-none" aria-hidden="true" />
 

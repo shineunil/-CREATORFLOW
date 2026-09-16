@@ -549,13 +549,12 @@ async def stop_ab_test(test_id: int, db: Session = Depends(get_db), channel: Cha
         winner_var.is_winner = True
         winner_total_views = sum(l.views_gained for l in winner_var.metric_logs)
         channel = test.video.channel if test.video else None
-        if channel and channel.user and channel.user.email:
+        if channel and channel.user and channel.user.email and channel.user.plan == PlanType.PRO:
             from email_service import send_test_completion_email
-            # 🔒 smtplib는 동기(blocking) 호출이라, async 핸들러 안에서 그대로 부르면 SMTP 서버가
-            # 응답 없을 때 이벤트 루프 전체(다른 요청 포함)가 멈춘다. 별도 스레드로 실행한다.
+            to_email = channel.user.notification_email if channel.user.notification_email and channel.user.notification_email_verified else channel.user.email
             await asyncio.to_thread(
                 send_test_completion_email,
-                user_email=channel.user.email,
+                user_email=to_email,
                 video_title=winner_var.title_text or test.video.youtube_video_id,
                 winner_name=winner_var.name,
                 views_gained=winner_total_views
