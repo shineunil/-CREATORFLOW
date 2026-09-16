@@ -278,7 +278,12 @@ class AVSchedulerEngine:
                 file_name = next_var.thumbnail_image_url.split('/')[-1]
                 file_path = os.path.join("uploads", file_name)
 
-                allowed_prefixes = ("https://res.cloudinary.com/", "https://cloudinary.com/")
+                allowed_prefixes = (
+                    "https://res.cloudinary.com/",
+                    "https://cloudinary.com/",
+                    "https://i.ytimg.com/",
+                    "https://img.youtube.com/",
+                )
                 url_is_safe = not next_var.thumbnail_image_url.startswith("http") or \
                               any(next_var.thumbnail_image_url.startswith(p) for p in allowed_prefixes)
 
