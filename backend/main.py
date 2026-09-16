@@ -611,16 +611,21 @@ async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: C
         
         # 원본 썸네일 복구
         if original_var.thumbnail_image_url:
-            _allowed = ("https://res.cloudinary.com/", "https://cloudinary.com/")
-            if original_var.thumbnail_image_url.startswith("http"):
-                if not any(original_var.thumbnail_image_url.startswith(p) for p in _allowed):
-                    logger.warning(f"원본 썸네일 URL 도메인 불허 — 복구 건너뜀: {original_var.thumbnail_image_url[:80]}")
+            import re as _re
+            _YT_NATIVE = ("https://i.ytimg.com/", "https://img.youtube.com/")
+            _allowed = ("https://res.cloudinary.com/", "https://cloudinary.com/") + _YT_NATIVE
+            restore_url = original_var.thumbnail_image_url
+            if any(restore_url.startswith(p) for p in _YT_NATIVE):
+                restore_url = _re.sub(r'/[^/]+\.jpg$', '/maxresdefault.jpg', restore_url)
+            if restore_url.startswith("http"):
+                if not any(restore_url.startswith(p) for p in _allowed):
+                    logger.warning(f"원본 썸네일 URL 도메인 불허 — 복구 건너뜀: {restore_url[:80]}")
                 else:
                     file_path = os.path.join("uploads", f"temp_original_{test.id}.jpg")
                     try:
                         import httpx
                         async with httpx.AsyncClient() as client:
-                            resp = await client.get(original_var.thumbnail_image_url)
+                            resp = await client.get(restore_url)
                             if resp.status_code == 200:
                                 with open(file_path, "wb") as f:
                                     f.write(resp.content)
