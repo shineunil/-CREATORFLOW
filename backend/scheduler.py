@@ -126,13 +126,17 @@ class AVSchedulerEngine:
                         try:
                             if winner_var.thumbnail_image_url:
                                 import os
-                                file_name = winner_var.thumbnail_image_url.split('/')[-1]
-                                file_path = os.path.join("uploads", file_name)
-                                if os.path.exists(file_path):
-                                    thumb_ok = await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token)
-                                    record_usage(session, COST_THUMBNAILS_SET)
-                                    if not thumb_ok:
-                                        logger.error(f"⚠️ 테스트 ID [{test.id}] 승자 썸네일 YouTube 반영 실패 (API가 실패를 반환함)")
+                                _YT_NATIVE = ("https://i.ytimg.com/", "https://img.youtube.com/")
+                                if any(winner_var.thumbnail_image_url.startswith(p) for p in _YT_NATIVE):
+                                    logger.info(f"승자 [{winner_var.name}] YouTube 원본 썸네일 — 업로드 건너뜀")
+                                else:
+                                    file_name = winner_var.thumbnail_image_url.split('/')[-1]
+                                    file_path = os.path.join("uploads", file_name)
+                                    if os.path.exists(file_path):
+                                        thumb_ok = await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token)
+                                        record_usage(session, COST_THUMBNAILS_SET)
+                                        if not thumb_ok:
+                                            logger.error(f"⚠️ 테스트 ID [{test.id}] 승자 썸네일 YouTube 반영 실패 (API가 실패를 반환함)")
                             if winner_var.title_text:
                                 title_ok = await update_youtube_title(test.video.youtube_video_id, winner_var.title_text, refresh_token)
                                 record_usage(session, COST_VIDEOS_UPDATE)
@@ -275,43 +279,50 @@ class AVSchedulerEngine:
             thumbnail_ok = True
             if next_var.thumbnail_image_url:
                 import os
-                file_name = next_var.thumbnail_image_url.split('/')[-1]
-                file_path = os.path.join("uploads", file_name)
 
-                allowed_prefixes = (
-                    "https://res.cloudinary.com/",
-                    "https://cloudinary.com/",
-                    "https://i.ytimg.com/",
-                    "https://img.youtube.com/",
-                )
-                url_is_safe = not next_var.thumbnail_image_url.startswith("http") or \
-                              any(next_var.thumbnail_image_url.startswith(p) for p in allowed_prefixes)
+                _YOUTUBE_NATIVE_PREFIXES = ("https://i.ytimg.com/", "https://img.youtube.com/")
+                is_youtube_native = any(next_var.thumbnail_image_url.startswith(p) for p in _YOUTUBE_NATIVE_PREFIXES)
 
-                if not os.path.exists(file_path) and next_var.thumbnail_image_url.startswith("http"):
-                    if not url_is_safe:
-                        logger.warning(f"허용되지 않은 썸네일 URL 도메인 — 다운로드 건너뜀: {next_var.thumbnail_image_url[:80]}")
-                        thumbnail_ok = False
-                    else:
-                        import httpx
-                        try:
-                            # 💥 비동기(async) 다운로드로 메인 이벤트 루프 블로킹(셀프 데드락) 방지
-                            async with httpx.AsyncClient() as client:
-                                resp = await client.get(next_var.thumbnail_image_url)
-                                if resp.status_code == 200:
-                                    with open(file_path, "wb") as f:
-                                        f.write(resp.content)
-                                    logger.info(f"새 썸네일 다운로드 완료: {file_path}")
-                                else:
-                                    logger.error(f"썸네일 다운로드 실패 (상태 코드: {resp.status_code})")
-                        except Exception as e:
-                            logger.error(f"썸네일 다운로드 에러: {e}")
-
-                if os.path.exists(file_path):
-                    thumbnail_ok = await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token)
-                    record_usage(session, COST_THUMBNAILS_SET)
+                if is_youtube_native:
+                    # YouTube 원본 썸네일은 이미 해당 영상에 걸려있으므로 업로드 불필요.
+                    # (hqdefault.jpg는 480x360으로 YouTube API 최소 요건 640x360 미달이라 업로드 시 실패함)
+                    logger.info(f"[{next_var.name}] YouTube 원본 썸네일 — 업로드 건너뜀 (이미 적용된 상태)")
                 else:
-                    logger.warning(f"썸네일 파일을 찾을 수 없습니다: {file_path}")
-                    thumbnail_ok = False
+                    file_name = next_var.thumbnail_image_url.split('/')[-1]
+                    file_path = os.path.join("uploads", file_name)
+
+                    allowed_prefixes = (
+                        "https://res.cloudinary.com/",
+                        "https://cloudinary.com/",
+                    )
+                    url_is_safe = not next_var.thumbnail_image_url.startswith("http") or \
+                                  any(next_var.thumbnail_image_url.startswith(p) for p in allowed_prefixes)
+
+                    if not os.path.exists(file_path) and next_var.thumbnail_image_url.startswith("http"):
+                        if not url_is_safe:
+                            logger.warning(f"허용되지 않은 썸네일 URL 도메인 — 다운로드 건너뜀: {next_var.thumbnail_image_url[:80]}")
+                            thumbnail_ok = False
+                        else:
+                            import httpx
+                            try:
+                                async with httpx.AsyncClient() as client:
+                                    resp = await client.get(next_var.thumbnail_image_url)
+                                    if resp.status_code == 200:
+                                        with open(file_path, "wb") as f:
+                                            f.write(resp.content)
+                                        logger.info(f"새 썸네일 다운로드 완료: {file_path}")
+                                    else:
+                                        logger.error(f"썸네일 다운로드 실패 (상태 코드: {resp.status_code})")
+                            except Exception as e:
+                                logger.error(f"썸네일 다운로드 에러: {e}")
+
+                    if thumbnail_ok:
+                        if os.path.exists(file_path):
+                            thumbnail_ok = await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token)
+                            record_usage(session, COST_THUMBNAILS_SET)
+                        else:
+                            logger.warning(f"썸네일 파일을 찾을 수 없습니다: {file_path}")
+                            thumbnail_ok = False
 
             title_ok = True
             if next_var.title_text:
