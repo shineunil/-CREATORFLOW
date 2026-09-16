@@ -460,7 +460,7 @@ async def create_ab_test(test_data: ABTestCreate, background_tasks: BackgroundTa
                 ABTest.is_deleted == False
             ).count()
             if active_count >= 1:
-                raise HTTPException(status_code=403, detail="BASIC 요금제는 동시에 1개의 테스트만 진행할 수 있습니다. PRO 요금제로 업그레이드해주세요.")
+                raise HTTPException(status_code=403, detail="BASIC plan allows only 1 active test at a time. Upgrade to PRO for unlimited concurrent tests.")
                 
             # 2. 월간 누적 테스트 생성 횟수 제한 (4회)
             now = datetime.now(timezone.utc)
@@ -470,15 +470,15 @@ async def create_ab_test(test_data: ABTestCreate, background_tasks: BackgroundTa
                 ABTest.start_time >= first_day_of_month,
             ).count()
             if monthly_count >= 4:
-                raise HTTPException(status_code=403, detail="이번 달 무료 테스트 제공량(4회)을 모두 소진하셨습니다. 계속해서 테스트를 진행하시려면 PRO 요금제로 업그레이드해주세요.")
+                raise HTTPException(status_code=403, detail="You've used all 4 free tests this month. Upgrade to PRO for unlimited tests.")
                 
             # 3. 교체 주기 제한 (짧은 주기는 시간대 편향이 커지고 Analytics 데이터와도 안 맞으므로 PRO 전용)
             if test_data.swap_interval_minutes < BASIC_MIN_SWAP_INTERVAL_MINUTES:
-                raise HTTPException(status_code=403, detail=f"BASIC 요금제는 최소 {BASIC_MIN_SWAP_INTERVAL_MINUTES // 60}시간 주기로만 테스트할 수 있습니다. 더 짧은 교체 주기는 PRO 요금제 전용입니다.")
+                raise HTTPException(status_code=403, detail=f"BASIC plan requires a minimum {BASIC_MIN_SWAP_INTERVAL_MINUTES // 60}-hour swap interval. Shorter intervals are a PRO feature.")
                 
             # 3. 썸네일 후보 개수 제한 (A, B, C 까지만 허용 = 최대 3개)
             if len(test_data.variations) > 3:
-                raise HTTPException(status_code=403, detail="BASIC 요금제는 원본 포함 최대 3개의 후보까지만 테스트할 수 있습니다. 무제한 추가를 원하시면 PRO로 업그레이드해주세요.")
+                raise HTTPException(status_code=403, detail="BASIC plan allows up to 3 thumbnail variants (A/B/C). Upgrade to PRO for up to 5 variants.")
 
     # 🔒 채널 범위로 조회해야 한다: Video.youtube_video_id는 DB 전역에서 unique라서, 채널 필터 없이
     # 조회하면 이미 다른 사용자가 등록해둔 영상 ID를 그대로 가져와 그 사람 채널에 테스트를 붙이게 된다
@@ -489,7 +489,7 @@ async def create_ab_test(test_data: ABTestCreate, background_tasks: BackgroundTa
         # 방어적으로) 그 영상을 가로채 테스트를 붙이지 못하도록 명확히 거부한다.
         existing_elsewhere = db.query(Video).filter(Video.youtube_video_id == test_data.youtube_video_id).first()
         if existing_elsewhere:
-            raise HTTPException(status_code=403, detail="이 영상은 다른 채널에 이미 연동되어 있어 테스트를 생성할 수 없습니다.")
+            raise HTTPException(status_code=403, detail="This video is already linked to another channel and cannot be used for a new test.")
         video = Video(channel_id=channel.id, youtube_video_id=test_data.youtube_video_id)
         db.add(video)
         db.commit()
