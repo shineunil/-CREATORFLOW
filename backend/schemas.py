@@ -4,6 +4,8 @@ from typing import List, Optional
 _ALLOWED_THUMBNAIL_PREFIXES = (
     "https://res.cloudinary.com/",
     "https://cloudinary.com/",
+    "https://i.ytimg.com/",       # YouTube 원본 썸네일 (Variation A 컨트롤)
+    "https://img.youtube.com/",   # YouTube 썸네일 대체 도메인
     "/uploads/",
 )
 
