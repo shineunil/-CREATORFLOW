@@ -177,12 +177,13 @@ export default function Dashboard() {
   }, []);
 
   const handleDeleteTest = (testId: string) => {
+    const isBasic = !userProfile.is_pro;
     setModalConfig({
       isOpen: true,
       type: "confirm",
       variant: "error",
       title: "Cancel & Delete Test",
-      message: "Are you sure you want to cancel and delete this test?\nThe YouTube thumbnail will be safely restored to the original (A). This action cannot be undone.",
+      message: `Are you sure you want to cancel and delete this test?\nThe YouTube thumbnail will be safely restored to the original (A). This action cannot be undone.${isBasic ? "\n\n⚠️ Note: Cancelled tests still count toward your 4 tests/month limit." : ""}`,
       confirmText: "Yes, delete permanently",
       cancelText: "Cancel",
       onConfirm: async () => {
