@@ -168,6 +168,10 @@ export default function PricingPage() {
                 <Check size={18} className="text-zinc-400 flex-shrink-0" aria-hidden="true" />
                 Minimum swap interval: 4 hours
               </li>
+              <li className="flex items-center gap-3 text-sm text-zinc-300">
+                <Check size={18} className="text-zinc-400 flex-shrink-0" aria-hidden="true" />
+                Best thumbnail auto-applied at test end
+              </li>
             </ul>
 
             <button disabled className="w-full py-4 rounded-xl bg-zinc-900 text-zinc-400 font-bold border border-zinc-800 cursor-not-allowed">
@@ -207,6 +211,10 @@ export default function PricingPage() {
               <li className="flex items-center gap-3 text-sm text-zinc-100">
                 <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
                 <span className="font-semibold text-cyan-300">Ultra-fast 30 mins</span> swap interval
+              </li>
+              <li className="flex items-center gap-3 text-sm text-zinc-100">
+                <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
+                Best thumbnail auto-applied at test end
               </li>
               <li className="flex items-center gap-3 text-sm text-zinc-100">
                 <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
