@@ -351,11 +351,14 @@ class AVSchedulerEngine:
             logger.error(f"⚠️ 영상 [{test.video.youtube_video_id}] 변인 교체 실패 - 다음 스케줄러 주기에 재시도합니다 (현재 유지: {still_showing})")
 
     def _get_next_variation(self, variations, current_var):
-        """A -> B -> C -> A 순환 로직"""
+        """B -> C -> A -> B 순환 로직 (최초 실행 시 컨트롤을 건너뛰고 첫 번째 새 썸네일부터 시작)"""
         if not variations:
             return None
         if not current_var:
-            return variations[0] # 최초 실행 시 첫 번째 변인 선택
+            # 컨트롤(Variation A)은 이미 YouTube에 적용된 상태이므로 건너뛰고
+            # 첫 번째 새 변인(Variation B)부터 즉시 적용
+            non_control = [v for v in variations if not v.is_control]
+            return non_control[0] if non_control else variations[0]
             
         try:
             # 리스트에서 현재 변인의 인덱스를 찾음
