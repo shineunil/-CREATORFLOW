@@ -374,9 +374,9 @@ export default function Dashboard() {
                         <Trash2 size={16} aria-hidden="true" /> Cancel & Delete Test
                       </button>
                     </div>
-                    <div className="bg-zinc-800/30 rounded-lg p-3 text-xs text-zinc-400 leading-relaxed border border-zinc-800/50">
-                      <strong className="text-zinc-300">💡 What is Swap Thumbnail Now?</strong> Skips the scheduled wait time and immediately forces a swap to the next thumbnail candidate.<br/>
-                      (Note: Due to YouTube cache, it may take 1-2 minutes to reflect on YouTube after clicking the button.)
+                    <div className="bg-zinc-800/30 rounded-lg p-3 text-xs text-zinc-400 leading-relaxed border border-zinc-800/50 space-y-1.5">
+                      <p><strong className="text-zinc-300">💡 Swap Thumbnail Now</strong> — Skips the scheduled wait and immediately rotates to the next thumbnail candidate. (1 use per test. YouTube cache may take 1–2 min to update.)</p>
+                      <p><strong className="text-zinc-300">🏆 Lock Winning Thumbnail</strong> — Ends the test early and permanently applies the current best-performing thumbnail to your video. <span className="text-red-400 font-semibold">This cannot be undone.</span></p>
                     </div>
                   </div>
                 )}
