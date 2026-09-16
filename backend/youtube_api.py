@@ -108,33 +108,41 @@ async def update_youtube_title(youtube_video_id: str, new_title: str, refresh_to
         logger.error(f"YouTube API Error (update_youtube_title): {e}")
         return False
 
-async def get_recent_videos(refresh_token: str, max_results: int = 50) -> list:
+async def get_recent_videos(refresh_token: str, max_results: int = 200) -> list:
     try:
         youtube = get_youtube_client(refresh_token)
         channel_req = youtube.channels().list(part="contentDetails", mine=True)
         channel_res = await asyncio.to_thread(channel_req.execute)
-        
+
         if not channel_res.get('items'):
             return []
-            
+
         uploads_playlist_id = channel_res['items'][0]['contentDetails']['relatedPlaylists']['uploads']
-        
-        playlist_req = youtube.playlistItems().list(
-            part="snippet",
-            playlistId=uploads_playlist_id,
-            maxResults=max_results
-        )
-        playlist_res = await asyncio.to_thread(playlist_req.execute)
-        
+
         videos = []
-        for item in playlist_res.get('items', []):
-            snippet = item['snippet']
-            videos.append({
-                "id": snippet['resourceId']['videoId'],
-                "title": snippet['title'],
-                "thumbnail_url": snippet['thumbnails'].get('high', {}).get('url', '')
-            })
-            
+        next_page_token = None
+
+        while len(videos) < max_results:
+            fetch_count = min(50, max_results - len(videos))
+            kwargs = dict(part="snippet", playlistId=uploads_playlist_id, maxResults=fetch_count)
+            if next_page_token:
+                kwargs["pageToken"] = next_page_token
+
+            playlist_req = youtube.playlistItems().list(**kwargs)
+            playlist_res = await asyncio.to_thread(playlist_req.execute)
+
+            for item in playlist_res.get('items', []):
+                snippet = item['snippet']
+                videos.append({
+                    "id": snippet['resourceId']['videoId'],
+                    "title": snippet['title'],
+                    "thumbnail_url": snippet['thumbnails'].get('high', {}).get('url', '')
+                })
+
+            next_page_token = playlist_res.get('nextPageToken')
+            if not next_page_token:
+                break
+
         return videos
 
     except RefreshError as e:
