@@ -468,7 +468,6 @@ async def create_ab_test(test_data: ABTestCreate, background_tasks: BackgroundTa
             monthly_count = db.query(ABTest).join(Video).filter(
                 Video.channel_id == channel.id,
                 ABTest.start_time >= first_day_of_month,
-                ABTest.is_deleted == False
             ).count()
             if monthly_count >= 4:
                 raise HTTPException(status_code=403, detail="이번 달 무료 테스트 제공량(4회)을 모두 소진하셨습니다. 계속해서 테스트를 진행하시려면 PRO 요금제로 업그레이드해주세요.")
