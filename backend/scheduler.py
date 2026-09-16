@@ -143,20 +143,26 @@ class AVSchedulerEngine:
                             logger.warning(f"⚠️ 채널 [{channel.id}] YouTube 연동이 만료/철회되어 재연동이 필요합니다. (승자 확정은 정상 처리됨)")
 
                 # 테스트 완료 이메일 알림 — PRO 유저 전용
+                # notification_email(인증된 별도 수신 이메일)이 있으면 우선 사용, 없으면 로그인 이메일로 발송
                 from models import PlanType
                 if (
                     channel.user
-                    and channel.user.email
                     and channel.user.plan == PlanType.PRO
                 ):
-                    from email_service import send_test_completion_email
-                    await asyncio.to_thread(
-                        send_test_completion_email,
-                        user_email=channel.user.email,
-                        video_title=winner_var.title_text or test.video.youtube_video_id,
-                        winner_name=winner_var.name,
-                        views_gained=winner_total_views
+                    send_to = (
+                        channel.user.notification_email
+                        if channel.user.notification_email and channel.user.notification_email_verified
+                        else channel.user.email
                     )
+                    if send_to:
+                        from email_service import send_test_completion_email
+                        await asyncio.to_thread(
+                            send_test_completion_email,
+                            user_email=send_to,
+                            video_title=winner_var.title_text or test.video.youtube_video_id,
+                            winner_name=winner_var.name,
+                            views_gained=winner_total_views
+                        )
 
             test.status = TestStatus.COMPLETED
             return
@@ -255,11 +261,14 @@ class AVSchedulerEngine:
             session.add(new_log)
             logger.info(f" - [{current_var.name}] 성과 기록: +{delta_views} views / {hours_exposed:.2f}h 노출")
 
-        test.last_views_snapshot = current_views
+        # last_views_snapshot은 스왑 성공 후에만 갱신 (실패 시 기준선 오염 방지)
         test.last_swapped_at = now
 
         # 4. 다음 순서의 Variation 결정 (A -> B -> C -> A)
         next_var = self._get_next_variation(all_vars, current_var)
+        if not next_var:
+            logger.error(f"[스케줄러] 테스트 [{test.id}] 다음 변인을 찾을 수 없습니다. 스왑 건너뜀.")
+            return
 
         # 5. YouTube API를 호출하여 실제 썸네일과 제목 교체
         try:
@@ -269,20 +278,28 @@ class AVSchedulerEngine:
                 file_name = next_var.thumbnail_image_url.split('/')[-1]
                 file_path = os.path.join("uploads", file_name)
 
+                allowed_prefixes = ("https://res.cloudinary.com/", "https://cloudinary.com/")
+                url_is_safe = not next_var.thumbnail_image_url.startswith("http") or \
+                              any(next_var.thumbnail_image_url.startswith(p) for p in allowed_prefixes)
+
                 if not os.path.exists(file_path) and next_var.thumbnail_image_url.startswith("http"):
-                    import httpx
-                    try:
-                        # 💥 비동기(async) 다운로드로 메인 이벤트 루프 블로킹(셀프 데드락) 방지
-                        async with httpx.AsyncClient() as client:
-                            resp = await client.get(next_var.thumbnail_image_url)
-                            if resp.status_code == 200:
-                                with open(file_path, "wb") as f:
-                                    f.write(resp.content)
-                                logger.info(f"새 썸네일 다운로드 완료: {file_path}")
-                            else:
-                                logger.error(f"썸네일 다운로드 실패 (상태 코드: {resp.status_code})")
-                    except Exception as e:
-                        logger.error(f"썸네일 다운로드 에러: {e}")
+                    if not url_is_safe:
+                        logger.warning(f"허용되지 않은 썸네일 URL 도메인 — 다운로드 건너뜀: {next_var.thumbnail_image_url[:80]}")
+                        thumbnail_ok = False
+                    else:
+                        import httpx
+                        try:
+                            # 💥 비동기(async) 다운로드로 메인 이벤트 루프 블로킹(셀프 데드락) 방지
+                            async with httpx.AsyncClient() as client:
+                                resp = await client.get(next_var.thumbnail_image_url)
+                                if resp.status_code == 200:
+                                    with open(file_path, "wb") as f:
+                                        f.write(resp.content)
+                                    logger.info(f"새 썸네일 다운로드 완료: {file_path}")
+                                else:
+                                    logger.error(f"썸네일 다운로드 실패 (상태 코드: {resp.status_code})")
+                        except Exception as e:
+                            logger.error(f"썸네일 다운로드 에러: {e}")
 
                 if os.path.exists(file_path):
                     thumbnail_ok = await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token)
@@ -304,6 +321,7 @@ class AVSchedulerEngine:
         # 6. 실제로 YouTube에 반영된 경우에만 "현재 변인"을 교체한다.
         #    실패 시 현재 변인을 그대로 유지해, 다음 측정 구간이 엉뚱한 변인 점수로 기록되는 것을 방지한다.
         if thumbnail_ok and title_ok:
+            test.last_views_snapshot = current_views  # 성공 시에만 기준선 갱신
             test.current_variation_id = next_var.id
             test.swap_failed = False
             test.swap_count += 1

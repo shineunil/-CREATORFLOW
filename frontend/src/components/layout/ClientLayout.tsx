@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import TopHeader from "./TopHeader";
+import AnnouncementPopup from "@/components/AnnouncementPopup";
 
 // 로그인 없이 접근 가능한 공개 페이지 목록
 // (개인정보처리방침/이용약관은 로그인 여부와 무관하게 항상 접근 가능해야 함 - 구글 OAuth 심사 요건)
@@ -77,6 +78,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <TopHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
         <main>{children}</main>
       </div>
+      <AnnouncementPopup />
     </div>
   );
 }

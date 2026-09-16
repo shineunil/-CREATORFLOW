@@ -90,12 +90,13 @@ export default function PricingPublicPage() {
                 Test completion <span className="font-semibold text-cyan-300">email notification</span>
               </li>
             </ul>
-            <Link
-              href="/login"
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-center transition-all shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            <button
+              disabled
+              title="Payment system coming soon"
+              className="w-full py-4 rounded-xl bg-zinc-800 text-zinc-500 font-bold border border-zinc-700 cursor-not-allowed"
             >
-              Get started
-            </Link>
+              Coming Soon
+            </button>
           </div>
         </div>
 

@@ -8,6 +8,9 @@ from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, 
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -20,9 +23,9 @@ import jwt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from database import init_db, get_db, SessionLocal
 from scheduler import AVSchedulerEngine
-from models import User, Channel, Video, ABTest, Variation, TestStatus, MetricLog, PlanType
+from models import User, Channel, Video, ABTest, Variation, TestStatus, MetricLog, PlanType, SiteAnnouncement
 from schemas import ABTestCreate, ABTestResponse
-from env_utils import is_dev_environment
+from env_utils import is_dev_environment, allow_test_upgrade
 from metrics_utils import compute_variation_vph
 from storage import is_cloud_storage_configured, upload_thumbnail_to_cloud
 from test_policy import BASIC_MIN_SWAP_INTERVAL_MINUTES, MAX_CONCURRENT_TESTS_PER_CHANNEL
@@ -147,7 +150,10 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("🛑 서버 및 스케줄러 종료...")
 
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="ThumbnailFlow API", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # 💥 Render 배포 시 uploads 폴더가 없으면 에러가 나므로, 마운트하기 전에 미리 폴더를 강제로 생성해 줍니다.
 os.makedirs("uploads", exist_ok=True)
@@ -171,10 +177,8 @@ def read_root():
     return {"message": "ThumbnailFlow API 서버 정상 동작 중 🚀"}
 
 @app.get("/api/status")
-def get_system_status(db: Session = Depends(get_db)):
-    user_count = db.query(User).count()
-    channel_count = db.query(Channel).count()
-    return {"status": "online", "users": user_count, "channels": channel_count}
+def get_system_status():
+    return {"status": "online"}
 
 # --- Google OAuth 로직 ---
 @app.get("/api/auth/login")
@@ -381,7 +385,7 @@ def switch_channel(target_channel_id: int, db: Session = Depends(get_db), channe
 @app.post("/api/settings/test-email")
 def send_test_email(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """이메일 알림 테스트 전송 엔드포인트"""
-    target_email = channel.user.email if channel and channel.user else "godlove3854@gmail.com"
+    target_email = channel.user.email if channel and channel.user else os.getenv("ADMIN_EMAIL", "")
     
     from email_service import send_test_completion_email
     result = send_test_completion_email(
@@ -463,7 +467,8 @@ async def create_ab_test(test_data: ABTestCreate, background_tasks: BackgroundTa
             first_day_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             monthly_count = db.query(ABTest).join(Video).filter(
                 Video.channel_id == channel.id,
-                ABTest.start_time >= first_day_of_month
+                ABTest.start_time >= first_day_of_month,
+                ABTest.is_deleted == False
             ).count()
             if monthly_count >= 4:
                 raise HTTPException(status_code=403, detail="이번 달 무료 테스트 제공량(4회)을 모두 소진하셨습니다. 계속해서 테스트를 진행하시려면 PRO 요금제로 업그레이드해주세요.")
@@ -544,7 +549,7 @@ async def stop_ab_test(test_id: int, db: Session = Depends(get_db), channel: Cha
     if winner_var:
         winner_var.is_winner = True
         winner_total_views = sum(l.views_gained for l in winner_var.metric_logs)
-        channel = test.video.channel
+        channel = test.video.channel if test.video else None
         if channel and channel.user and channel.user.email:
             from email_service import send_test_completion_email
             # 🔒 smtplib는 동기(blocking) 호출이라, async 핸들러 안에서 그대로 부르면 SMTP 서버가
@@ -587,7 +592,7 @@ async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: C
     if not test:
         raise HTTPException(status_code=404, detail="테스트를 찾을 수 없습니다.")
         
-    if test.video.channel_id != channel.id:
+    if not test.video or test.video.channel_id != channel.id:
         raise HTTPException(status_code=403, detail="권한이 없습니다.")
 
     # 재시도/더블클릭으로 같은 삭제 요청이 두 번 오면, 이미 삭제된 테스트에 대해 원본 복구
@@ -603,20 +608,24 @@ async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: C
         
         # 원본 썸네일 복구
         if original_var.thumbnail_image_url:
+            _allowed = ("https://res.cloudinary.com/", "https://cloudinary.com/")
             if original_var.thumbnail_image_url.startswith("http"):
-                file_path = os.path.join("uploads", f"temp_original_{test.id}.jpg")
-                try:
-                    import httpx
-                    async with httpx.AsyncClient() as client:
-                        resp = await client.get(original_var.thumbnail_image_url)
-                        if resp.status_code == 200:
-                            with open(file_path, "wb") as f:
-                                f.write(resp.content)
-                            await update_youtube_thumbnail(test.video.youtube_video_id, file_path, channel.oauth_refresh_token)
-                        else:
-                            logger.error(f"원본 썸네일 복구 실패 (상태 코드: {resp.status_code})")
-                except Exception as e:
-                    logger.error(f"원본 썸네일 복구 다운로드 에러: {e}")
+                if not any(original_var.thumbnail_image_url.startswith(p) for p in _allowed):
+                    logger.warning(f"원본 썸네일 URL 도메인 불허 — 복구 건너뜀: {original_var.thumbnail_image_url[:80]}")
+                else:
+                    file_path = os.path.join("uploads", f"temp_original_{test.id}.jpg")
+                    try:
+                        import httpx
+                        async with httpx.AsyncClient() as client:
+                            resp = await client.get(original_var.thumbnail_image_url)
+                            if resp.status_code == 200:
+                                with open(file_path, "wb") as f:
+                                    f.write(resp.content)
+                                await update_youtube_thumbnail(test.video.youtube_video_id, file_path, channel.oauth_refresh_token)
+                            else:
+                                logger.error(f"원본 썸네일 복구 실패 (상태 코드: {resp.status_code})")
+                    except Exception as e:
+                        logger.error(f"원본 썸네일 복구 다운로드 에러: {e}")
             else:
                 try:
                     file_name = original_var.thumbnail_image_url.split('/')[-1]
@@ -876,7 +885,7 @@ def get_analytics(db: Session = Depends(get_db), channel: Channel = Depends(get_
             "title_text": var.title_text,
             "thumbnail_image_url": var.thumbnail_image_url,
             "total_views_gained": int(total_views or 0),
-            "youtube_video_id": var.ab_test.video.youtube_video_id,
+            "youtube_video_id": var.ab_test.video.youtube_video_id if var.ab_test and var.ab_test.video else None,
         }
 
     return {
@@ -987,7 +996,9 @@ def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
         "is_pro": user.plan == PlanType.PRO or user.plan == PlanType.AGENCY,
         "channel_title": channel.channel_title,
         "needs_reconnect": channel.needs_reconnect,
-        "is_admin": is_admin
+        "is_admin": is_admin,
+        "notification_email": user.notification_email,
+        "notification_email_verified": user.notification_email_verified,
     }
 
 @app.post("/api/checkout/create-session")
@@ -996,10 +1007,11 @@ def create_checkout_session(plan: str = "PRO", db: Session = Depends(get_db), ch
     user_email = channel.user.email if channel and channel.user else "creator@example.com"
     
     checkout_base_url = os.getenv("LEMON_SQUEEZY_CHECKOUT_URL")
+    encoded_email = urllib.parse.quote(user_email, safe="")
     if checkout_base_url:
-        checkout_url = f"{checkout_base_url}?checkout[custom][user_email]={user_email}"
+        checkout_url = f"{checkout_base_url}?checkout[custom][user_email]={encoded_email}"
     else:
-        checkout_url = f"https://lemonsqueezy.com/checkout/mock?plan={plan}&user_email={user_email}"
+        checkout_url = f"https://lemonsqueezy.com/checkout/mock?plan={plan}&user_email={encoded_email}"
         
     return {
         "checkout_url": checkout_url,
@@ -1010,7 +1022,7 @@ def create_checkout_session(plan: str = "PRO", db: Session = Depends(get_db), ch
 @app.post("/api/checkout/upgrade-test")
 def upgrade_user_plan_test(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """결제 테스트용: 현재 유저의 요금제를 즉시 PRO로 업그레이드합니다. 프로덕션에서는 비활성."""
-    if not is_dev_environment():
+    if not allow_test_upgrade():
         raise HTTPException(status_code=403, detail="Test upgrade is disabled in production.")
     user = channel.user
     if not user:
@@ -1196,6 +1208,176 @@ def get_admin_tests(db: Session = Depends(get_db), admin: User = Depends(get_cur
             for t in tests
         ]
     }
+
+# 인메모리 인증 코드 저장소: {user_id: {"code": str, "email": str, "expires_at": datetime}}
+_email_verify_store: dict = {}
+
+@app.post("/api/user/notification-email/send-code")
+@limiter.limit("5/minute")
+def send_notification_email_code(
+    request: Request,
+    payload: dict,
+    channel: Channel = Depends(get_current_channel),
+    db: Session = Depends(get_db),
+):
+    """알림 이메일 인증 코드 발송."""
+    import secrets
+    import httpx as _httpx
+
+    email = (payload.get("email") or "").strip()
+    # 기본적인 형식 검사 + 길이 제한
+    if not email or "@" not in email or "." not in email.split("@")[-1] or len(email) > 254:
+        raise HTTPException(status_code=400, detail="Invalid email address.")
+
+    # 만료된 인메모리 엔트리 정리 (메모리 누수 방지)
+    now = datetime.now(timezone.utc)
+    expired_keys = [k for k, v in _email_verify_store.items() if v["expires_at"] < now]
+    for k in expired_keys:
+        _email_verify_store.pop(k, None)
+
+    # 암호학적으로 안전한 6자리 코드 생성
+    code = str(secrets.randbelow(900000) + 100000)
+    _email_verify_store[channel.user_id] = {
+        "code": code,
+        "email": email,
+        "expires_at": now + timedelta(minutes=10),
+        "attempts": 0,
+    }
+
+    RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+    RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "ThumbnailFlow <onboarding@resend.dev>")
+    html = f"""<div style="font-family:Arial,sans-serif;background:#09090b;color:#f4f4f5;padding:40px;border-radius:16px;">
+<h2 style="color:#06b6d4;">ThumbnailFlow Email Verification</h2>
+<p>Your verification code:</p>
+<div style="font-size:36px;font-weight:900;letter-spacing:8px;color:#fff;background:#18181b;padding:20px 32px;border-radius:12px;display:inline-block;border:1px solid #06b6d4;">{code}</div>
+<p style="color:#a1a1aa;margin-top:16px;">This code expires in 10 minutes.</p>
+</div>"""
+
+    simulated = False
+    if RESEND_API_KEY:
+        try:
+            _httpx.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+                json={"from": RESEND_FROM_EMAIL, "to": [email], "subject": "[ThumbnailFlow] Email Verification Code", "html": html},
+                timeout=10,
+            )
+        except Exception as e:
+            logger.error(f"Verification email send error: {e}")
+    else:
+        simulated = True
+        logger.info(f"[SIMULATE] Verification code for {email}: {code}")
+
+    return {"ok": True, "simulated": simulated}
+
+
+@app.post("/api/user/notification-email/verify")
+def verify_notification_email(
+    payload: dict,
+    channel: Channel = Depends(get_current_channel),
+    db: Session = Depends(get_db),
+):
+    """인증 코드 확인 후 notification_email 저장."""
+    import hmac as _hmac
+    code = (payload.get("code") or "").strip()
+    entry = _email_verify_store.get(channel.user_id)
+    if not entry:
+        raise HTTPException(status_code=400, detail="No verification request found. Please request a new code.")
+    if datetime.now(timezone.utc) > entry["expires_at"]:
+        _email_verify_store.pop(channel.user_id, None)
+        raise HTTPException(status_code=400, detail="Verification code expired. Please request a new one.")
+
+    # 브루트포스 방지: 5회 초과 시 코드 무효화
+    entry["attempts"] = entry.get("attempts", 0) + 1
+    if entry["attempts"] > 5:
+        _email_verify_store.pop(channel.user_id, None)
+        raise HTTPException(status_code=429, detail="Too many attempts. Please request a new code.")
+
+    if not _hmac.compare_digest(entry["code"], code):
+        remaining = 5 - entry["attempts"]
+        raise HTTPException(status_code=400, detail=f"Incorrect verification code. {remaining} attempt(s) remaining.")
+
+    user = db.query(User).filter(User.id == channel.user_id).first()
+    if user:
+        user.notification_email = entry["email"]
+        user.notification_email_verified = True
+        db.commit()
+    _email_verify_store.pop(channel.user_id, None)
+    return {"ok": True, "notification_email": entry["email"]}
+
+
+@app.delete("/api/user/notification-email")
+def delete_notification_email(
+    channel: Channel = Depends(get_current_channel),
+    db: Session = Depends(get_db),
+):
+    """알림 이메일 삭제 (기본 로그인 이메일로 복귀)."""
+    user = db.query(User).filter(User.id == channel.user_id).first()
+    if user:
+        user.notification_email = None
+        user.notification_email_verified = False
+        db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/announcement")
+def get_active_announcement(db: Session = Depends(get_db)):
+    """현재 활성화된 공지사항 팝업 반환 (공개 엔드포인트, 인증 불필요)."""
+    ann = db.query(SiteAnnouncement).filter(SiteAnnouncement.is_active == True).order_by(SiteAnnouncement.updated_at.desc()).first()
+    if not ann:
+        return {"announcement": None}
+    return {
+        "announcement": {
+            "id": ann.id,
+            "title": ann.title,
+            "message": ann.message,
+            "button_text": ann.button_text,
+            "button_url": ann.button_url,
+        }
+    }
+
+@app.post("/api/admin/announcement")
+def upsert_announcement(
+    payload: dict,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin),
+):
+    """공지사항 생성 또는 전체 교체 (하나만 활성 유지)."""
+    title = (payload.get("title") or "").strip()[:200]
+    message = (payload.get("message") or "").strip()[:2000]
+    button_text = (payload.get("button_text") or "").strip()[:100] or None
+    raw_url = (payload.get("button_url") or "").strip()
+
+    if not title or not message:
+        raise HTTPException(status_code=400, detail="Title and message are required.")
+
+    # XSS 방지: button_url은 반드시 http/https만 허용
+    button_url = None
+    if raw_url:
+        if not (raw_url.startswith("http://") or raw_url.startswith("https://")):
+            raise HTTPException(status_code=400, detail="button_url must start with http:// or https://")
+        button_url = raw_url[:500]
+
+    db.query(SiteAnnouncement).update({"is_active": False})
+    db.commit()
+    ann = SiteAnnouncement(
+        title=title,
+        message=message,
+        button_text=button_text,
+        button_url=button_url,
+        is_active=True,
+    )
+    db.add(ann)
+    db.commit()
+    db.refresh(ann)
+    return {"id": ann.id, "title": ann.title, "message": ann.message}
+
+@app.delete("/api/admin/announcement")
+def delete_announcement(db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    """모든 공지사항 비활성화."""
+    db.query(SiteAnnouncement).update({"is_active": False})
+    db.commit()
+    return {"ok": True}
 
 from webhook import router as webhook_router
 app.include_router(webhook_router)

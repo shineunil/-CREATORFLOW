@@ -275,6 +275,21 @@ export default function Dashboard() {
         </div>
       )}
 
+      {userProfile.is_pro && userProfile.email?.includes("@pages.plusgoogle.com") && !userProfile.notification_email && (
+        <div className="mx-8 mb-2 flex flex-wrap items-center gap-3 justify-between px-5 py-4 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-200">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={20} className="text-blue-400 flex-shrink-0" aria-hidden="true" />
+            <p className="text-sm">
+              You're signed in with a YouTube Brand Account — test completion notifications may not reach your inbox.
+              Please set up a notification email to receive alerts.
+            </p>
+          </div>
+          <Link href="/settings" className="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded-lg hover:bg-blue-400 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            Set Notification Email →
+          </Link>
+        </div>
+      )}
+
       <div className="p-8 w-full space-y-6">
         {isLoading ? (
           <div className="text-zinc-400 text-center py-20 animate-pulse" role="status">Loading data...</div>

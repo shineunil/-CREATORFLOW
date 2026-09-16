@@ -1,12 +1,25 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 
+_ALLOWED_THUMBNAIL_PREFIXES = (
+    "https://res.cloudinary.com/",
+    "https://cloudinary.com/",
+    "/uploads/",
+)
+
 class VariationCreate(BaseModel):
     name: str = Field(..., max_length=100)
     title_text: str = Field(..., max_length=200)  # 유튜브 제목 최대 100자이나 여유분 포함
     is_control: bool = False
     # 썸네일을 변경하지 않고 제목만 변경할 수도 있으므로 None 허용
     thumbnail_image_url: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("thumbnail_image_url")
+    @classmethod
+    def validate_thumbnail_url(cls, v: Optional[str]) -> Optional[str]:
+        if v and not any(v.startswith(p) for p in _ALLOWED_THUMBNAIL_PREFIXES):
+            raise ValueError("허용되지 않는 썸네일 URL입니다.")
+        return v
 
 class ABTestCreate(BaseModel):
     youtube_video_id: str = Field(..., min_length=5, max_length=20)  # 유튜브 video ID는 11자

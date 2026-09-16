@@ -1,6 +1,7 @@
 import os
 import logging
 import httpx
+import html as _html
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +22,10 @@ def send_test_completion_email(user_email: str, video_title: str, winner_name: s
         logger.warning("Email missing")
         return {"sent": False, "simulated": False}
 
+    safe_title = _html.escape(str(video_title))
+    safe_winner = _html.escape(str(winner_name))
     subject = f"[ThumbnailFlow] A/B Test Completed! Winner: {winner_name}"
-    html_content = f"""<div style="font-family: Arial, sans-serif; background-color: #0909b2; color: #f4f4f5; padding: 40px; border-radius: 16px;"><h2 style="color: #06b6d4;">A/B Experiment Completed</h2><p>Video: <strong>{video_title}</strong></p><hr style="border-color: #2727a;" /><div style="background-color: #18181b; padding: 20px; border-radius: 12px; border: 1px solid #06b6d4;"><h3 style="color: #22c5e;">Winner: {winner_name}</h3><p>Highest Views: +{views_gained} views</p></div></div>"""
+    html_content = f"""<div style="font-family: Arial, sans-serif; background-color: #09090b; color: #f4f4f5; padding: 40px; border-radius: 16px;"><h2 style="color: #06b6d4;">A/B Experiment Completed</h2><p>Video: <strong>{safe_title}</strong></p><hr style="border-color: #27272a;" /><div style="background-color: #18181b; padding: 20px; border-radius: 12px; border: 1px solid #06b6d4;"><h3 style="color: #22d3ee;">Winner: {safe_winner}</h3><p>Highest Views: +{views_gained} views</p></div></div>"""
     logger.info(f"[Email Notification] To: {user_email} winner={winner_name}")
     if not RESEND_API_KEY:
         logger.info("RESEND_API_KEY 미설정 - 시뮬레이션 모드로 처리 (실제 이메일 발송 안 됨)")

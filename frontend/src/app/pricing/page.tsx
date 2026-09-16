@@ -162,7 +162,7 @@ export default function PricingPage() {
               </li>
               <li className="flex items-center gap-3 text-sm text-zinc-300">
                 <Check size={18} className="text-zinc-400 flex-shrink-0" aria-hidden="true" />
-                Max 2 extra thumbnails (A, B, C)
+                Up to 3 thumbnail variants (A / B / C)
               </li>
               <li className="flex items-center gap-3 text-sm text-zinc-300">
                 <Check size={18} className="text-zinc-400 flex-shrink-0" aria-hidden="true" />
@@ -202,7 +202,7 @@ export default function PricingPage() {
               </li>
               <li className="flex items-center gap-3 text-sm text-zinc-100">
                 <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
-                Max 4 extra thumbnails (A~E)
+                Up to 5 thumbnail variants (A ~ E)
               </li>
               <li className="flex items-center gap-3 text-sm text-zinc-100">
                 <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
@@ -222,12 +222,12 @@ export default function PricingPage() {
             ) : (
               <button
                 ref={upgradeButtonRef}
-                onClick={handleStartCheckout}
-                aria-haspopup="dialog"
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold transition-all shadow-lg hover:shadow-cyan-500/25 cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                disabled
+                title="Payment system coming soon"
+                className="w-full py-4 rounded-xl bg-zinc-800 text-zinc-500 font-bold border border-zinc-700 cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <CreditCard size={18} aria-hidden="true" />
-                <span>Upgrade to PRO</span>
+                <span>Coming Soon</span>
               </button>
             )}
           </div>

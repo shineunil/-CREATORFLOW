@@ -4,6 +4,7 @@ import os
 import hmac
 import hashlib
 import logging
+import time
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, PlanType
@@ -26,6 +27,14 @@ def verify_paddle_signature(body: bytes, signature_header: str, secret: str) -> 
         ts = parts.get("ts")
         h1 = parts.get("h1")
         if not ts or not h1:
+            return False
+
+        # Replay attack 방지: 타임스탬프가 현재 시각 기준 ±300초 초과 시 거부
+        try:
+            if abs(time.time() - int(ts)) > 300:
+                logger.warning(f"[Paddle Webhook] 타임스탬프 만료 (ts={ts})")
+                return False
+        except (ValueError, TypeError):
             return False
 
         signed_payload = f"{ts}:{body.decode('utf-8')}"
@@ -98,6 +107,14 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
         logger.info(f"[Paddle Webhook] {event_type} → {email}")
 
         user = db.query(User).filter(User.email == email).first()
+        # 이메일로 못 찾으면 custom_data의 user_id로 2차 조회 (브랜드 계정 가짜 이메일 대응)
+        if not user:
+            uid = custom_data.get("user_id")
+            if uid:
+                try:
+                    user = db.query(User).filter(User.id == int(uid)).first()
+                except (ValueError, TypeError):
+                    pass
         if not user:
             logger.warning(f"[Paddle Webhook] 유저를 찾을 수 없음: {email}")
             return {"status": "user_not_found"}
@@ -131,4 +148,5 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
     except Exception as e:
         logger.error(f"[Paddle Webhook] 처리 중 오류: {e}")
-        return {"status": "error"}
+        # 5xx 반환 → Paddle이 실패로 인식하고 자동 재시도
+        raise HTTPException(status_code=500, detail="Internal webhook processing error")

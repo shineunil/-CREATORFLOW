@@ -1,8 +1,11 @@
 import os
+import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from models import Base
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -24,6 +27,7 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     if not SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
         _migrate_timestamps_to_utc()
+        _migrate_add_columns()
 
 
 def _migrate_timestamps_to_utc():
@@ -41,8 +45,25 @@ def _migrate_timestamps_to_utc():
             try:
                 conn.execute(text(stmt))
                 conn.commit()
-            except Exception:
+            except Exception as e:
                 conn.rollback()  # 이미 TIMESTAMPTZ면 무시하고 계속 진행
+                logger.debug(f"Migration skip (probably already applied): {e}")
+
+def _migrate_add_columns():
+    """신규 컬럼을 기존 테이블에 추가합니다. (서버 시작 시 자동 실행, 멱등)"""
+    migrations = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_email VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_email_verified BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE site_announcements ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()",
+    ]
+    with engine.connect() as conn:
+        for stmt in migrations:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                logger.debug(f"Column migration skip: {e}")
 
 def get_db():
     """요청(Request)마다 DB 세션을 생성하고 종료하는 제너레이터"""

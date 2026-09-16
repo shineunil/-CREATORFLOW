@@ -35,6 +35,8 @@ class User(Base):
     # 최초 결제(구독 생성) 웹훅을 받을 때 채워지며, 결제 이력이 없는 유저는 계속 null.
     paddle_customer_id = Column(String, nullable=True)
     paddle_subscription_id = Column(String, nullable=True)
+    notification_email = Column(String, nullable=True)
+    notification_email_verified = Column(Boolean, default=False)
 
     # 1:N relationship with Channels
     channels = relationship("Channel", back_populates="user", cascade="all, delete-orphan")
@@ -120,3 +122,17 @@ class ApiQuotaUsage(Base):
     id = Column(Integer, primary_key=True, index=True)
     date = Column(String, unique=True, index=True, nullable=False)  # "YYYY-MM-DD" (태평양 시간 기준)
     units_used = Column(Integer, default=0)
+
+
+class SiteAnnouncement(Base):
+    """관리자가 사이트 전체에 팝업으로 표시하는 공지사항."""
+    __tablename__ = 'site_announcements'
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    button_text = Column(String, nullable=True)
+    button_url = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
