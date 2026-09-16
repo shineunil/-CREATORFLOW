@@ -573,8 +573,11 @@ async def force_swap_ab_test(test_id: int, db: Session = Depends(get_db), channe
         raise HTTPException(status_code=404, detail="테스트를 찾을 수 없거나 권한이 없습니다.")
     if test.status != TestStatus.RUNNING:
         raise HTTPException(status_code=400, detail="진행 중인 테스트만 교체 가능합니다.")
-        
+    if test.manual_swap_used:
+        raise HTTPException(status_code=429, detail="수동 즉시 교체는 테스트당 1회만 사용할 수 있습니다.")
+
     await scheduler_engine._do_swap(test, db)
+    test.manual_swap_used = True
     db.commit()
 
     if channel.needs_reconnect:
@@ -971,6 +974,7 @@ def get_ab_tests(db: Session = Depends(get_db), channel: Channel = Depends(get_c
             "swap_interval": test.swap_interval_minutes,
             "start_time": test.start_time.isoformat() if test.start_time else None,
             "end_time": test.end_time.isoformat() if test.end_time else None,
+            "manual_swap_used": test.manual_swap_used or False,
             "variations": vars_data,
         })
 

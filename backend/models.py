@@ -80,6 +80,7 @@ class ABTest(Base):
     swap_failed = Column(Boolean, default=False) # 직전 스왑(썸네일/제목 교체) 시도가 실패해 재시도 대상인지 여부
     swap_count = Column(Integer, default=0) # 지금까지 성공적으로 반영된 스왑 횟수 (최소 사이클 판정용)
     extension_count = Column(Integer, default=0) # 사이클/표본 부족으로 자동 연장된 횟수 (무한 연장 방지)
+    manual_swap_used = Column(Boolean, default=False) # 수동 즉시 교체(Swap Now) 버튼을 이미 사용했는지 여부
     warmup_captured = Column(Boolean, default=True) # 스왑 직후 워밍업 구간이 지나 조회수 기준선을 다시 캡처했는지 여부
     exposure_start_at = Column(DateTime(timezone=True), nullable=True)
 

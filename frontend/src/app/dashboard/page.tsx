@@ -349,12 +349,17 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleSwapTest(test.test_id)}
-                        disabled={isSwapping === test.test_id}
-                        className="px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                        disabled={isSwapping === test.test_id || test.manual_swap_used}
+                        title={test.manual_swap_used ? "Already used once for this test" : undefined}
+                        className="px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                       >
                         {isSwapping === test.test_id ? (
                           <>
                             <Loader2 size={16} className="animate-spin" aria-hidden="true" /> Swapping...
+                          </>
+                        ) : test.manual_swap_used ? (
+                          <>
+                            <Settings2 size={16} aria-hidden="true" /> Swap Used
                           </>
                         ) : (
                           <>
