@@ -20,19 +20,8 @@ export const API_BASE_URL =
     : "http://localhost:8000";                     // 로컬 개발용 (자동 적용)
 
 // -------------------------------------------------------
-// 2. Paddle 결제 설정
-//    [라이브 전환 시] 아래 3가지를 Paddle 대시보드의
-//    "Live" 탭에서 발급받은 값으로 교체
+// 2. Stripe 결제 설정
+//    Stripe Checkout은 서버사이드 redirect 방식이라
+//    클라이언트에 별도 키 노출이 없습니다.
+//    백엔드 .env → STRIPE_SECRET_KEY, STRIPE_PRICE_ID 참고
 // -------------------------------------------------------
-export const PADDLE_CONFIG = {
-  // [라이브 전환 시] "sandbox" → "production" 으로 변경
-  environment: "sandbox" as "sandbox" | "production",
-
-  // [라이브 전환 시] Paddle 대시보드 Developer Tools → Client-side token
-  // test_xxx... → live_xxx... 으로 변경
-  clientToken: "test_9238033b9dedeeb22b63d067626",
-
-  // [라이브 전환 시] Paddle 대시보드 Catalog → Prices → PRO Price ID
-  // pri_01m1psq... → 라이브 Price ID 로 변경
-  proPriceId: "pri_01m1psq971t3sy5h2xq0venhsg",
-};

@@ -126,23 +126,35 @@ APScheduler (10분마다 실행)
 
 ---
 
-## 6. 결제 흐름 (Paddle)
+## 6. 결제 흐름 (Stripe)
 
 ```
 사용자 → PRO 업그레이드 클릭
   │
   ▼
-Paddle Checkout (결제창)
+백엔드 /api/checkout/create-session (POST)
+  │
+  ├─▶ Stripe Checkout Session 생성
+  │       └─ metadata: { user_id }
+  │       └─ success_url: /dashboard?upgraded=true
+  └─▶ checkout_url 반환
   │
   ▼
-결제 완료
+프론트엔드 → Stripe 호스팅 결제 페이지로 redirect
   │
   ▼
-Paddle → 백엔드 Webhook (/api/webhooks/paddle)
+결제 완료 → /dashboard?upgraded=true 으로 redirect
   │
-  ├─▶ 서명 검증 (PADDLE_WEBHOOK_SECRET)
-  ├─▶ 이메일로 유저 조회
-  └─▶ Neon DB → users.is_pro = true 업데이트
+  ▼ (비동기)
+Stripe → 백엔드 Webhook (/api/webhooks/stripe)
+  │
+  ├─▶ 서명 검증 (STRIPE_WEBHOOK_SECRET)
+  ├─▶ checkout.session.completed → user_id로 유저 조회
+  │       ├─▶ users.plan = PRO 업데이트
+  │       ├─▶ users.stripe_customer_id 저장
+  │       └─▶ users.stripe_subscription_id 저장
+  ├─▶ customer.subscription.deleted → BASIC 다운그레이드
+  └─▶ invoice.payment_failed → BASIC 다운그레이드
   │
   ▼
 대시보드 → PRO 기능 활성화
@@ -160,7 +172,7 @@ Paddle → 백엔드 Webhook (/api/webhooks/paddle)
 | Cloudinary | 썸네일 이미지 저장 | 월 25GB |
 | YouTube Data API | 썸네일 교체 / 조회수 | 일 10,000 유닛 |
 | Resend | 이메일 발송 | 월 3,000건 |
-| Paddle | 결제 처리 | 건당 수수료 |
+| Stripe | 결제 처리 | 2.9% + 30¢/건 |
 | Sentry | 에러 모니터링 | 월 5,000건 |
 | UptimeRobot | Render 슬립 방지 핑 | 5분 간격 |
 

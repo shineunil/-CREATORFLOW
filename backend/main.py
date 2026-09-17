@@ -983,9 +983,10 @@ def get_ab_tests(db: Session = Depends(get_db), channel: Channel = Depends(get_c
 
     return {"tests": result}
 
-# --- 결제 시스템 (Lemon Squeezy Integration) ---
-import hmac
-import hashlib
+# --- 결제 시스템 (Stripe Integration) ---
+import stripe as stripe_sdk
+stripe_sdk.api_key = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
 
 @app.get("/api/user/me")
 def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
@@ -1009,22 +1010,28 @@ def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
     }
 
 @app.post("/api/checkout/create-session")
-def create_checkout_session(plan: str = "PRO", db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
-    """Lemon Squeezy 결제 체크아웃 URL 생성 엔드포인트"""
-    user_email = channel.user.email if channel and channel.user else "creator@example.com"
-    
-    checkout_base_url = os.getenv("LEMON_SQUEEZY_CHECKOUT_URL")
-    encoded_email = urllib.parse.quote(user_email, safe="")
-    if checkout_base_url:
-        checkout_url = f"{checkout_base_url}?checkout[custom][user_email]={encoded_email}"
-    else:
-        checkout_url = f"https://lemonsqueezy.com/checkout/mock?plan={plan}&user_email={encoded_email}"
-        
-    return {
-        "checkout_url": checkout_url,
-        "user_email": user_email,
-        "plan": plan
-    }
+async def create_stripe_checkout_session(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+    """Stripe Checkout Session 생성 - 호스팅된 결제 페이지 URL을 반환합니다."""
+    user = channel.user
+    if not STRIPE_PRICE_ID:
+        raise HTTPException(status_code=503, detail="결제 시스템이 아직 설정되지 않았습니다.")
+
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    try:
+        session = stripe_sdk.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
+            mode="subscription",
+            success_url=f"{frontend_url}/dashboard?upgraded=true",
+            cancel_url=f"{frontend_url}/pricing",
+            customer_email=user.email if user else None,
+            metadata={"user_id": str(user.id) if user else ""},
+        )
+    except stripe_sdk.StripeError as e:
+        logger.error(f"[Stripe Checkout] 세션 생성 실패: {e}")
+        raise HTTPException(status_code=502, detail="결제 페이지를 여는 데 실패했습니다.")
+
+    return {"checkout_url": session.url}
 
 @app.post("/api/checkout/upgrade-test")
 def upgrade_user_plan_test(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
@@ -1044,108 +1051,29 @@ def upgrade_user_plan_test(db: Session = Depends(get_db), channel: Channel = Dep
     db.commit()
     return {"status": "success", "message": "PRO 요금제로 성공적으로 업그레이드되었습니다!", "plan": user.plan.value}
 
-@app.post("/api/webhooks/lemonsqueezy")
-async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
-    """Lemon Squeezy 결제 성공/구독 변경 시 호출되는 웹훅"""
-    secret = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "")
-    if not secret and not is_dev_environment():
-        logger.error("[Lemon Squeezy Webhook] 🚨 LEMON_SQUEEZY_WEBHOOK_SECRET 미설정 - 프로덕션에서 웹훅 거부")
-        raise HTTPException(status_code=500, detail="Webhook secret not configured")
-
-    signature = request.headers.get("x-signature")
-    payload = await request.body()
-    if secret:
-        if not signature:
-            raise HTTPException(status_code=401, detail="Missing signature")
-        computed_signature = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(signature, computed_signature):
-            logger.warning("Invalid Lemon Squeezy webhook signature")
-            raise HTTPException(status_code=401, detail="Invalid signature")
-
-    data = await request.json()
-    event_name = data.get("meta", {}).get("event_name")
-    
-    custom_data = data.get("meta", {}).get("custom_data", {})
-    user_email = custom_data.get("user_email")
-
-    if not user_email:
-        user_email = data.get("data", {}).get("attributes", {}).get("user_email")
-
-    if event_name in ["subscription_created", "order_created", "subscription_updated"]:
-        if user_email:
-            user = db.query(User).filter(User.email == user_email).first()
-            if user:
-                user.plan = PlanType.PRO
-                db.commit()
-                logger.info(f"🎉 웹훅 수신: 유저 {user_email}의 요금제가 PRO로 성공적으로 업그레이드 되었습니다.")
-
-    # 구독 취소/만료/결제 실패 시 다운그레이드 처리가 없으면, 유저가 결제를 끊어도 PRO가 영구히
-    # 유지되는 매출 손실 버그가 된다 (webhook.py의 Paddle 핸들러와 동일한 패턴으로 맞춘다).
-    elif event_name in ["subscription_cancelled", "subscription_expired", "subscription_paused"]:
-        if user_email:
-            user = db.query(User).filter(User.email == user_email).first()
-            if user:
-                user.plan = PlanType.BASIC
-                db.commit()
-                logger.info(f"⬇️ 웹훅 수신: 유저 {user_email}의 요금제가 BASIC으로 다운그레이드 되었습니다. (사유: {event_name})")
-
-    return {"status": "ok"}
-
-# --- Paddle 결제 연동 ---
-PADDLE_PRICE_ID = os.getenv("PADDLE_PRICE_ID", "pri_01m1psq971t3sy5h2xq0venhsg")
-
-@app.get("/api/checkout/paddle-config")
-def get_paddle_checkout_config(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
-    """Paddle 결제 체크아웃용 Price ID 및 유저 이메일 반환"""
-    user_email = channel.user.email if channel and channel.user else "creator@example.com"
-
-    return {
-        "price_id": PADDLE_PRICE_ID,
-        "user_email": user_email,
-        "environment": os.getenv("PADDLE_ENVIRONMENT", "sandbox")
-    }
-
 @app.get("/api/billing/portal")
-async def get_paddle_billing_portal(channel: Channel = Depends(get_current_channel)):
+async def get_stripe_billing_portal(channel: Channel = Depends(get_current_channel)):
     """
-    Paddle 고객 포털(Customer Portal) 딥링크를 발급합니다. 구독 취소, 결제수단 변경,
-    결제 내역/영수증 조회를 전부 Paddle이 호스팅하는 화면에서 처리하므로 직접 구현하지 않는다.
-    구독을 시작한 적 없는 유저(paddle_customer_id 없음)는 발급할 포털이 없다.
+    Stripe Customer Portal URL 발급. 구독 취소, 결제 수단 변경, 결제 내역 조회를
+    Stripe가 호스팅하는 화면에서 처리한다. stripe_customer_id 없는 유저는 발급 불가.
     """
     user = channel.user
-    if not user or not user.paddle_customer_id:
+    if not user or not user.stripe_customer_id:
         raise HTTPException(status_code=404, detail="결제 내역이 없습니다. PRO 결제를 진행한 뒤 다시 시도해주세요.")
 
-    api_key = os.getenv("PADDLE_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="결제 시스템이 설정되지 않았습니다.")
-
-    is_sandbox = os.getenv("PADDLE_ENVIRONMENT", "sandbox") == "sandbox"
-    base_url = "https://sandbox-api.paddle.com" if is_sandbox else "https://api.paddle.com"
-
-    body = {}
-    if user.paddle_subscription_id:
-        body["subscription_ids"] = [user.paddle_subscription_id]
-
-    async with httpx.AsyncClient() as client:
-        res = await client.post(
-            f"{base_url}/customers/{user.paddle_customer_id}/portal-sessions",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json=body,
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    try:
+        portal_session = stripe_sdk.billing_portal.Session.create(
+            customer=user.stripe_customer_id,
+            return_url=f"{frontend_url}/settings",
         )
+    except stripe_sdk.StripeError as e:
+        logger.error(f"[Stripe Portal] 세션 생성 실패: {e}")
+        raise HTTPException(status_code=502, detail="결제 관리 페이지를 여는 데 실패했습니다.")
 
-    if res.status_code != 201:
-        logger.error(f"[Paddle Portal] 세션 생성 실패 ({res.status_code}): {res.text}")
-        raise HTTPException(status_code=502, detail="결제 관리 페이지를 여는 데 실패했습니다. 잠시 후 다시 시도해주세요.")
+    return {"url": portal_session.url}
 
-    urls = res.json().get("data", {}).get("urls", {})
-    portal_url = urls.get("general", {}).get("overview")
-    if not portal_url:
-        raise HTTPException(status_code=502, detail="결제 관리 페이지 링크를 가져오지 못했습니다.")
-
-    return {"url": portal_url}
-
-# /api/webhooks/paddle 엔드포인트는 webhook.py 라우터에서 처리합니다 (서명 검증 포함)
+# /api/webhooks/stripe 엔드포인트는 webhook.py 라우터에서 처리합니다 (서명 검증 포함)
 
 # --- 관리자 대시보드 (ADMIN_EMAILS 환경 변수에 등록된 계정만 접근 가능) ---
 
@@ -1184,7 +1112,7 @@ def get_admin_users(db: Session = Depends(get_db), admin: User = Depends(get_cur
                 "plan": u.plan.name,
                 "created_at": u.created_at.isoformat() if u.created_at else None,
                 "channel_count": len(u.channels),
-                "has_paddle_customer": bool(u.paddle_customer_id),
+                "has_stripe_customer": bool(u.stripe_customer_id),
             }
             for u in users
         ]
@@ -1386,5 +1314,5 @@ def delete_announcement(db: Session = Depends(get_db), admin: User = Depends(get
     db.commit()
     return {"ok": True}
 
-from webhook import router as webhook_router
-app.include_router(webhook_router)
+from webhook import router as stripe_router
+app.include_router(stripe_router)

@@ -31,10 +31,10 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     plan = Column(Enum(PlanType), default=PlanType.BASIC)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    # Paddle 고객 포털(구독 취소/다운그레이드/결제 내역 조회)에 필요한 식별자.
-    # 최초 결제(구독 생성) 웹훅을 받을 때 채워지며, 결제 이력이 없는 유저는 계속 null.
-    paddle_customer_id = Column(String, nullable=True)
-    paddle_subscription_id = Column(String, nullable=True)
+    # Stripe 고객 포털(구독 취소/변경/결제 내역 조회)에 필요한 식별자.
+    # checkout.session.completed 웹훅을 받을 때 채워지며, 결제 이력이 없는 유저는 계속 null.
+    stripe_customer_id = Column(String, nullable=True)
+    stripe_subscription_id = Column(String, nullable=True)
     notification_email = Column(String, nullable=True)
     notification_email_verified = Column(Boolean, default=False)
 

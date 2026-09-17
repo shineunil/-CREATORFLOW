@@ -617,11 +617,25 @@ function NewTestContent() {
                     </option>
                   </select>
                   <p className="text-xs text-zinc-400 mt-2">Candidates are rotated on YouTube and compared by views gained per hour (VPH).</p>
+                  <div className="mt-3 flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">BASIC</span>
+                      {["4h", "12h", "24h"].map(t => (
+                        <span key={t} className="text-[11px] font-bold text-zinc-300 bg-zinc-800/60 border border-zinc-700 px-2 py-0.5 rounded-full">{t}</span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded">PRO</span>
+                      {["30min", "1h", "2h", "4h", "12h", "24h"].map(t => (
+                        <span key={t} className="text-[11px] font-bold text-cyan-300 bg-cyan-950/30 border border-cyan-800/50 px-2 py-0.5 rounded-full">{t}</span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
               <div className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
                 <label className="block text-sm font-bold text-zinc-300 mb-2">Total Optimization Duration</label>
-                <select 
+                <select
                   value={durationHours}
                   onChange={(e) => setDurationHours(e.target.value)}
                   className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 appearance-none"
@@ -631,6 +645,20 @@ function NewTestContent() {
                   <option value="72">Apply best thumbnail permanently after 72 hours</option>
                 </select>
                 <p className="text-xs text-zinc-400 mt-2">When the test ends, the winning thumbnail will be applied permanently.</p>
+                <div className="mt-3 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">BASIC</span>
+                    {["24h", "48h", "72h"].map(t => (
+                      <span key={t} className="text-[11px] font-bold text-zinc-300 bg-zinc-800/60 border border-zinc-700 px-2 py-0.5 rounded-full">{t}</span>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded">PRO</span>
+                    {["24h", "48h", "72h"].map(t => (
+                      <span key={t} className="text-[11px] font-bold text-cyan-300 bg-cyan-950/30 border border-cyan-800/50 px-2 py-0.5 rounded-full">{t}</span>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

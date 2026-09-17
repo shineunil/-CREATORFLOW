@@ -13,3 +13,4 @@ httpx>=0.25.0
 Pillow>=10.0.0
 sentry-sdk[fastapi]>=2.0.0
 slowapi>=0.1.9
+stripe>=8.0.0

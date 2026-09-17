@@ -1,17 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Check, Crown, Zap, CreditCard, Sparkles, ShieldCheck, X } from "lucide-react";
+import { Check, Crown, Zap, CreditCard, Sparkles, ShieldCheck, X, Loader2 } from "lucide-react";
 import Modal from "@/components/Modal";
 import { apiFetch } from "@/lib/api";
-import { PADDLE_CONFIG } from "@/lib/config";
-
-import { initializePaddle, Paddle } from '@paddle/paddle-js';
 
 export default function PricingPage() {
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [userProfile, setUserProfile] = useState<{ email?: string; channel_title?: string; plan: string; is_pro: boolean }>({ plan: "BASIC", is_pro: false });
-  const [paddle, setPaddle] = useState<Paddle>();
   const upgradeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -25,28 +22,6 @@ export default function PricingPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isCheckoutModalOpen]);
-
-  useEffect(() => {
-    initializePaddle({
-      environment: PADDLE_CONFIG.environment,
-      token: PADDLE_CONFIG.clientToken,
-      eventCallback: async function(data) {
-        if (data.name === "checkout.completed") {
-          // Paddle이 결제 성공 시 settings.successUrl로 즉시 이동시켜주므로(아래 handlePaddleCheckout),
-          // 대부분 이 콜백이 실행되기 전에 페이지가 이미 이동한다. successUrl 이동이 지연되는 극히
-          // 드문 경우를 대비한 보험용 폴백일 뿐이라 별도 모달 없이 조용히 이동만 시킨다.
-          setIsCheckoutModalOpen(false);
-          window.location.href = "/dashboard?upgraded=true";
-        }
-      }
-    }).then(
-      (paddleInstance: Paddle | undefined) => {
-        if (paddleInstance) {
-          setPaddle(paddleInstance);
-        }
-      },
-    );
-  }, []);
 
   // Modal State
   const [modalConfig, setModalConfig] = useState<{
@@ -93,43 +68,21 @@ export default function PricingPage() {
     fetchUserProfile();
   }, []);
 
-  const handleStartCheckout = () => {
-    setIsCheckoutModalOpen(true);
-  };
-
-
-  const handlePaddleCheckout = () => {
-    if (!paddle) {
-      showAlert("Notice", "Payment gateway is initializing. Please try again in a moment.", "warning");
-      return;
-    }
-    
-    setIsCheckoutModalOpen(false);
-    // customer.email과 customData.email 둘 다 명시적으로 실어 보낸다: 백엔드 웹훅(webhook.py)이
-    // "이 결제가 누구 것인지" 이 이메일로 유저를 찾아서 PRO로 업그레이드하는데, 이걸 안 보내면
-    // Paddle 쪽 체크아웃 폼에서 입력한 값에만 의존하게 되어 업그레이드가 조용히 실패할 수 있다.
-    const checkoutOptions: any = {
-      items: [
-        {
-          priceId: PADDLE_CONFIG.proPriceId,
-          quantity: 1
-        }
-      ],
-      // Paddle의 자체 결제 완료 화면(브라우저 언어에 따라 한국어로 뜸)을 건너뛰고, 결제 성공 즉시
-      // 우리 대시보드로 바로 이동시킨다.
-      settings: {
-        successUrl: `${window.location.origin}/dashboard?upgraded=true`,
-      },
-      ...(userProfile.email ? {
-        customer: { email: userProfile.email },
-        customData: { email: userProfile.email }
-      } : {})
-    };
-
+  const handleStripeCheckout = async () => {
+    setIsRedirecting(true);
     try {
-      paddle.Checkout.open(checkoutOptions);
-    } catch(err) {
-      console.error("Paddle Checkout Error:", err);
+      const res = await apiFetch("/api/checkout/create-session", { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server error (${res.status})`);
+      }
+      const { checkout_url } = await res.json();
+      window.location.href = checkout_url;
+    } catch (err: any) {
+      console.error("Stripe Checkout Error:", err);
+      setIsRedirecting(false);
+      setIsCheckoutModalOpen(false);
+      showAlert("Checkout Error", err.message || "Failed to start checkout. Please try again.", "error");
     }
   };
 
@@ -220,7 +173,7 @@ export default function PricingPage() {
                 <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
                 Test completion <span className="font-semibold text-cyan-300">email notification</span>
               </li>
-              </ul>
+            </ul>
 
             {userProfile.is_pro ? (
               <div className="w-full py-4 rounded-xl bg-gradient-to-r from-emerald-600/30 to-teal-600/30 border border-emerald-500/50 text-emerald-400 font-bold flex items-center justify-center gap-2 shadow-lg">
@@ -230,19 +183,18 @@ export default function PricingPage() {
             ) : (
               <button
                 ref={upgradeButtonRef}
-                disabled
-                title="Payment system coming soon"
-                className="w-full py-4 rounded-xl bg-zinc-800 text-zinc-500 font-bold border border-zinc-700 cursor-not-allowed flex items-center justify-center gap-2"
+                onClick={() => setIsCheckoutModalOpen(true)}
+                className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold transition-all shadow-lg hover:shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
               >
                 <CreditCard size={18} aria-hidden="true" />
-                <span>Coming Soon</span>
+                <span>Upgrade to PRO</span>
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Payment Gateway Modal */}
+      {/* Checkout Confirmation Modal */}
       {isCheckoutModalOpen && (
         <div
           role="dialog"
@@ -256,14 +208,15 @@ export default function PricingPage() {
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1">
-                  <Sparkles size={14} aria-hidden="true" /> Paddle Global Payment
+                  <Sparkles size={14} aria-hidden="true" /> Secure Stripe Checkout
                 </span>
                 <h3 id="checkout-modal-title" className="text-2xl font-extrabold mt-1">PRO Premium Checkout</h3>
               </div>
               <button
-                onClick={() => { setIsCheckoutModalOpen(false); upgradeButtonRef.current?.focus(); }}
+                onClick={() => { if (!isRedirecting) { setIsCheckoutModalOpen(false); upgradeButtonRef.current?.focus(); } }}
                 aria-label="결제 창 닫기"
-                className="text-zinc-400 hover:text-white p-1 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                disabled={isRedirecting}
+                className="text-zinc-400 hover:text-white p-1 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 disabled:opacity-50"
               >
                 <X size={20} aria-hidden="true" />
               </button>
@@ -278,16 +231,33 @@ export default function PricingPage() {
                 <span className="text-zinc-400">Total Amount</span>
                 <span className="font-bold text-emerald-400 text-base">$29.00 / month</span>
               </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-400">Billing</span>
+                <span className="text-zinc-300">Cancel anytime</span>
+              </div>
             </div>
 
             <div className="space-y-3">
-              <button onClick={handlePaddleCheckout} className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold transition-all shadow-lg hover:shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
-                <CreditCard size={18} aria-hidden="true" />
-                <span>Proceed with Paddle Checkout</span>
+              <button
+                onClick={handleStripeCheckout}
+                disabled={isRedirecting}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed text-white font-extrabold transition-all shadow-lg hover:shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+              >
+                {isRedirecting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                    <span>Redirecting to Stripe...</span>
+                  </>
+                ) : (
+                  <>
+                    <CreditCard size={18} aria-hidden="true" />
+                    <span>Proceed to Stripe Checkout</span>
+                  </>
+                )}
               </button>
             </div>
             <p className="text-[11px] text-center text-zinc-400">
-              Paddle acts as the Merchant of Record (MoR) for secure global payments.
+              Powered by Stripe — secure, encrypted card processing. You will be redirected to Stripe&apos;s hosted checkout page.
             </p>
           </div>
         </div>
