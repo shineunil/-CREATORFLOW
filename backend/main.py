@@ -5,7 +5,7 @@ import shutil
 import asyncio
 from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Form, BackgroundTasks
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -102,16 +102,43 @@ def create_access_token(user_id: int, channel_id: int) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def _decode_token(request: Request) -> dict:
-    auth = request.headers.get("Authorization")
-    if not auth or not auth.startswith("Bearer "):
+    # L-3: HttpOnly 쿠키 우선 읽기, 없으면 Authorization 헤더 폴백 (구 버전 호환)
+    token = request.cookies.get("auth_token")
+    if not token:
+        auth = request.headers.get("Authorization")
+        if auth and auth.startswith("Bearer "):
+            token = auth.split(" ")[1]
+    if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    token = auth.split(" ")[1]
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+def _set_auth_cookie(response: JSONResponse, token: str):
+    """HttpOnly 쿠키에 JWT를 설정한다. cross-origin(Vercel+Render)은 SameSite=None; Secure 필요."""
+    dev = is_dev_environment()
+    response.set_cookie(
+        key="auth_token",
+        value=token,
+        httponly=True,
+        secure=not dev,
+        samesite="lax" if dev else "none",
+        max_age=60 * 60 * 24 * JWT_EXPIRE_DAYS,
+        path="/",
+    )
+
+def _clear_auth_cookie(response: JSONResponse):
+    dev = is_dev_environment()
+    response.delete_cookie(
+        key="auth_token",
+        path="/",
+        secure=not dev,
+        samesite="lax" if dev else "none",
+        httponly=True,
+    )
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     payload = _decode_token(request)
@@ -217,12 +244,11 @@ def get_system_status():
 
 # --- Google OAuth 로직 ---
 @app.get("/api/auth/login")
-def login_via_google(state: str | None = None):
+def login_via_google(request: Request, state: str | None = None):
     """
     구글 로그인 페이지로 리다이렉트합니다.
-    이미 로그인된 상태에서 "채널 추가"로 들어온 경우, 프론트가 현재 JWT를 state로 실어 보낸다.
-    구글은 이 state 값을 그대로 콜백에 돌려주므로, 콜백에서 그걸로 "새로 로그인하는 구글
-    계정과 무관하게 지금 로그인된 유저 소유로 채널을 붙여야 한다"는 걸 알 수 있다.
+    이미 로그인된 상태에서 "채널 추가"로 들어온 경우, HttpOnly 쿠키에서 현재 유저를 읽는다.
+    쿠키가 없으면 구 버전 호환을 위해 state 파라미터에서 JWT를 파싱한다.
     """
     scope = "openid email profile https://www.googleapis.com/auth/youtube.force-ssl"
     auth_url = (
@@ -234,17 +260,24 @@ def login_via_google(state: str | None = None):
         f"access_type=offline&"
         f"prompt=consent"
     )
-    if state:
-        # H-1: 프론트가 보낸 JWT를 Google에 그대로 전달하지 않는다.
-        # JWT에서 user_id를 추출해 HMAC-signed nonce로 변환 후 state로 사용한다.
-        linking_user_id = None
+    # L-3: 쿠키에서 현재 로그인 유저 ID를 읽는다 — JWT를 URL에 노출하지 않아도 됨
+    linking_user_id = None
+    auth_cookie = request.cookies.get("auth_token")
+    if auth_cookie:
+        try:
+            p = jwt.decode(auth_cookie, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            linking_user_id = int(p["sub"])
+        except Exception:
+            pass
+    # 구 버전 호환: 프론트가 state로 JWT를 보낸 경우
+    if not linking_user_id and state:
         try:
             p = jwt.decode(state, JWT_SECRET, algorithms=[JWT_ALGORITHM])
             linking_user_id = int(p["sub"])
         except Exception:
             pass
-        if linking_user_id:
-            auth_url += f"&state={urllib.parse.quote(_make_state_nonce(linking_user_id))}"
+    if linking_user_id:
+        auth_url += f"&state={urllib.parse.quote(_make_state_nonce(linking_user_id))}"
     return RedirectResponse(auth_url)
 
 @app.get("/api/auth/callback")
@@ -385,7 +418,9 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
 @app.post("/api/auth/logout")
 def logout_user():
     """유저 단순 세션 로그아웃 엔드포인트 (채널 연동 토큰은 유지되어 백그라운드 A/B 테스트가 계속 실행됩니다)"""
-    return {"message": "성공적으로 로그아웃되었습니다."}
+    response = JSONResponse(content={"message": "성공적으로 로그아웃되었습니다."})
+    _clear_auth_cookie(response)
+    return response
 
 @app.get("/api/auth/exchange")
 def exchange_auth_code(code: str, db: Session = Depends(get_db)):
@@ -401,7 +436,10 @@ def exchange_auth_code(code: str, db: Session = Depends(get_db)):
     token = entry.token
     entry.used = True
     db.commit()
-    return {"token": token}
+    # L-3: JWT를 응답 body 대신 HttpOnly 쿠키에 설정한다.
+    response = JSONResponse(content={"ok": True})
+    _set_auth_cookie(response, token)
+    return response
 
 @app.post("/api/channels/{target_channel_id}/disconnect")
 def disconnect_channel(target_channel_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
@@ -453,7 +491,10 @@ def switch_channel(target_channel_id: int, db: Session = Depends(get_db), channe
         raise HTTPException(status_code=404, detail="채널을 찾을 수 없거나 이 계정 소유가 아닙니다.")
 
     token = create_access_token(target.user_id, target.id)
-    return {"token": token, "channel_title": target.channel_title}
+    # L-3: JWT를 응답 body 대신 HttpOnly 쿠키에 설정한다.
+    response = JSONResponse(content={"ok": True, "channel_title": target.channel_title})
+    _set_auth_cookie(response, token)
+    return response
 
 @app.post("/api/channels/{target_channel_id}/check-capabilities")
 async def check_channel_capabilities_endpoint(

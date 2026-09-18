@@ -134,11 +134,8 @@ export default function SettingsPage() {
   };
 
   const handleConnectAnotherChannel = () => {
-    // 지금 로그인된 유저의 JWT를 state로 실어 보내야, 콜백에서 새 채널을 (구글 로그인이
-    // 다른 계정/브랜드 계정으로 이뤄지더라도) 지금 이 유저 소유로 붙일 수 있다.
-    const currentToken = localStorage.getItem("jwt_token");
-    const stateParam = currentToken ? `?state=${encodeURIComponent(currentToken)}` : "";
-    window.location.href = `${API_BASE_URL}/api/auth/login${stateParam}`;
+    // L-3: JWT를 URL에 노출할 필요 없음 — 백엔드가 HttpOnly 쿠키에서 현재 유저를 직접 읽음
+    window.location.href = `${API_BASE_URL}/api/auth/login`;
   };
 
   const handleOpenBillingPortal = async () => {
@@ -164,7 +161,7 @@ export default function SettingsPage() {
   const handleLogout = async () => {
     try {
       await apiFetch("/api/auth/logout", { method: "POST" });
-      localStorage.removeItem("jwt_token");
+      localStorage.removeItem("isLoggedIn");
       localStorage.removeItem("connectedChannel");
       showAlert(
         "🔑 Logged Out",
@@ -176,7 +173,7 @@ export default function SettingsPage() {
       );
     } catch (e) {
       console.error(e);
-      localStorage.removeItem("jwt_token");
+      localStorage.removeItem("isLoggedIn");
       localStorage.removeItem("connectedChannel");
       window.location.href = "/";
     }

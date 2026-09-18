@@ -27,7 +27,7 @@ export default function ChannelSelect() {
   };
 
   useEffect(() => {
-    if (!localStorage.getItem("jwt_token")) return;
+    if (!localStorage.getItem("isLoggedIn")) return;
     loadChannels();
 
     const handleChannelSwitched = () => loadChannels();
