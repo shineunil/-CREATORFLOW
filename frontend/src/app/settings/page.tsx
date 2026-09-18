@@ -492,14 +492,6 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3">
                       <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" aria-hidden="true" />
                       <span className="text-sm text-white flex-1 truncate">{notifEmail}</span>
-                      <button
-                        onClick={handleRemoveNotifEmail}
-                        disabled={notifLoading}
-                        title="Remove notification email"
-                        className="text-red-400/70 hover:text-red-400 transition-colors disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 rounded"
-                      >
-                        <Trash2 size={15} aria-hidden="true" />
-                      </button>
                     </div>
                   ) : (
                     <div className="space-y-2">
