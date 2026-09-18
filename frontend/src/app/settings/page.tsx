@@ -414,8 +414,8 @@ export default function SettingsPage() {
               <Shield size={18} className="text-cyan-400" aria-hidden="true" /> Channel Capabilities
             </h2>
             <p className="text-xs text-zinc-400 mb-4">
-              YouTube 계정 인증 여부에 따라 사용 가능한 기능이 달라집니다.{" "}
-              맞춤 썸네일은 YouTube 정책상 전화번호 인증이 완료된 계정만 사용할 수 있습니다.
+              Available features depend on your YouTube account verification status.{" "}
+              Custom thumbnails require phone number verification per YouTube policy.
             </p>
             <div className="space-y-4">
               {channels.filter(c => c.is_connected).map((c) => {
@@ -436,23 +436,23 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Type size={14} className="text-zinc-400" aria-hidden="true" />
-                          <span className="text-sm text-zinc-300">제목 변경 (A/B 테스트)</span>
+                          <span className="text-sm text-zinc-300">Title Change (A/B Test)</span>
                         </div>
-                        <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">✓ 사용 가능</span>
+                        <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">✓ Available</span>
                       </div>
 
                       {/* 맞춤 썸네일 */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Image size={14} className="text-zinc-400" aria-hidden="true" />
-                          <span className="text-sm text-zinc-300">맞춤 썸네일 업로드</span>
+                          <span className="text-sm text-zinc-300">Custom Thumbnail Upload</span>
                         </div>
                         {perm === "allowed" ? (
-                          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">✓ 인증 완료</span>
+                          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">✓ Verified</span>
                         ) : perm === "denied" ? (
-                          <span className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full">✗ 인증 필요</span>
+                          <span className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full">✗ Verification Required</span>
                         ) : (
-                          <span className="text-xs font-bold text-zinc-400 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-full">— 미확인</span>
+                          <span className="text-xs font-bold text-zinc-400 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-full">— Not Checked</span>
                         )}
                       </div>
                     </div>
@@ -461,7 +461,7 @@ export default function SettingsPage() {
                       <div className="mt-3 flex items-start gap-2 px-3 py-2.5 bg-amber-950/40 border border-amber-500/30 rounded-lg">
                         <AlertTriangle size={13} className="text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
                         <p className="text-xs text-amber-300 leading-relaxed">
-                          YouTube 정책상 맞춤 썸네일을 사용하려면 전화번호 인증이 필요합니다.{" "}
+                          Custom thumbnails require phone number verification per YouTube policy. You can complete it in about 1 minute at{" "}
                           <a
                             href={`https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(userEmail || "")}&continue=https%3A%2F%2Fwww.youtube.com%2Ffeatures`}
                             target="_blank"
@@ -469,8 +469,7 @@ export default function SettingsPage() {
                             className="inline-flex items-center gap-1 underline text-amber-200 hover:text-white font-semibold"
                           >
                             youtube.com/features <ExternalLink size={11} aria-hidden="true" />
-                          </a>
-                          {" "}에서 약 1분 내로 완료할 수 있습니다.
+                          </a>.
                         </p>
                       </div>
                     )}
@@ -481,13 +480,13 @@ export default function SettingsPage() {
                       className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                     >
                       {isChecking ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={12} aria-hidden="true" />}
-                      {isChecking ? "확인 중..." : "지금 확인"}
+                      {isChecking ? "Checking..." : "Check Now"}
                     </button>
                   </div>
                 );
               })}
               {channels.filter(c => c.is_connected).length === 0 && (
-                <p className="text-sm text-zinc-500 py-2">연동된 채널이 없습니다.</p>
+                <p className="text-sm text-zinc-500 py-2">No connected channels.</p>
               )}
             </div>
           </section>
