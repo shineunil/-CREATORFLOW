@@ -483,8 +483,8 @@ function NewTestContent() {
                           <input 
                             type="file" 
                             onChange={(e) => handleImageUpload(e, v.id)} 
-                            accept="image/png, image/jpeg" 
-                            className="hidden" 
+                            accept="image/png, image/jpeg, image/webp, image/jpg"
+                            className="hidden"
                           />
                           <img src={v.thumbnail_image_url} alt={`Thumbnail ${v.id}`} className={`w-full aspect-video object-cover ${v.analyzing ? 'opacity-50 blur-sm' : ''}`} />
                           {!v.analyzing && (
@@ -531,12 +531,12 @@ function NewTestContent() {
                           <input
                             type="file"
                             onChange={(e) => handleImageUpload(e, v.id)}
-                            accept="image/png, image/jpeg"
+                            accept="image/png, image/jpeg, image/webp, image/jpg"
                             className="hidden"
                           />
                           <UploadCloud size={48} className="text-zinc-400 group-hover/upload:text-cyan-400 mb-4 transition-colors" aria-hidden="true" />
                           <span className="text-lg font-bold text-zinc-300 group-hover/upload:text-white">Click to upload image</span>
-                          <span className="text-sm font-medium text-zinc-400 mt-2">Recommended: 1280x720 (Max 2MB)</span>
+                          <span className="text-sm font-medium text-zinc-400 mt-2">Recommended: 1280x720 (Max 10MB)</span>
                           <button
                             type="button"
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleGenerator(v.id); }}

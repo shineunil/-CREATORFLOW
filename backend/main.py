@@ -668,7 +668,7 @@ async def upload_thumbnail(
     
     # 🔒 허용 확장자 화이트리스트 (실행 파일 업로드 차단)
     ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-    ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB 제한
     
     file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
