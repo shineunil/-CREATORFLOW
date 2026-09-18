@@ -462,7 +462,7 @@ export default function SettingsPage() {
                         <p className="text-xs text-amber-300 leading-relaxed">
                           YouTube 정책상 맞춤 썸네일을 사용하려면 전화번호 인증이 필요합니다.{" "}
                           <a
-                            href="https://www.youtube.com/features"
+                            href={`https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(userEmail || "")}&continue=https%3A%2F%2Fwww.youtube.com%2Ffeatures`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 underline text-amber-200 hover:text-white font-semibold"

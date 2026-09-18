@@ -495,7 +495,7 @@ function NewTestContent() {
                           <strong>YouTube 정책:</strong> 맞춤 썸네일을 사용하려면 YouTube 계정{" "}
                           <strong>전화번호 인증</strong>이 필요합니다. (YouTube 자체 보안 정책이며 저희 앱과 무관합니다){" "}
                           <a
-                            href="https://www.youtube.com/features"
+                            href={`https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(userProfile.email || "")}&continue=https%3A%2F%2Fwww.youtube.com%2Ffeatures`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="underline text-amber-200 hover:text-white font-semibold"
