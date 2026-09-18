@@ -550,16 +550,6 @@ export default function SettingsPage() {
                   )}
                 </div>
 
-                <div className="pt-4 flex items-center justify-between">
-                  <span className="text-xs text-zinc-400">Verify the email template and delivery:</span>
-                  <button
-                    onClick={handleSendTestEmail}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/40 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-                  >
-                    <Mail size={14} aria-hidden="true" />
-                    <span>🧪 Send a Test Email</span>
-                  </button>
-                </div>
               </>
             )}
           </section>
