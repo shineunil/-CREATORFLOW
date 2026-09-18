@@ -99,6 +99,7 @@ export default function SettingsPage() {
         setNotifEmail(data.notification_email || null);
         setNotifEmailVerified(!!data.notification_email_verified);
         if (data.notification_email) setNotifEmailInput(data.notification_email);
+        if (typeof data.email_alerts_enabled === "boolean") setEmailAlerts(data.email_alerts_enabled);
       })
       .catch((err) => {
         console.error(err);
@@ -578,7 +579,19 @@ export default function SettingsPage() {
                       aria-label="Enable test-completion alerts"
                       className="sr-only peer"
                       checked={emailAlerts}
-                      onChange={() => setEmailAlerts(!emailAlerts)}
+                      onChange={async () => {
+                        const next = !emailAlerts;
+                        setEmailAlerts(next);
+                        try {
+                          await apiFetch("/api/user/preferences", {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ email_alerts_enabled: next }),
+                          });
+                        } catch {
+                          setEmailAlerts(!next); // 실패하면 롤백
+                        }
+                      }}
                     />
                     <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-400 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
                   </label>

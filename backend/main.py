@@ -21,6 +21,8 @@ from PIL import Image
 import io
 
 import jwt
+import hmac as _hmac_lib
+import hashlib as _hashlib
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from database import init_db, get_db, SessionLocal
 from scheduler import AVSchedulerEngine
@@ -58,6 +60,30 @@ if not JWT_SECRET:
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = int(os.getenv("JWT_EXPIRE_DAYS", "1"))
 security = HTTPBearer()
+
+# H-1: OAuth state에 JWT 원문 대신 HMAC-signed nonce 사용
+# Google OAuth URL에 JWT 전체를 state로 넣으면 구글 서버/프록시 로그에 남는다.
+# 대신 user_id + 랜덤값을 HMAC으로 서명한 단기 nonce를 사용한다.
+def _make_state_nonce(user_id: int) -> str:
+    import secrets as _sec
+    rand = _sec.token_urlsafe(12)
+    payload = f"{user_id}:{rand}"
+    sig = _hmac_lib.new(JWT_SECRET.encode(), payload.encode(), _hashlib.sha256).hexdigest()[:16]
+    return f"{payload}:{sig}"
+
+def _verify_state_nonce(state: str) -> int | None:
+    try:
+        last_colon = state.rfind(":")
+        if last_colon < 0:
+            return None
+        payload, sig = state[:last_colon], state[last_colon + 1:]
+        expected = _hmac_lib.new(JWT_SECRET.encode(), payload.encode(), _hashlib.sha256).hexdigest()[:16]
+        if not _hmac_lib.compare_digest(sig, expected):
+            return None
+        uid_str = payload.split(":", 1)[0]
+        return int(uid_str)
+    except Exception:
+        return None
 
 def create_access_token(user_id: int, channel_id: int) -> str:
     """
@@ -201,7 +227,16 @@ def login_via_google(state: str | None = None):
         f"prompt=consent"
     )
     if state:
-        auth_url += f"&state={urllib.parse.quote(state)}"
+        # H-1: 프론트가 보낸 JWT를 Google에 그대로 전달하지 않는다.
+        # JWT에서 user_id를 추출해 HMAC-signed nonce로 변환 후 state로 사용한다.
+        linking_user_id = None
+        try:
+            p = jwt.decode(state, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            linking_user_id = int(p["sub"])
+        except Exception:
+            pass
+        if linking_user_id:
+            auth_url += f"&state={urllib.parse.quote(_make_state_nonce(linking_user_id))}"
     return RedirectResponse(auth_url)
 
 @app.get("/api/auth/callback")
@@ -215,11 +250,14 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
     # 그 유저를 채널 소유자로 쓴다 (아래 4번 DB 저장 로직에서 google_user_id 기준 조회/생성을 건너뜀).
     linking_user_id: int | None = None
     if state:
-        try:
-            state_payload = jwt.decode(state, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            linking_user_id = int(state_payload["sub"])
-        except (jwt.PyJWTError, KeyError, ValueError):
-            logger.warning("채널 추가 시 전달된 state 토큰이 유효하지 않습니다. 신규 로그인으로 처리합니다.")
+        # H-1: HMAC-signed nonce로 검증 (신규), 실패하면 레거시 JWT 폴백
+        linking_user_id = _verify_state_nonce(state)
+        if linking_user_id is None:
+            try:
+                state_payload = jwt.decode(state, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+                linking_user_id = int(state_payload["sub"])
+            except (jwt.PyJWTError, KeyError, ValueError):
+                logger.warning("채널 추가 시 전달된 state 토큰이 유효하지 않습니다. 신규 로그인으로 처리합니다.")
     
     # 1. code를 이용해 access_token과 refresh_token 발급
     token_url = "https://oauth2.googleapis.com/token"
@@ -231,9 +269,8 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
         "grant_type": "authorization_code",
     }
     
-    # 로컬 환경(localhost)에서는 SSL 검증을 끄고, 실제 라이브 배포 환경에서는 보안을 위해 검증을 켭니다.
-    is_local = "localhost" in BACKEND_URL or "127.0.0.1" in BACKEND_URL
-    ssl_verify = False if is_local else True
+    # M-1: 문자열 비교 대신 is_dev_environment()로 SSL 검증 여부를 결정한다.
+    ssl_verify = not is_dev_environment()
     
     async with httpx.AsyncClient(verify=ssl_verify) as client:
         token_res = await client.post(token_url, data=token_data)
@@ -613,7 +650,7 @@ async def stop_ab_test(test_id: int, db: Session = Depends(get_db), channel: Cha
         winner_var.is_winner = True
         winner_total_views = sum(l.views_gained for l in winner_var.metric_logs)
         channel = test.video.channel if test.video else None
-        if channel and channel.user and channel.user.email and channel.user.plan == PlanType.PRO:
+        if channel and channel.user and channel.user.email and channel.user.plan == PlanType.PRO and channel.user.email_alerts_enabled:
             from email_service import send_test_completion_email
             to_email = channel.user.notification_email if channel.user.notification_email and channel.user.notification_email_verified else channel.user.email
             await asyncio.to_thread(
@@ -1208,7 +1245,23 @@ def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
         "is_admin": is_admin,
         "notification_email": user.notification_email,
         "notification_email_verified": user.notification_email_verified,
+        "email_alerts_enabled": user.email_alerts_enabled,
     }
+
+@app.patch("/api/user/preferences")
+def update_user_preferences(
+    payload: dict,
+    channel: Channel = Depends(get_current_channel),
+    db: Session = Depends(get_db),
+):
+    """M-6: 이메일 알림 수신 여부 등 사용자 환경설정을 업데이트합니다."""
+    user = db.query(User).filter(User.id == channel.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
+    if "email_alerts_enabled" in payload:
+        user.email_alerts_enabled = bool(payload["email_alerts_enabled"])
+    db.commit()
+    return {"ok": True, "email_alerts_enabled": user.email_alerts_enabled}
 
 @app.post("/api/checkout/create-session")
 async def create_stripe_checkout_session(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):

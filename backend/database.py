@@ -62,6 +62,8 @@ def _migrate_add_columns():
         "CREATE INDEX IF NOT EXISTS idx_abtests_video_id   ON ab_tests(video_id)",
         "CREATE INDEX IF NOT EXISTS idx_variations_test_id ON variations(ab_test_id)",
         "CREATE INDEX IF NOT EXISTS idx_metriclogs_var_id  ON metrics_logs(variation_id)",
+        # M-6: 이메일 알림 opt-out 컬럼
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_alerts_enabled BOOLEAN NOT NULL DEFAULT TRUE",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

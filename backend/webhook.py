@@ -47,14 +47,13 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         customer_email = data_obj.get("customer_email") or data_obj.get("customer_details", {}).get("email")
         user_id = data_obj.get("metadata", {}).get("user_id")
 
+        # M-4: metadata.user_id만 사용. email 폴백은 타 유저의 이메일로 오인 업그레이드 위험이 있다.
         user = None
         if user_id:
             try:
                 user = db.query(User).filter(User.id == int(user_id)).first()
             except (ValueError, TypeError):
                 pass
-        if not user and customer_email:
-            user = db.query(User).filter(User.email == customer_email).first()
 
         if user:
             user.plan = PlanType.PRO
