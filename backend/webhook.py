@@ -27,6 +27,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     if secret:
         try:
             event = stripe.Webhook.construct_event(body, sig_header, secret)
+            event = event.to_dict()  # Stripe SDK v8+ returns object, not dict
         except stripe.SignatureVerificationError:
             logger.warning("[Stripe Webhook] 🚨 서명 검증 실패 - 위조 요청 차단!")
             raise HTTPException(status_code=400, detail="Invalid Stripe webhook signature")
