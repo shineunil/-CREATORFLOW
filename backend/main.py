@@ -18,6 +18,7 @@ import httpx
 import urllib.parse
 import certifi
 from PIL import Image
+import io
 
 import jwt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -710,21 +711,25 @@ async def upload_thumbnail(
         os.remove(file_path)
         raise HTTPException(status_code=400, detail=f"허용되지 않는 이미지 형식입니다 (감지된 형식: {detected_format}).")
 
-    # 해상도 측정 (verify() 후에는 재오픈 필요)
-    img_width, img_height = 0, 0
+    # YouTube 규격에 맞게 자동 리사이즈 + 압축 (블로킹 I/O → 스레드 풀에서 실행)
     try:
-        with Image.open(file_path) as img2:
-            img_width, img_height = img2.size
-    except Exception:
-        pass
+        processed_path, img_width, img_height, file_size_bytes, was_processed = await asyncio.to_thread(
+            _process_image_for_youtube, file_path
+        )
+        unique_filename = os.path.basename(processed_path)
+    except Exception as e:
+        logger.warning(f"[Upload] 이미지 자동 처리 실패 (원본 사용): {e}")
+        img_width, img_height, file_size_bytes, was_processed = 0, 0, total_size, False
+        processed_path = file_path
 
-    public_url = await publish_local_image(file_path, unique_filename)
+    public_url = await publish_local_image(processed_path, unique_filename)
     return {
         "url": public_url,
         "filename": unique_filename,
         "width": img_width,
         "height": img_height,
-        "file_size_bytes": total_size,
+        "file_size_bytes": file_size_bytes,
+        "was_processed": was_processed,
     }
 
 @app.post("/api/generate-thumbnail")
@@ -791,6 +796,74 @@ async def generate_thumbnail_endpoint(
     return {"url": public_url, "filename": output_filename, "analysis": analysis}
 
 from ml_scorer import analyze_thumbnail
+
+def _process_image_for_youtube(file_path: str) -> tuple[str, int, int, int, bool]:
+    """
+    YouTube 썸네일 규격에 맞게 이미지를 자동 조정합니다.
+    - 최소 해상도 미달(1280×720) → 업스케일
+    - 파일 크기 초과(2MB) → JPEG 품질 낮춰 압축
+    Returns: (final_path, width, height, size_bytes, was_processed)
+    """
+    YOUTUBE_MIN_W = 1280
+    YOUTUBE_MIN_H = 720
+    YOUTUBE_MAX_BYTES = 2 * 1024 * 1024  # 2MB
+
+    img = Image.open(file_path)
+    try:
+        # RGBA/P 등 → RGB 변환 (JPEG 저장 필수)
+        if img.mode == "RGBA":
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[3])
+            img.close()
+            img = bg
+        elif img.mode != "RGB":
+            converted = img.convert("RGB")
+            img.close()
+            img = converted
+
+        orig_w, orig_h = img.size
+        current_size = os.path.getsize(file_path)
+
+        # 최소 해상도 미달 → 업스케일
+        if orig_w < YOUTUBE_MIN_W or orig_h < YOUTUBE_MIN_H:
+            scale = max(YOUTUBE_MIN_W / orig_w, YOUTUBE_MIN_H / orig_h)
+            resized = img.resize((int(orig_w * scale), int(orig_h * scale)), Image.LANCZOS)
+            img.close()
+            img = resized
+
+        final_w, final_h = img.size
+        needs_processing = (final_w != orig_w or final_h != orig_h or current_size > YOUTUBE_MAX_BYTES)
+
+        if not needs_processing:
+            return file_path, final_w, final_h, current_size, False
+
+        # JPEG 압축 (quality 95→40까지 5씩 낮춰 2MB 이하 달성)
+        new_path = os.path.splitext(file_path)[0] + ".jpg"
+        quality = 95
+        buf = io.BytesIO()
+        while quality >= 40:
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=quality, optimize=True)
+            if buf.tell() <= YOUTUBE_MAX_BYTES:
+                break
+            quality -= 5
+
+        buf.seek(0)
+        with open(new_path, "wb") as f:
+            f.write(buf.read())
+
+        if new_path != file_path:
+            try:
+                os.remove(file_path)
+            except Exception:
+                pass
+
+        return new_path, final_w, final_h, os.path.getsize(new_path), True
+    finally:
+        try:
+            img.close()
+        except Exception:
+            pass
 
 async def publish_local_image(file_path: str, filename: str) -> str:
     """
