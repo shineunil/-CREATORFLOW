@@ -205,16 +205,16 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
                       </button>
                     ))}
                   </div>
-                  <button
-                    role="menuitem"
-                    onClick={handleConnectAnother}
-                    disabled={atChannelLimit}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-bold text-zinc-300 hover:bg-zinc-800/60 border-t border-zinc-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400"
-                    title={atChannelLimit ? "요금제의 채널 연동 한도에 도달했습니다" : ""}
-                  >
-                    <Plus size={16} className="text-cyan-400" aria-hidden="true" />
-                    {atChannelLimit ? "채널 연동 한도 도달 (업그레이드 필요)" : "다른 채널 연동하기"}
-                  </button>
+                  {!atChannelLimit && (
+                    <button
+                      role="menuitem"
+                      onClick={handleConnectAnother}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-bold text-zinc-300 hover:bg-zinc-800/60 border-t border-zinc-800 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400"
+                    >
+                      <Plus size={16} className="text-cyan-400" aria-hidden="true" />
+                      다른 채널 연동하기
+                    </button>
+                  )}
                 </div>
               )}
             </div>
