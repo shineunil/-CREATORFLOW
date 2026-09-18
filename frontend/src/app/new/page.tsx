@@ -490,10 +490,27 @@ function NewTestContent() {
                       <label className="block text-base font-bold text-white mb-3">Test Thumbnail Image</label>
                       
                       {v.thumbnail_image_url ? (
+                        <>
+                        <div className="flex items-start gap-2 mb-2 px-3 py-2 bg-amber-950/40 border border-amber-500/30 rounded-lg">
+                          <span className="text-amber-400 text-xs mt-0.5 flex-shrink-0">⚠️</span>
+                          <p className="text-xs text-amber-300 leading-relaxed">
+                            YouTube 맞춤 썸네일을 사용하려면{" "}
+                            <strong>계정 인증</strong>이 필요합니다.{" "}
+                            <a
+                              href="https://www.youtube.com/features"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline text-amber-200 hover:text-white"
+                            >
+                              youtube.com/features
+                            </a>
+                            {" "}에서 전화번호 인증을 완료해 주세요. (약 1분 소요)
+                          </p>
+                        </div>
                         <label className="block relative rounded-xl overflow-hidden group/img cursor-pointer">
-                          <input 
-                            type="file" 
-                            onChange={(e) => handleImageUpload(e, v.id)} 
+                          <input
+                            type="file"
+                            onChange={(e) => handleImageUpload(e, v.id)}
                             accept="image/png, image/jpeg, image/webp, image/jpg"
                             className="hidden"
                           />
@@ -504,6 +521,7 @@ function NewTestContent() {
                             </div>
                           )}
                         </label>
+                        </>
                       ) : v.analyzing ? (
                         <div className="w-full aspect-video rounded-xl border-2 border-dashed border-zinc-700 bg-zinc-900/50 flex flex-col items-center justify-center" role="status">
                           <span className="w-8 h-8 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin mb-3" aria-hidden="true"></span>

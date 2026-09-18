@@ -10,6 +10,7 @@ from youtube_api import (
     update_youtube_thumbnail,
     update_youtube_title,
     TokenRevokedError,
+    ThumbnailPermissionError,
 )
 from metrics_utils import compute_variation_vph
 from test_policy import (
@@ -344,6 +345,10 @@ class AVSchedulerEngine:
             if next_var.title_text:
                 title_ok = await update_youtube_title(test.video.youtube_video_id, next_var.title_text, refresh_token)
                 record_usage(session, COST_VIDEOS_UPDATE)
+        except ThumbnailPermissionError:
+            test.swap_failed = True
+            logger.warning(f"⚠️ 채널 [{channel.id}] YouTube 맞춤 썸네일 권한 없음 — youtube.com/features 에서 계정 인증 필요")
+            return
         except TokenRevokedError:
             channel.needs_reconnect = True
             test.swap_failed = True

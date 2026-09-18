@@ -250,9 +250,19 @@ export default function Dashboard() {
         showAlert("Swap Success", "Thumbnail swapped successfully.", "success");
         const myToken = ++testsRefreshTokenRef.current;
         apiFetch("/api/tests").then(r => r.json()).then(d => {
-          if (testsRefreshTokenRef.current !== myToken) return; // 더 최신 새로고침이 이미 진행됨 - 이 응답은 버림
+          if (testsRefreshTokenRef.current !== myToken) return;
           setTestData(d.tests || []);
         });
+      } else if (res.status === 502) {
+        const errData = await res.json().catch(() => ({}));
+        const isPermission = (errData.detail || "").includes("썸네일") || (errData.detail || "").includes("thumbnail");
+        showAlert(
+          "썸네일 교체 실패",
+          isPermission
+            ? "YouTube 계정 인증이 필요합니다.\n\nyoutube.com/features 에서 전화번호 인증을 완료하면 바로 해결됩니다. (약 1분 소요)\n\n인증 후 테스트를 다시 시작해 주세요."
+            : (errData.detail || "YouTube 썸네일 교체에 실패했습니다. 잠시 후 자동으로 재시도됩니다."),
+          "warning"
+        );
       } else {
         showAlert("Swap Failed", "Failed to swap thumbnail. Please try again.", "error");
       }

@@ -17,6 +17,10 @@ class TokenRevokedError(Exception):
     """저장된 refresh_token이 만료되었거나 유저가 연동을 철회해 더 이상 사용할 수 없을 때 발생합니다."""
     pass
 
+class ThumbnailPermissionError(Exception):
+    """YouTube 채널이 맞춤 썸네일 업로드 권한을 갖고 있지 않을 때 발생합니다 (계정 인증 필요)."""
+    pass
+
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 YOUTUBE_API_SERVICE_NAME = 'youtube'
@@ -80,7 +84,11 @@ async def update_youtube_thumbnail(youtube_video_id: str, image_file_path: str, 
     except RefreshError as e:
         raise TokenRevokedError(str(e))
     except HttpError as e:
-        logger.error(f"[Thumbnail] ❌ YouTube API HttpError {e.resp.status}: {e.content.decode('utf-8', errors='replace')}")
+        status = int(e.resp.status)
+        body = e.content.decode('utf-8', errors='replace')
+        logger.error(f"[Thumbnail] ❌ YouTube API HttpError {status}: {body}")
+        if status == 403 and "thumbnail" in body.lower():
+            raise ThumbnailPermissionError(body)
         return False
     except Exception as e:
         logger.error(f"[Thumbnail] ❌ 예외 발생: {type(e).__name__}: {e}", exc_info=True)

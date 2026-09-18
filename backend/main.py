@@ -625,7 +625,14 @@ async def force_swap_ab_test(test_id: int, db: Session = Depends(get_db), channe
     if channel.needs_reconnect:
         raise HTTPException(status_code=409, detail="YouTube 연동이 만료되었습니다. 다시 로그인해 채널을 재연동해주세요.")
     if test.swap_failed:
-        raise HTTPException(status_code=502, detail="YouTube에 썸네일/제목 반영에 실패했습니다. 잠시 후 스케줄러가 자동으로 재시도합니다.")
+        # 채널에 403 권한 오류가 기록됐으면 전용 메시지 반환
+        perm_denied = getattr(channel, "thumbnail_permission_denied", False)
+        if perm_denied:
+            raise HTTPException(
+                status_code=502,
+                detail="YouTube 계정 인증이 필요합니다. youtube.com/features 에서 전화번호 인증을 완료해 주세요."
+            )
+        raise HTTPException(status_code=502, detail="YouTube 썸네일 교체에 실패했습니다. 잠시 후 스케줄러가 자동으로 재시도합니다.")
 
     current_var = db.query(Variation).filter(Variation.id == test.current_variation_id).first()
     return {"message": "즉시 썸네일/제목 교체가 수행되었습니다.", "current_variation": current_var.name if current_var else None}
