@@ -710,8 +710,22 @@ async def upload_thumbnail(
         os.remove(file_path)
         raise HTTPException(status_code=400, detail=f"허용되지 않는 이미지 형식입니다 (감지된 형식: {detected_format}).")
 
+    # 해상도 측정 (verify() 후에는 재오픈 필요)
+    img_width, img_height = 0, 0
+    try:
+        with Image.open(file_path) as img2:
+            img_width, img_height = img2.size
+    except Exception:
+        pass
+
     public_url = await publish_local_image(file_path, unique_filename)
-    return {"url": public_url, "filename": unique_filename}
+    return {
+        "url": public_url,
+        "filename": unique_filename,
+        "width": img_width,
+        "height": img_height,
+        "file_size_bytes": total_size,
+    }
 
 @app.post("/api/generate-thumbnail")
 async def generate_thumbnail_endpoint(

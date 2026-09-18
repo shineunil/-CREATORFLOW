@@ -188,9 +188,27 @@ function NewTestContent() {
           ml_feedback: feedback,
           analyzing: false
         } : v));
+
+        // YouTube 썸네일 규격 경고
+        const warnings: string[] = [];
+        if (data.width && data.height && (data.width < 1280 || data.height < 720)) {
+          warnings.push(`해상도 ${data.width}×${data.height} — YouTube 최소 규격은 1280×720입니다.`);
+        }
+        if (data.file_size_bytes && data.file_size_bytes > 2 * 1024 * 1024) {
+          const mb = (data.file_size_bytes / (1024 * 1024)).toFixed(1);
+          warnings.push(`파일 크기 ${mb}MB — YouTube 최대 허용 크기는 2MB입니다.`);
+        }
+        if (warnings.length > 0) {
+          showAlert(
+            "⚠️ YouTube 썸네일 규격 미달",
+            warnings.join("\n") + "\n\n이미지는 저장됐지만 YouTube 썸네일 교체가 실패할 수 있습니다.\n1280×720 이상, 2MB 이하 이미지를 사용해 주세요.",
+            "warning"
+          );
+        }
       } else {
         if (isStale()) return;
-        showAlert("Upload Failed", "Failed to upload image.", "error");
+        const errData = await response.json().catch(() => ({}));
+        showAlert("업로드 실패", errData.detail || "이미지 업로드에 실패했습니다.", "error");
         setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: false } : v));
       }
     } catch (error) {
