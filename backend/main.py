@@ -151,8 +151,15 @@ def get_current_admin(request: Request, db: Session = Depends(get_db)) -> User:
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
+    # L-4: 브랜드 계정 로그인 시 @pages.plusgoogle.com 이메일이 저장되어 email만으로는
+    # 관리자를 식별할 수 없다. google_user_id 기반 체크를 추가한다.
     admin_emails = {e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()}
-    if not user.email or user.email.lower() not in admin_emails:
+    admin_gids   = {g.strip() for g in os.getenv("ADMIN_GOOGLE_USER_IDS", "").split(",") if g.strip()}
+    is_admin = (
+        (bool(user.email) and user.email.lower() in admin_emails)
+        or (bool(user.google_user_id) and user.google_user_id in admin_gids)
+    )
+    if not is_admin:
         raise HTTPException(status_code=403, detail="관리자 권한이 없습니다.")
     return user
 
@@ -182,9 +189,10 @@ app = FastAPI(title="ThumbnailFlow API", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# 💥 Render 배포 시 uploads 폴더가 없으면 에러가 나므로, 마운트하기 전에 미리 폴더를 강제로 생성해 줍니다.
+# L-2: 프로덕션(Cloudinary)에서는 로컬 uploads/ 를 공개 서빙하지 않는다.
 os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+if is_dev_environment():
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -478,7 +486,7 @@ async def check_channel_capabilities_endpoint(
         raise HTTPException(status_code=401, detail="YouTube 연동이 만료되었습니다. 재연동이 필요합니다.")
     except Exception as e:
         logger.error(f"[Capabilities] 예상치 못한 에러: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"권한 확인 중 오류가 발생했습니다: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail="권한 확인 중 오류가 발생했습니다.")
 
 
 @app.post("/api/settings/test-email")
@@ -564,8 +572,12 @@ async def create_ab_test(request: Request, test_data: ABTestCreate, background_t
                 raise HTTPException(status_code=403, detail="BASIC plan allows only 1 active test at a time. Upgrade to PRO for unlimited concurrent tests.")
                 
             # 2. 월간 누적 테스트 생성 횟수 제한 (4회)
-            now = datetime.now(timezone.utc)
-            first_day_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            # M-5: YouTube 쿼터와 동일하게 PT 기준으로 월 시작을 계산한다.
+            from zoneinfo import ZoneInfo as _ZoneInfo
+            _pt = _ZoneInfo("America/Los_Angeles")
+            _now_pt = datetime.now(_pt)
+            _month_start_pt = _now_pt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            first_day_of_month = _month_start_pt.astimezone(timezone.utc)
             monthly_count = db.query(ABTest).join(Video).filter(
                 Video.channel_id == channel.id,
                 ABTest.start_time >= first_day_of_month,

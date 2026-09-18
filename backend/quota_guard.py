@@ -48,3 +48,23 @@ def record_usage(session, units: int):
 def has_quota_for(session, units: int) -> bool:
     """안전 마진을 제외하고 요청한 유닛만큼의 쿼터가 남아있는지 확인한다."""
     return (get_today_usage(session) + units) <= (DAILY_QUOTA_LIMIT - QUOTA_SAFETY_MARGIN)
+
+
+def check_and_reserve_usage(session, units: int) -> bool:
+    """L-5: 쿼터 확인과 사용량 기록을 원자적으로 수행한다.
+    PostgreSQL에서는 SELECT FOR UPDATE로 row-level lock을 획득해 TOCTOU를 방지한다.
+    SQLite(개발 환경)에서는 with_for_update()가 무시되므로 동작에는 영향이 없다."""
+    today = _today_pacific()
+    row = (session.query(ApiQuotaUsage)
+           .filter(ApiQuotaUsage.date == today)
+           .with_for_update()
+           .first())
+    current = row.units_used if row else 0
+    if (current + units) > (DAILY_QUOTA_LIMIT - QUOTA_SAFETY_MARGIN):
+        return False
+    if row:
+        row.units_used += units
+    else:
+        session.add(ApiQuotaUsage(date=today, units_used=units))
+    session.flush()
+    return True

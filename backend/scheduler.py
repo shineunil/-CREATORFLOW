@@ -21,7 +21,7 @@ from test_policy import (
     MAX_AUTO_EXTENSIONS,
     SWAP_WARMUP_MINUTES,
 )
-from quota_guard import has_quota_for, record_usage, COST_VIDEOS_LIST, COST_VIDEOS_UPDATE, COST_THUMBNAILS_SET
+from quota_guard import has_quota_for, record_usage, check_and_reserve_usage, COST_VIDEOS_LIST, COST_VIDEOS_UPDATE, COST_THUMBNAILS_SET
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -117,8 +117,9 @@ class AVSchedulerEngine:
                     # 호출하면 Google이 403 quotaExceeded를 반환해도 update_youtube_thumbnail이
                     # 조용히 False를 반환할 뿐이라, DB엔 "승자 확정됨"이라 남지만 실제 YouTube
                     # 썸네일은 예전 것 그대로 남는 상황이 아무 로그 없이 발생할 수 있었다.
+                    # L-5: check_and_reserve_usage로 확인+예약을 원자적으로 처리 (TOCTOU 방지)
                     worst_case_cost = COST_THUMBNAILS_SET + COST_VIDEOS_UPDATE
-                    if not has_quota_for(session, worst_case_cost):
+                    if not check_and_reserve_usage(session, worst_case_cost):
                         logger.warning(
                             f"⚠️ YouTube API 일일 쿼터 소진 임박 - 테스트 ID [{test.id}] 승자 썸네일/제목 적용을 건너뜁니다 "
                             f"(DB상 승자 확정은 유지되나, YouTube에는 반영되지 않았습니다)"
@@ -144,12 +145,10 @@ class AVSchedulerEngine:
                                         logger.error(f"승자 썸네일 다운로드 에러: {_e}")
                                 if os.path.exists(win_file):
                                     thumb_ok = await update_youtube_thumbnail(test.video.youtube_video_id, win_file, refresh_token)
-                                    record_usage(session, COST_THUMBNAILS_SET)
                                     if not thumb_ok:
                                         logger.error(f"⚠️ 테스트 ID [{test.id}] 승자 썸네일 YouTube 반영 실패 (API가 실패를 반환함)")
                             if winner_var.title_text:
                                 title_ok = await update_youtube_title(test.video.youtube_video_id, winner_var.title_text, refresh_token)
-                                record_usage(session, COST_VIDEOS_UPDATE)
                                 if not title_ok:
                                     logger.error(f"⚠️ 테스트 ID [{test.id}] 승자 제목 YouTube 반영 실패 (API가 실패를 반환함)")
                         except TokenRevokedError:
@@ -237,8 +236,9 @@ class AVSchedulerEngine:
 
         # YouTube Data API 쿼터는 프로젝트(앱) 전체 공유 자원이므로, 소진 위험이 있으면
         # 이번 스왑을 건너뛴다 (last_swapped_at을 갱신하지 않으므로 다음 tick에 다시 시도됨).
+        # L-5: check_and_reserve_usage로 확인+예약을 원자적으로 처리 (TOCTOU 방지)
         worst_case_cost = COST_VIDEOS_LIST + COST_THUMBNAILS_SET + COST_VIDEOS_UPDATE
-        if not has_quota_for(session, worst_case_cost):
+        if not check_and_reserve_usage(session, worst_case_cost):
             logger.warning(f"⚠️ YouTube API 일일 쿼터 소진 임박 - 테스트 ID [{test.id}] 스왑을 건너뜁니다 (쿼터 리셋 후 자동 재개)")
             return
 
@@ -251,7 +251,6 @@ class AVSchedulerEngine:
         # 2. YouTube API를 호출하여 현재 총 조회수 가져오기
         try:
             current_views = await get_video_views(test.video.youtube_video_id, refresh_token)
-            record_usage(session, COST_VIDEOS_LIST)
         except TokenRevokedError:
             channel.needs_reconnect = True
             logger.warning(f"⚠️ 채널 [{channel.id}] YouTube 연동이 만료/철회되어 재연동이 필요합니다.")
@@ -336,7 +335,6 @@ class AVSchedulerEngine:
                 if thumbnail_ok:
                     if os.path.exists(file_path):
                         thumbnail_ok = await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token)
-                        record_usage(session, COST_THUMBNAILS_SET)
                     else:
                         logger.warning(f"썸네일 파일을 찾을 수 없습니다: {file_path}")
                         thumbnail_ok = False
@@ -344,7 +342,6 @@ class AVSchedulerEngine:
             title_ok = True
             if next_var.title_text:
                 title_ok = await update_youtube_title(test.video.youtube_video_id, next_var.title_text, refresh_token)
-                record_usage(session, COST_VIDEOS_UPDATE)
         except ThumbnailPermissionError:
             test.swap_failed = True
             channel.thumbnail_permission = "denied"
