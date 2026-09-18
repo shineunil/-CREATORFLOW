@@ -1194,14 +1194,21 @@ def send_notification_email_code(
     simulated = False
     if RESEND_API_KEY:
         try:
-            _httpx.post(
+            res = _httpx.post(
                 "https://api.resend.com/emails",
                 headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
                 json={"from": RESEND_FROM_EMAIL, "to": [email], "subject": "[ThumbnailFlow] Email Verification Code", "html": html},
                 timeout=10,
             )
+            if res.status_code not in (200, 201):
+                logger.error(f"Resend error ({res.status_code}): {res.text}")
+                raise HTTPException(status_code=502, detail=f"이메일 발송에 실패했습니다. (Resend {res.status_code})")
+            logger.info(f"[Resend] 인증 코드 발송 성공 → {email}")
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Verification email send error: {e}")
+            raise HTTPException(status_code=502, detail="이메일 발송 중 오류가 발생했습니다.")
     else:
         simulated = True
         logger.info(f"[SIMULATE] Verification code for {email}: {code}")
