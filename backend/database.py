@@ -55,6 +55,7 @@ def _migrate_add_columns():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_email VARCHAR",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_email_verified BOOLEAN DEFAULT FALSE",
         "ALTER TABLE site_announcements ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()",
+        "ALTER TABLE channels ADD COLUMN IF NOT EXISTS thumbnail_permission VARCHAR DEFAULT 'unknown'",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

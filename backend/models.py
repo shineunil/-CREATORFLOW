@@ -50,6 +50,7 @@ class Channel(Base):
     channel_title = Column(String)
     oauth_refresh_token = Column(String, nullable=True) # Essential for background jobs
     needs_reconnect = Column(Boolean, default=False) # refresh_token이 만료/철회되어 유저의 재동의(재로그인)가 필요한 상태
+    thumbnail_permission = Column(String, nullable=True, default="unknown")  # "unknown" | "allowed" | "denied"
 
     user = relationship("User", back_populates="channels")
     videos = relationship("Video", back_populates="channel", cascade="all, delete-orphan")

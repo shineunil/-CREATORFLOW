@@ -94,6 +94,26 @@ async def update_youtube_thumbnail(youtube_video_id: str, image_file_path: str, 
         logger.error(f"[Thumbnail] ❌ 예외 발생: {type(e).__name__}: {e}", exc_info=True)
         return False
 
+async def check_channel_capabilities(refresh_token: str) -> dict:
+    """채널의 YouTube 기능 허용 여부를 반환합니다. longUploadsStatus로 계정 인증 여부를 판단합니다."""
+    try:
+        youtube = get_youtube_client(refresh_token)
+        req = youtube.channels().list(part="status", mine=True)
+        res = await asyncio.to_thread(req.execute)
+        items = res.get("items", [])
+        if not items:
+            return {"thumbnail_permission": "unknown"}
+        long_uploads = items[0].get("status", {}).get("longUploadsStatus", "disallowed")
+        permission = "allowed" if long_uploads == "allowed" else "denied"
+        logger.info(f"[Capabilities] longUploadsStatus={long_uploads} → thumbnail_permission={permission}")
+        return {"thumbnail_permission": permission}
+    except RefreshError as e:
+        raise TokenRevokedError(str(e))
+    except Exception as e:
+        logger.error(f"[Capabilities] 체크 실패: {e}")
+        return {"thumbnail_permission": "unknown"}
+
+
 async def update_youtube_title(youtube_video_id: str, new_title: str, refresh_token: str) -> bool:
     try:
         youtube = get_youtube_client(refresh_token)

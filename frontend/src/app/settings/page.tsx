@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Settings, Mail, Bell, Shield, LogOut, PlaySquare, Plus, AlertTriangle, CreditCard, Loader2, CheckCircle2, Trash2 } from "lucide-react";
+import { Settings, Mail, Bell, Shield, LogOut, PlaySquare, Plus, AlertTriangle, CreditCard, Loader2, CheckCircle2, Trash2, RefreshCw, Image, Type, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
@@ -16,6 +16,7 @@ type ChannelSummary = {
   needs_reconnect: boolean;
   is_connected: boolean;
   is_active: boolean;
+  thumbnail_permission: "unknown" | "allowed" | "denied";
 };
 
 export default function SettingsPage() {
@@ -37,6 +38,7 @@ export default function SettingsPage() {
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [maxChannels, setMaxChannels] = useState(1);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [checkingCapabilities, setCheckingCapabilities] = useState<Record<number, boolean>>({});
   // state만으로 중복 클릭을 막으면 리렌더 반영 전 짧은 틈에 두 번째 클릭이 통과할 수 있어 ref로 보강한다.
   const isSwitchingRef = useRef(false);
   const [modalConfig, setModalConfig] = useState<{
@@ -176,6 +178,23 @@ export default function SettingsPage() {
       localStorage.removeItem("jwt_token");
       localStorage.removeItem("connectedChannel");
       window.location.href = "/";
+    }
+  };
+
+  const handleCheckCapabilities = async (channelId: number) => {
+    setCheckingCapabilities(prev => ({ ...prev, [channelId]: true }));
+    try {
+      const res = await apiFetch(`/api/channels/${channelId}/check-capabilities`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setChannels(prev => prev.map(c => c.id === channelId ? { ...c, thumbnail_permission: data.thumbnail_permission } : c));
+      } else {
+        showAlert("Error", data.detail || "Failed to check capabilities.", "error");
+      }
+    } catch {
+      showAlert("Error", "Something went wrong.", "error");
+    } finally {
+      setCheckingCapabilities(prev => ({ ...prev, [channelId]: false }));
     }
   };
 
@@ -386,6 +405,90 @@ export default function SettingsPage() {
               <Plus size={16} aria-hidden="true" />
               <span>{channels.length >= maxChannels ? "Channel limit reached (upgrade needed)" : "Connect Another Channel"}</span>
             </button>
+          </section>
+
+          {/* Channel Capabilities */}
+          <section className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <Shield size={18} className="text-cyan-400" aria-hidden="true" /> Channel Capabilities
+            </h2>
+            <p className="text-xs text-zinc-400 mb-4">
+              YouTube 계정 인증 여부에 따라 사용 가능한 기능이 달라집니다.{" "}
+              맞춤 썸네일은 YouTube 정책상 전화번호 인증이 완료된 계정만 사용할 수 있습니다.
+            </p>
+            <div className="space-y-4">
+              {channels.filter(c => c.is_connected).map((c) => {
+                const perm = c.thumbnail_permission || "unknown";
+                const isChecking = !!checkingCapabilities[c.id];
+                return (
+                  <div key={c.id} className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-300 flex-shrink-0" aria-hidden="true">
+                        {c.channel_title ? c.channel_title.substring(0, 1).toUpperCase() : "?"}
+                      </div>
+                      <span className="font-semibold text-sm text-white">{c.channel_title || "Untitled"}</span>
+                      {c.is_active && <span className="text-[11px] font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">Active</span>}
+                    </div>
+
+                    <div className="space-y-2">
+                      {/* 제목 변경 — 항상 가능 */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Type size={14} className="text-zinc-400" aria-hidden="true" />
+                          <span className="text-sm text-zinc-300">제목 변경 (A/B 테스트)</span>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">✓ 사용 가능</span>
+                      </div>
+
+                      {/* 맞춤 썸네일 */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Image size={14} className="text-zinc-400" aria-hidden="true" />
+                          <span className="text-sm text-zinc-300">맞춤 썸네일 업로드</span>
+                        </div>
+                        {perm === "allowed" ? (
+                          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">✓ 인증 완료</span>
+                        ) : perm === "denied" ? (
+                          <span className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full">✗ 인증 필요</span>
+                        ) : (
+                          <span className="text-xs font-bold text-zinc-400 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-full">— 미확인</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {perm === "denied" && (
+                      <div className="mt-3 flex items-start gap-2 px-3 py-2.5 bg-amber-950/40 border border-amber-500/30 rounded-lg">
+                        <AlertTriangle size={13} className="text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                        <p className="text-xs text-amber-300 leading-relaxed">
+                          YouTube 정책상 맞춤 썸네일을 사용하려면 전화번호 인증이 필요합니다.{" "}
+                          <a
+                            href="https://www.youtube.com/features"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 underline text-amber-200 hover:text-white font-semibold"
+                          >
+                            youtube.com/features <ExternalLink size={11} aria-hidden="true" />
+                          </a>
+                          {" "}에서 약 1분 내로 완료할 수 있습니다.
+                        </p>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => handleCheckCapabilities(c.id)}
+                      disabled={isChecking}
+                      className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                    >
+                      {isChecking ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={12} aria-hidden="true" />}
+                      {isChecking ? "확인 중..." : "지금 확인"}
+                    </button>
+                  </div>
+                );
+              })}
+              {channels.filter(c => c.is_connected).length === 0 && (
+                <p className="text-sm text-zinc-500 py-2">연동된 채널이 없습니다.</p>
+              )}
+            </div>
           </section>
 
           {/* Billing */}

@@ -347,6 +347,7 @@ class AVSchedulerEngine:
                 record_usage(session, COST_VIDEOS_UPDATE)
         except ThumbnailPermissionError:
             test.swap_failed = True
+            channel.thumbnail_permission = "denied"
             logger.warning(f"⚠️ 채널 [{channel.id}] YouTube 맞춤 썸네일 권한 없음 — youtube.com/features 에서 계정 인증 필요")
             return
         except TokenRevokedError:
@@ -362,6 +363,8 @@ class AVSchedulerEngine:
             test.current_variation_id = next_var.id
             test.swap_failed = False
             test.swap_count += 1
+            if next_var.thumbnail_image_url:
+                channel.thumbnail_permission = "allowed"
             # 새로 적용된 변인의 워밍업 구간 측정을 위해 기준선 재캡처를 대기 상태로 전환
             test.warmup_captured = False
             test.exposure_start_at = None

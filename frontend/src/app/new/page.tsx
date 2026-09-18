@@ -487,26 +487,27 @@ function NewTestContent() {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
                     <div>
-                      <label className="block text-base font-bold text-white mb-3">Test Thumbnail Image</label>
-                      
+                      <label className="block text-base font-bold text-white mb-2">Test Thumbnail Image</label>
+
+                      <div className="flex items-start gap-2 mb-3 px-3 py-2.5 bg-amber-950/40 border border-amber-500/30 rounded-lg">
+                        <span className="text-amber-400 text-xs mt-0.5 flex-shrink-0">⚠️</span>
+                        <p className="text-xs text-amber-300 leading-relaxed">
+                          <strong>YouTube 정책:</strong> 맞춤 썸네일을 사용하려면 YouTube 계정{" "}
+                          <strong>전화번호 인증</strong>이 필요합니다. (YouTube 자체 보안 정책이며 저희 앱과 무관합니다){" "}
+                          <a
+                            href="https://www.youtube.com/features"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline text-amber-200 hover:text-white font-semibold"
+                          >
+                            youtube.com/features
+                          </a>
+                          {" "}에서 1분 내로 완료할 수 있어요.
+                        </p>
+                      </div>
+
                       {v.thumbnail_image_url ? (
                         <>
-                        <div className="flex items-start gap-2 mb-2 px-3 py-2 bg-amber-950/40 border border-amber-500/30 rounded-lg">
-                          <span className="text-amber-400 text-xs mt-0.5 flex-shrink-0">⚠️</span>
-                          <p className="text-xs text-amber-300 leading-relaxed">
-                            YouTube 맞춤 썸네일을 사용하려면{" "}
-                            <strong>계정 인증</strong>이 필요합니다.{" "}
-                            <a
-                              href="https://www.youtube.com/features"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline text-amber-200 hover:text-white"
-                            >
-                              youtube.com/features
-                            </a>
-                            {" "}에서 전화번호 인증을 완료해 주세요. (약 1분 소요)
-                          </p>
-                        </div>
                         <label className="block relative rounded-xl overflow-hidden group/img cursor-pointer">
                           <input
                             type="file"

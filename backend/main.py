@@ -370,6 +370,7 @@ def list_channels(db: Session = Depends(get_db), channel: Channel = Depends(get_
                 "needs_reconnect": c.needs_reconnect,
                 "is_connected": bool(c.oauth_refresh_token),
                 "is_active": c.id == channel.id,
+                "thumbnail_permission": c.thumbnail_permission or "unknown",
             }
             for c in channels
         ],
@@ -385,6 +386,35 @@ def switch_channel(target_channel_id: int, db: Session = Depends(get_db), channe
 
     token = create_access_token(target.user_id, target.id)
     return {"token": token, "channel_title": target.channel_title}
+
+@app.post("/api/channels/{target_channel_id}/check-capabilities")
+@limiter.limit("10/hour")
+async def check_channel_capabilities_endpoint(
+    request: Request,
+    target_channel_id: int,
+    db: Session = Depends(get_db),
+    channel: Channel = Depends(get_current_channel),
+):
+    """채널의 YouTube 기능 권한(맞춤 썸네일 등)을 실시간으로 체크하고 DB에 저장합니다."""
+    from youtube_api import check_channel_capabilities, TokenRevokedError
+
+    target = db.query(Channel).filter(Channel.id == target_channel_id).first()
+    if not target or target.user_id != channel.user_id:
+        raise HTTPException(status_code=404, detail="채널을 찾을 수 없습니다.")
+    if not target.oauth_refresh_token:
+        raise HTTPException(status_code=400, detail="연동이 해제된 채널입니다.")
+
+    try:
+        result = await check_channel_capabilities(target.oauth_refresh_token)
+    except TokenRevokedError:
+        target.needs_reconnect = True
+        db.commit()
+        raise HTTPException(status_code=401, detail="YouTube 연동이 만료되었습니다. 재연동이 필요합니다.")
+
+    target.thumbnail_permission = result["thumbnail_permission"]
+    db.commit()
+    return {"thumbnail_permission": target.thumbnail_permission}
+
 
 @app.post("/api/settings/test-email")
 @limiter.limit("3/hour")
