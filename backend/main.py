@@ -615,7 +615,8 @@ async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: C
         if original_var.thumbnail_image_url:
             import re as _re
             _YT_NATIVE = ("https://i.ytimg.com/", "https://img.youtube.com/")
-            _allowed = ("https://res.cloudinary.com/", "https://cloudinary.com/") + _YT_NATIVE
+            _backend = os.getenv("BACKEND_URL", "")
+            _allowed = ("https://res.cloudinary.com/", "https://cloudinary.com/") + _YT_NATIVE + ((_backend,) if _backend else ())
             restore_url = original_var.thumbnail_image_url
             if any(restore_url.startswith(p) for p in _YT_NATIVE):
                 restore_url = _re.sub(r'/[^/]+\.jpg$', '/maxresdefault.jpg', restore_url)

@@ -302,12 +302,15 @@ class AVSchedulerEngine:
                 file_name = download_url.split('/')[-1] + "_" + str(next_var.id)
                 file_path = os.path.join("uploads", file_name)
 
-                allowed_prefixes = (
+                import os as _os
+                _backend_url = _os.getenv("BACKEND_URL", "")
+                allowed_prefixes = tuple(filter(None, [
                     "https://res.cloudinary.com/",
                     "https://cloudinary.com/",
                     "https://i.ytimg.com/",
                     "https://img.youtube.com/",
-                )
+                    _backend_url if _backend_url else None,
+                ]))
                 url_is_safe = not download_url.startswith("http") or \
                               any(download_url.startswith(p) for p in allowed_prefixes)
 
