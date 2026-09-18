@@ -204,7 +204,10 @@ def login_via_google(state: str | None = None):
     return RedirectResponse(auth_url)
 
 @app.get("/api/auth/callback")
-async def google_auth_callback(code: str, state: str | None = None, db: Session = Depends(get_db)):
+async def google_auth_callback(request: Request, code: str | None = None, error: str | None = None, state: str | None = None, db: Session = Depends(get_db)):
+    if error or not code:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=cancelled")
+
     """구글 로그인 성공 시 되돌아오는 콜백 엔드포인트"""
 
     # "채널 추가" 흐름이면 state에 기존 로그인 유저의 JWT가 실려있다. 유효하면 이 흐름 전체에서
