@@ -386,7 +386,8 @@ def switch_channel(target_channel_id: int, db: Session = Depends(get_db), channe
     return {"token": token, "channel_title": target.channel_title}
 
 @app.post("/api/settings/test-email")
-def send_test_email(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+@limiter.limit("3/hour")
+def send_test_email(request: Request, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """이메일 알림 테스트 전송 엔드포인트"""
     target_email = channel.user.email if channel and channel.user else os.getenv("ADMIN_EMAIL", "")
     
