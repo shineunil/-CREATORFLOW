@@ -56,21 +56,34 @@ async def get_video_views(youtube_video_id: str, refresh_token: str) -> int:
 
 async def update_youtube_thumbnail(youtube_video_id: str, image_file_path: str, refresh_token: str) -> bool:
     try:
+        import os as _os
+        file_size = _os.path.getsize(image_file_path) if _os.path.exists(image_file_path) else -1
+        logger.info(f"[Thumbnail] 업로드 시작 → video={youtube_video_id} file={image_file_path} size={file_size}bytes")
+
         youtube = get_youtube_client(refresh_token)
+        # 실제 확장자가 아닌 파일 뒤에 _id 가 붙을 수 있으므로 MIME은 jpeg 기본
         ext = image_file_path.lower().split('.')[-1]
         mime_type = 'image/png' if ext == 'png' else 'image/jpeg'
         media_body = MediaFileUpload(image_file_path, mimetype=mime_type, chunksize=-1, resumable=True)
-        
+
         request = youtube.thumbnails().set(videoId=youtube_video_id, media_body=media_body)
         response = await asyncio.to_thread(request.execute)
-        
-        logger.info(f"Thumbnail updated: {response['items'][0].get('default', {}).get('url')}")
+
+        # response 구조 안전하게 파싱 (items 없어도 성공으로 처리)
+        try:
+            thumb_url = response.get('items', [{}])[0].get('default', {}).get('url', '')
+            logger.info(f"[Thumbnail] ✅ 업로드 성공 → {thumb_url or '(url 없음)'}")
+        except Exception:
+            logger.info(f"[Thumbnail] ✅ 업로드 성공 (응답 파싱 실패, raw={response})")
         return True
 
     except RefreshError as e:
         raise TokenRevokedError(str(e))
+    except HttpError as e:
+        logger.error(f"[Thumbnail] ❌ YouTube API HttpError {e.resp.status}: {e.content.decode('utf-8', errors='replace')}")
+        return False
     except Exception as e:
-        logger.error(f"YouTube API Error (update_youtube_thumbnail): {e}")
+        logger.error(f"[Thumbnail] ❌ 예외 발생: {type(e).__name__}: {e}", exc_info=True)
         return False
 
 async def update_youtube_title(youtube_video_id: str, new_title: str, refresh_token: str) -> bool:

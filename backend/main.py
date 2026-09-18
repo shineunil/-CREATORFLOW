@@ -568,6 +568,45 @@ async def stop_ab_test(test_id: int, db: Session = Depends(get_db), channel: Cha
     db.commit()
     return {"message": "테스트가 성공적으로 중단 및 종료되었습니다.", "winner": winner_var.name if winner_var else None}
 
+@app.get("/api/tests/{test_id}/debug")
+async def debug_test_state(test_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+    """테스트 현재 상태 및 썸네일 URL 디버그 정보 반환."""
+    from datetime import datetime, timezone
+    test = db.query(ABTest).join(Video).filter(ABTest.id == test_id, Video.channel_id == channel.id).first()
+    if not test:
+        raise HTTPException(status_code=404, detail="테스트를 찾을 수 없거나 권한이 없습니다.")
+
+    now = datetime.now(timezone.utc)
+    last_swap = test.last_swapped_at
+    if last_swap and last_swap.tzinfo is None:
+        last_swap = last_swap.replace(tzinfo=timezone.utc)
+    seconds_since_swap = (now - last_swap).total_seconds() if last_swap else None
+    next_swap_in_seconds = max(0, test.swap_interval_minutes * 60 - (seconds_since_swap or 0))
+
+    current_var = db.query(Variation).filter(Variation.id == test.current_variation_id).first() if test.current_variation_id else None
+    all_vars = db.query(Variation).filter(Variation.ab_test_id == test.id).order_by(Variation.id).all()
+
+    return {
+        "test_id": test.id,
+        "status": test.status.value if test.status else None,
+        "swap_count": test.swap_count,
+        "swap_failed": test.swap_failed,
+        "swap_interval_minutes": test.swap_interval_minutes,
+        "last_swapped_at": last_swap.isoformat() if last_swap else None,
+        "seconds_since_last_swap": round(seconds_since_swap or 0),
+        "next_swap_in_seconds": round(next_swap_in_seconds),
+        "next_swap_in_minutes": round(next_swap_in_seconds / 60, 1),
+        "current_variation": current_var.name if current_var else None,
+        "variations": [
+            {
+                "name": v.name,
+                "is_control": v.is_control,
+                "thumbnail_url": v.thumbnail_image_url,
+            }
+            for v in all_vars
+        ],
+    }
+
 @app.post("/api/tests/{test_id}/swap")
 async def force_swap_ab_test(test_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """테스트 대기 시간을 기다리지 않고 즉시 다음 변인(썸네일/제목)으로 교체 테스트를 실행합니다."""
