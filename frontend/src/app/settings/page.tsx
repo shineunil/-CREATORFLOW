@@ -185,11 +185,14 @@ export default function SettingsPage() {
     setCheckingCapabilities(prev => ({ ...prev, [channelId]: true }));
     try {
       const res = await apiFetch(`/api/channels/${channelId}/check-capabilities`, { method: "POST" });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setChannels(prev => prev.map(c => c.id === channelId ? { ...c, thumbnail_permission: data.thumbnail_permission } : c));
       } else {
-        showAlert("Error", data.detail || "Failed to check capabilities.", "error");
+        const msg = typeof data.detail === "string" ? data.detail
+          : data.error ? String(data.error)
+          : `서버 오류 (${res.status})`;
+        showAlert("Error", msg, "error");
       }
     } catch {
       showAlert("Error", "Something went wrong.", "error");

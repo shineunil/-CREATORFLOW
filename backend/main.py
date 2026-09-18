@@ -388,9 +388,7 @@ def switch_channel(target_channel_id: int, db: Session = Depends(get_db), channe
     return {"token": token, "channel_title": target.channel_title}
 
 @app.post("/api/channels/{target_channel_id}/check-capabilities")
-@limiter.limit("10/hour")
 async def check_channel_capabilities_endpoint(
-    request: Request,
     target_channel_id: int,
     db: Session = Depends(get_db),
     channel: Channel = Depends(get_current_channel),
@@ -406,14 +404,21 @@ async def check_channel_capabilities_endpoint(
 
     try:
         result = await check_channel_capabilities(target.oauth_refresh_token)
+        perm = result.get("thumbnail_permission", "unknown")
+        try:
+            target.thumbnail_permission = perm
+            db.commit()
+        except Exception as db_err:
+            db.rollback()
+            logger.warning(f"[Capabilities] DB 저장 실패 (컬럼 없을 수 있음): {db_err}")
+        return {"thumbnail_permission": perm}
     except TokenRevokedError:
         target.needs_reconnect = True
         db.commit()
         raise HTTPException(status_code=401, detail="YouTube 연동이 만료되었습니다. 재연동이 필요합니다.")
-
-    target.thumbnail_permission = result["thumbnail_permission"]
-    db.commit()
-    return {"thumbnail_permission": target.thumbnail_permission}
+    except Exception as e:
+        logger.error(f"[Capabilities] 예상치 못한 에러: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"권한 확인 중 오류가 발생했습니다: {type(e).__name__}")
 
 
 @app.post("/api/settings/test-email")
