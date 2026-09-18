@@ -56,6 +56,12 @@ def _migrate_add_columns():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_email_verified BOOLEAN DEFAULT FALSE",
         "ALTER TABLE site_announcements ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()",
         "ALTER TABLE channels ADD COLUMN IF NOT EXISTS thumbnail_permission VARCHAR DEFAULT 'unknown'",
+        # H-2: PostgreSQL은 FK에 자동 인덱스를 생성하지 않으므로 명시적으로 추가
+        "CREATE INDEX IF NOT EXISTS idx_channels_user_id   ON channels(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_videos_channel_id  ON videos(channel_id)",
+        "CREATE INDEX IF NOT EXISTS idx_abtests_video_id   ON ab_tests(video_id)",
+        "CREATE INDEX IF NOT EXISTS idx_variations_test_id ON variations(ab_test_id)",
+        "CREATE INDEX IF NOT EXISTS idx_metriclogs_var_id  ON metrics_logs(variation_id)",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

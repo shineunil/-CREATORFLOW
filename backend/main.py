@@ -24,7 +24,7 @@ import jwt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from database import init_db, get_db, SessionLocal
 from scheduler import AVSchedulerEngine
-from models import User, Channel, Video, ABTest, Variation, TestStatus, MetricLog, PlanType, SiteAnnouncement
+from models import User, Channel, Video, ABTest, Variation, TestStatus, MetricLog, PlanType, SiteAnnouncement, OAuthAuthCode, EmailVerificationCode
 from schemas import ABTestCreate, ABTestResponse
 from env_utils import is_dev_environment, allow_test_upgrade
 from metrics_utils import compute_variation_vph
@@ -56,7 +56,7 @@ JWT_SECRET = os.getenv("JWT_SECRET")
 if not JWT_SECRET:
     raise RuntimeError("🚨 JWT_SECRET 환경 변수가 설정되지 않았습니다. .env 파일을 확인하세요.")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_DAYS = int(os.getenv("JWT_EXPIRE_DAYS", "7"))
+JWT_EXPIRE_DAYS = int(os.getenv("JWT_EXPIRE_DAYS", "1"))
 security = HTTPBearer()
 
 def create_access_token(user_id: int, channel_id: int) -> str:
@@ -322,18 +322,41 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
 
     logger.info(f"유튜브 채널 연동 성공: {channel_title} ({email})")
 
-    # 5. 프론트엔드로 리다이렉트 (JWT 발급 포함)
-    # 채널의 실제 소유 유저(channel.user_id) 기준으로 토큰을 발급한다. 이미 다른 계정이
-    # 먼저 연동해둔 채널이라면(예: 같은 브랜드 계정을 여러 사람이 관리하는 경우) 방금
-    # 로그인한 이메일이 아니라 원래 소유자 명의로 세션이 유지되어야 계정 탈취를 방지할 수 있다.
+    # 5. 프론트엔드로 리다이렉트 (C-1: JWT를 URL에 직접 싣지 않음)
+    # JWT 전체를 URL에 노출하면 브라우저 히스토리·서버 로그·Referer에 그대로 남는다.
+    # 대신 단기(5분) 일회용 auth_code를 생성해 URL에 실어 보내고,
+    # 프론트엔드가 해당 코드를 /api/auth/exchange로 교환해 JWT를 받도록 한다.
+    import secrets as _secrets
     token = create_access_token(channel.user_id, channel.id)
+    auth_code = _secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    # 만료된 코드 정리 (최대 행 수 제어)
+    db.query(OAuthAuthCode).filter(OAuthAuthCode.expires_at < now).delete()
+    db.add(OAuthAuthCode(code=auth_code, token=token, expires_at=now + timedelta(minutes=5)))
+    db.commit()
     channel_title_encoded = urllib.parse.quote(channel_title)
-    return RedirectResponse(f"{FRONTEND_URL}/dashboard?token={token}&connected_channel={channel_title_encoded}")
+    return RedirectResponse(f"{FRONTEND_URL}/dashboard?auth_code={auth_code}&connected_channel={channel_title_encoded}")
 
 @app.post("/api/auth/logout")
 def logout_user():
     """유저 단순 세션 로그아웃 엔드포인트 (채널 연동 토큰은 유지되어 백그라운드 A/B 테스트가 계속 실행됩니다)"""
     return {"message": "성공적으로 로그아웃되었습니다."}
+
+@app.get("/api/auth/exchange")
+def exchange_auth_code(code: str, db: Session = Depends(get_db)):
+    """OAuth 콜백 후 단기 auth_code를 실제 JWT로 교환합니다. 코드는 5분 내 1회만 유효합니다."""
+    now = datetime.now(timezone.utc)
+    entry = (
+        db.query(OAuthAuthCode)
+        .filter(OAuthAuthCode.code == code, OAuthAuthCode.used == False, OAuthAuthCode.expires_at > now)
+        .first()
+    )
+    if not entry:
+        raise HTTPException(status_code=400, detail="유효하지 않거나 만료된 인증 코드입니다.")
+    token = entry.token
+    entry.used = True
+    db.commit()
+    return {"token": token}
 
 @app.post("/api/channels/{target_channel_id}/disconnect")
 def disconnect_channel(target_channel_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
@@ -471,7 +494,8 @@ async def _apply_first_variant_in_background(test_id: int):
 
 # --- A/B Test 로직 ---
 @app.post("/api/tests", response_model=ABTestResponse)
-async def create_ab_test(test_data: ABTestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+@limiter.limit("20/minute")
+async def create_ab_test(request: Request, test_data: ABTestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """프론트엔드에서 보낸 설정값으로 새로운 A/B 테스트를 DB에 생성합니다."""
 
     # 🔒 같은 채널이 동시에 두 번 테스트 생성을 요청하면(더블클릭, 두 탭 등) 아래 개수 제한 체크가
@@ -643,7 +667,8 @@ async def debug_test_state(test_id: int, db: Session = Depends(get_db), channel:
     }
 
 @app.post("/api/tests/{test_id}/swap")
-async def force_swap_ab_test(test_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+@limiter.limit("5/minute")
+async def force_swap_ab_test(request: Request, test_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """테스트 대기 시간을 기다리지 않고 즉시 다음 변인(썸네일/제목)으로 교체 테스트를 실행합니다."""
     test = db.query(ABTest).join(Video).filter(ABTest.id == test_id, Video.channel_id == channel.id).first()
     if not test:
@@ -742,9 +767,11 @@ async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: C
     return {"message": "테스트가 취소되고 원본으로 복구되었습니다."}
 
 @app.post("/api/upload")
+@limiter.limit("10/minute")
 async def upload_thumbnail(
+    request: Request,
     file: UploadFile = File(...),
-    channel: Channel = Depends(get_current_channel)  # 🔒 로그인 필수
+    channel: Channel = Depends(get_current_channel),
 ):
     """프론트엔드에서 업로드한 썸네일 이미지를 서버에 저장하고 URL을 반환합니다."""
     
@@ -987,7 +1014,8 @@ async def api_analyze_thumbnail(request: Request, channel: Channel = Depends(get
 from youtube_api import get_recent_videos, TokenRevokedError
 
 @app.get("/api/videos")
-async def get_channel_videos(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+@limiter.limit("30/minute")
+async def get_channel_videos(request: Request, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """현재 연동된 채널의 최근 유튜브 영상 목록을 가져옵니다."""
     if not channel or not channel.oauth_refresh_token:
         raise HTTPException(status_code=400, detail="연동된 채널이나 인증 토큰이 없습니다.")
@@ -1317,9 +1345,6 @@ def get_admin_tests(db: Session = Depends(get_db), admin: User = Depends(get_cur
         ]
     }
 
-# 인메모리 인증 코드 저장소: {user_id: {"code": str, "email": str, "expires_at": datetime}}
-_email_verify_store: dict = {}
-
 @app.post("/api/user/notification-email/send-code")
 @limiter.limit("5/minute")
 def send_notification_email_code(
@@ -1328,29 +1353,26 @@ def send_notification_email_code(
     channel: Channel = Depends(get_current_channel),
     db: Session = Depends(get_db),
 ):
-    """알림 이메일 인증 코드 발송."""
+    """알림 이메일 인증 코드 발송 (C-2: DB 저장으로 멀티 워커 지원)."""
     import secrets
     import httpx as _httpx
 
     email = (payload.get("email") or "").strip()
-    # 기본적인 형식 검사 + 길이 제한
     if not email or "@" not in email or "." not in email.split("@")[-1] or len(email) > 254:
         raise HTTPException(status_code=400, detail="Invalid email address.")
 
-    # 만료된 인메모리 엔트리 정리 (메모리 누수 방지)
     now = datetime.now(timezone.utc)
-    expired_keys = [k for k, v in _email_verify_store.items() if v["expires_at"] < now]
-    for k in expired_keys:
-        _email_verify_store.pop(k, None)
-
+    # 기존 미인증 코드 삭제 (유저당 1개 유지)
+    db.query(EmailVerificationCode).filter(EmailVerificationCode.user_id == channel.user_id).delete()
     # 암호학적으로 안전한 6자리 코드 생성
     code = str(secrets.randbelow(900000) + 100000)
-    _email_verify_store[channel.user_id] = {
-        "code": code,
-        "email": email,
-        "expires_at": now + timedelta(minutes=10),
-        "attempts": 0,
-    }
+    db.add(EmailVerificationCode(
+        user_id=channel.user_id,
+        code=code,
+        email=email,
+        expires_at=now + timedelta(minutes=10),
+    ))
+    db.commit()
 
     RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
     RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "ThumbnailFlow <onboarding@resend.dev>")
@@ -1392,33 +1414,43 @@ def verify_notification_email(
     channel: Channel = Depends(get_current_channel),
     db: Session = Depends(get_db),
 ):
-    """인증 코드 확인 후 notification_email 저장."""
+    """인증 코드 확인 후 notification_email 저장 (C-2: DB 기반)."""
     import hmac as _hmac
     code = (payload.get("code") or "").strip()
-    entry = _email_verify_store.get(channel.user_id)
+    now = datetime.now(timezone.utc)
+    entry = (
+        db.query(EmailVerificationCode)
+        .filter(EmailVerificationCode.user_id == channel.user_id)
+        .first()
+    )
     if not entry:
         raise HTTPException(status_code=400, detail="No verification request found. Please request a new code.")
-    if datetime.now(timezone.utc) > entry["expires_at"]:
-        _email_verify_store.pop(channel.user_id, None)
+    if now > entry.expires_at:
+        db.delete(entry)
+        db.commit()
         raise HTTPException(status_code=400, detail="Verification code expired. Please request a new one.")
 
     # 브루트포스 방지: 5회 초과 시 코드 무효화
-    entry["attempts"] = entry.get("attempts", 0) + 1
-    if entry["attempts"] > 5:
-        _email_verify_store.pop(channel.user_id, None)
+    entry.attempts += 1
+    if entry.attempts > 5:
+        db.delete(entry)
+        db.commit()
         raise HTTPException(status_code=429, detail="Too many attempts. Please request a new code.")
 
-    if not _hmac.compare_digest(entry["code"], code):
-        remaining = 5 - entry["attempts"]
+    db.commit()  # attempts 증가 저장
+
+    if not _hmac.compare_digest(entry.code, code):
+        remaining = 5 - entry.attempts
         raise HTTPException(status_code=400, detail=f"Incorrect verification code. {remaining} attempt(s) remaining.")
 
     user = db.query(User).filter(User.id == channel.user_id).first()
     if user:
-        user.notification_email = entry["email"]
+        user.notification_email = entry.email
         user.notification_email_verified = True
-        db.commit()
-    _email_verify_store.pop(channel.user_id, None)
-    return {"ok": True, "notification_email": entry["email"]}
+    email_saved = entry.email
+    db.delete(entry)
+    db.commit()
+    return {"ok": True, "notification_email": email_saved}
 
 
 @app.delete("/api/user/notification-email")

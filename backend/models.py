@@ -45,7 +45,7 @@ class Channel(Base):
     __tablename__ = 'channels'
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     youtube_channel_id = Column(String, unique=True, index=True, nullable=False)
     channel_title = Column(String)
     oauth_refresh_token = Column(String, nullable=True) # Essential for background jobs
@@ -59,7 +59,7 @@ class Video(Base):
     __tablename__ = 'videos'
 
     id = Column(Integer, primary_key=True, index=True)
-    channel_id = Column(Integer, ForeignKey('channels.id'), nullable=False)
+    channel_id = Column(Integer, ForeignKey('channels.id'), nullable=False, index=True)
     youtube_video_id = Column(String, unique=True, index=True, nullable=False)
     
     channel = relationship("Channel", back_populates="videos")
@@ -69,10 +69,10 @@ class ABTest(Base):
     __tablename__ = 'ab_tests'
 
     id = Column(Integer, primary_key=True, index=True)
-    video_id = Column(Integer, ForeignKey('videos.id'), nullable=False)
+    video_id = Column(Integer, ForeignKey('videos.id'), nullable=False, index=True)
     status = Column(Enum(TestStatus), default=TestStatus.PENDING)
     swap_interval_minutes = Column(Integer, default=120) # e.g., swap every 2 hours
-    current_variation_id = Column(Integer, ForeignKey('variations.id'), nullable=True) # Optimization/Cache
+    current_variation_id = Column(Integer, ForeignKey('variations.id', ondelete="SET NULL"), nullable=True)
     last_swapped_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_views_snapshot = Column(Integer, default=0) # 마지막 교체 시점의 총 조회수 스냅샷
     start_time = Column(DateTime(timezone=True), nullable=True)
@@ -92,7 +92,7 @@ class Variation(Base):
     __tablename__ = 'variations'
 
     id = Column(Integer, primary_key=True, index=True)
-    ab_test_id = Column(Integer, ForeignKey('ab_tests.id', ondelete="CASCADE"), nullable=False)
+    ab_test_id = Column(Integer, ForeignKey('ab_tests.id', ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String) # e.g., 'Variation A'
     thumbnail_image_url = Column(String)
     title_text = Column(String)
@@ -106,7 +106,7 @@ class MetricLog(Base):
     __tablename__ = 'metrics_logs'
 
     id = Column(Integer, primary_key=True, index=True)
-    variation_id = Column(Integer, ForeignKey('variations.id', ondelete="CASCADE"), nullable=False)
+    variation_id = Column(Integer, ForeignKey('variations.id', ondelete="CASCADE"), nullable=False, index=True)
     measured_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     views_gained = Column(Integer, default=0) # Delta views during this interval
     hours_exposed = Column(Float, default=0) # 이 구간 동안 실제 노출된 시간(시간 단위) - VPH 계산용
@@ -124,6 +124,29 @@ class ApiQuotaUsage(Base):
     id = Column(Integer, primary_key=True, index=True)
     date = Column(String, unique=True, index=True, nullable=False)  # "YYYY-MM-DD" (태평양 시간 기준)
     units_used = Column(Integer, default=0)
+
+
+class OAuthAuthCode(Base):
+    """OAuth 콜백 후 JWT를 URL에 직접 싣지 않기 위한 단기 교환 코드 (C-1)."""
+    __tablename__ = 'oauth_auth_codes'
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String, unique=True, index=True, nullable=False)
+    token = Column(String, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used = Column(Boolean, default=False)
+
+
+class EmailVerificationCode(Base):
+    """이메일 인증 코드 — 멀티 워커 배포 지원을 위해 인메모리 dict 대신 DB에 저장 (C-2)."""
+    __tablename__ = 'email_verification_codes'
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=False, index=True)
+    code = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    attempts = Column(Integer, default=0)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
 
 
 class SiteAnnouncement(Base):
