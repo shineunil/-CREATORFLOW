@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Check, Crown, Zap } from "lucide-react";
+import PaddleCheckoutButton from "@/components/PaddleCheckoutButton";
 
 export const metadata = {
   title: "Pricing",
@@ -106,13 +107,7 @@ export default function PricingPublicPage() {
                 Test completion <span className="font-semibold text-cyan-300">email notification</span>
               </li>
             </ul>
-            <button
-              disabled
-              title="Payment system coming soon"
-              className="w-full py-4 rounded-xl bg-zinc-800 text-zinc-500 font-bold border border-zinc-700 cursor-not-allowed"
-            >
-              Coming Soon
-            </button>
+            <PaddleCheckoutButton />
           </div>
         </div>
 

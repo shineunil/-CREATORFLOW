@@ -68,7 +68,7 @@ export default function PricingPage() {
     fetchUserProfile();
   }, []);
 
-  const handleStripeCheckout = async () => {
+  const handlePaddleCheckout = async () => {
     setIsRedirecting(true);
     try {
       const res = await apiFetch("/api/checkout/create-session", { method: "POST" });
@@ -79,7 +79,7 @@ export default function PricingPage() {
       const { checkout_url } = await res.json();
       window.location.href = checkout_url;
     } catch (err: any) {
-      console.error("Stripe Checkout Error:", err);
+      console.error("Paddle Checkout Error:", err);
       setIsRedirecting(false);
       setIsCheckoutModalOpen(false);
       showAlert("Checkout Error", err.message || "Failed to start checkout. Please try again.", "error");
@@ -208,7 +208,7 @@ export default function PricingPage() {
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1">
-                  <Sparkles size={14} aria-hidden="true" /> Secure Stripe Checkout
+                  <Sparkles size={14} aria-hidden="true" /> Secure Paddle Checkout
                 </span>
                 <h3 id="checkout-modal-title" className="text-2xl font-extrabold mt-1">PRO Premium Checkout</h3>
               </div>
@@ -239,25 +239,25 @@ export default function PricingPage() {
 
             <div className="space-y-3">
               <button
-                onClick={handleStripeCheckout}
+                onClick={handlePaddleCheckout}
                 disabled={isRedirecting}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed text-white font-extrabold transition-all shadow-lg hover:shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
               >
                 {isRedirecting ? (
                   <>
                     <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-                    <span>Redirecting to Stripe...</span>
+                    <span>Redirecting to Paddle...</span>
                   </>
                 ) : (
                   <>
                     <CreditCard size={18} aria-hidden="true" />
-                    <span>Proceed to Stripe Checkout</span>
+                    <span>Proceed to Paddle Checkout</span>
                   </>
                 )}
               </button>
             </div>
             <p className="text-[11px] text-center text-zinc-400">
-              Powered by Stripe — secure, encrypted card processing. You will be redirected to Stripe&apos;s hosted checkout page.
+              Powered by Paddle — secure, encrypted card processing. You will be redirected to Paddle&apos;s hosted checkout page.
             </p>
           </div>
         </div>
