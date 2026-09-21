@@ -1274,10 +1274,11 @@ def get_ab_tests(db: Session = Depends(get_db), channel: Channel = Depends(get_c
 
     return {"tests": result}
 
-# --- 결제 시스템 (Stripe Integration) ---
-import stripe as stripe_sdk
-stripe_sdk.api_key = os.getenv("STRIPE_SECRET_KEY")
-STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
+# --- 결제 시스템 (Paddle Billing) ---
+import httpx as _httpx
+PADDLE_API_KEY   = os.getenv("PADDLE_API_KEY", "")
+PADDLE_PRICE_ID  = os.getenv("PADDLE_PRICE_ID", "")
+PADDLE_API_BASE  = "https://api.paddle.com"
 
 @app.get("/api/user/me")
 def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
@@ -1317,28 +1318,36 @@ def update_user_preferences(
     return {"ok": True, "email_alerts_enabled": user.email_alerts_enabled}
 
 @app.post("/api/checkout/create-session")
-async def create_stripe_checkout_session(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
-    """Stripe Checkout Session 생성 - 호스팅된 결제 페이지 URL을 반환합니다."""
+async def create_checkout_session(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+    """Paddle Checkout 트랜잭션 생성 - 호스팅된 결제 페이지 URL을 반환합니다."""
     user = channel.user
-    if not STRIPE_PRICE_ID:
+    if not PADDLE_API_KEY or not PADDLE_PRICE_ID:
         raise HTTPException(status_code=503, detail="결제 시스템이 아직 설정되지 않았습니다.")
 
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    payload: dict = {
+        "items": [{"price_id": PADDLE_PRICE_ID, "quantity": 1}],
+        "custom_data": {"user_id": str(user.id) if user else ""},
+        "checkout": {"url": f"{frontend_url}/dashboard?upgraded=true"},
+    }
+    if user and user.email:
+        payload["customer"] = {"email": user.email}
+
     try:
-        session = stripe_sdk.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
-            mode="subscription",
-            success_url=f"{frontend_url}/dashboard?upgraded=true",
-            cancel_url=f"{frontend_url}/pricing",
-            customer_email=user.email if user else None,
-            metadata={"user_id": str(user.id) if user else ""},
-        )
-    except stripe_sdk.StripeError as e:
-        logger.error(f"[Stripe Checkout] 세션 생성 실패: {e}")
+        async with _httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"{PADDLE_API_BASE}/transactions",
+                headers={"Authorization": f"Bearer {PADDLE_API_KEY}", "Content-Type": "application/json"},
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        checkout_url = data["data"]["checkout"]["url"]
+    except Exception as e:
+        logger.error(f"[Paddle Checkout] 트랜잭션 생성 실패: {e}")
         raise HTTPException(status_code=502, detail="결제 페이지를 여는 데 실패했습니다.")
 
-    return {"checkout_url": session.url}
+    return {"checkout_url": checkout_url}
 
 @app.post("/api/checkout/upgrade-test")
 def upgrade_user_plan_test(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
@@ -1359,28 +1368,31 @@ def upgrade_user_plan_test(db: Session = Depends(get_db), channel: Channel = Dep
     return {"status": "success", "message": "PRO 요금제로 성공적으로 업그레이드되었습니다!", "plan": user.plan.value}
 
 @app.get("/api/billing/portal")
-async def get_stripe_billing_portal(channel: Channel = Depends(get_current_channel)):
+async def get_billing_portal(channel: Channel = Depends(get_current_channel)):
     """
-    Stripe Customer Portal URL 발급. 구독 취소, 결제 수단 변경, 결제 내역 조회를
-    Stripe가 호스팅하는 화면에서 처리한다. stripe_customer_id 없는 유저는 발급 불가.
+    Paddle Customer Portal URL 발급. Paddle 고객 ID로 인증 토큰을 발급받아
+    구독 관리 페이지로 리다이렉트한다.
     """
     user = channel.user
     if not user or not user.stripe_customer_id:
         raise HTTPException(status_code=404, detail="결제 내역이 없습니다. PRO 결제를 진행한 뒤 다시 시도해주세요.")
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
     try:
-        portal_session = stripe_sdk.billing_portal.Session.create(
-            customer=user.stripe_customer_id,
-            return_url=f"{frontend_url}/settings",
-        )
-    except stripe_sdk.StripeError as e:
-        logger.error(f"[Stripe Portal] 세션 생성 실패: {e}")
+        async with _httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"{PADDLE_API_BASE}/customers/{user.stripe_customer_id}/auth-token",
+                headers={"Authorization": f"Bearer {PADDLE_API_KEY}"},
+            )
+            resp.raise_for_status()
+            token = resp.json()["data"]["customer_auth_token"]
+        portal_url = f"https://customer.paddle.com?customerAuthToken={token}"
+    except Exception as e:
+        logger.error(f"[Paddle Portal] 포털 URL 발급 실패: {e}")
         raise HTTPException(status_code=502, detail="결제 관리 페이지를 여는 데 실패했습니다.")
 
-    return {"url": portal_session.url}
+    return {"url": portal_url}
 
-# /api/webhooks/stripe 엔드포인트는 webhook.py 라우터에서 처리합니다 (서명 검증 포함)
+# /api/webhook/paddle 엔드포인트는 webhook.py 라우터에서 처리합니다 (서명 검증 포함)
 
 # --- 관리자 대시보드 (ADMIN_EMAILS 환경 변수에 등록된 계정만 접근 가능) ---
 
@@ -1632,5 +1644,5 @@ def delete_announcement(db: Session = Depends(get_db), admin: User = Depends(get
     db.commit()
     return {"ok": True}
 
-from webhook import router as stripe_router
-app.include_router(stripe_router)
+from webhook import router as paddle_router
+app.include_router(paddle_router)
