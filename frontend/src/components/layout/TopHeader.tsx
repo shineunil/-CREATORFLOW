@@ -233,7 +233,7 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
           </div>
         ) : (
           <div className="flex items-center gap-1.5 md:gap-4">
-            <Link href="/faq" className="hidden sm:inline-block text-base font-bold text-zinc-400 hover:text-white transition-colors px-4 py-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 whitespace-nowrap">
+            <Link href="/faq" className="hidden sm:inline-block text-base font-bold text-white hover:text-zinc-300 transition-colors px-4 py-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 whitespace-nowrap">
               FAQ
             </Link>
             <button onClick={() => router.push("/login")} className="hidden sm:inline-block text-base font-bold text-zinc-200 hover:text-white transition-colors px-4 py-2 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
