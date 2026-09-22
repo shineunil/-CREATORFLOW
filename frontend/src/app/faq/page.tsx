@@ -93,7 +93,7 @@ export default function FAQPage() {
         </Link>
 
         <h1 className="text-3xl font-black text-white mb-2">Frequently Asked Questions</h1>
-        <p className="text-sm text-zinc-500 mb-12">
+        <p className="text-base text-zinc-500 mb-12">
           Can&apos;t find your answer?{" "}
           <a
             href="mailto:admin@trythumbnailflow.com"
@@ -107,14 +107,14 @@ export default function FAQPage() {
         <div className="space-y-14">
           {faqs.map((section) => (
             <div key={section.section}>
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-cyan-500 mb-6">
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-cyan-500 mb-6">
                 {section.section}
               </h2>
               <div className="space-y-8">
                 {section.items.map((item) => (
                   <div key={item.q} className="border-b border-zinc-800 pb-8 last:border-0 last:pb-0">
-                    <p className="text-sm font-semibold text-white mb-2">{item.q}</p>
-                    <p className="text-sm text-zinc-400 leading-relaxed">{item.a}</p>
+                    <p className="text-base font-semibold text-white mb-2">{item.q}</p>
+                    <p className="text-base text-zinc-400 leading-relaxed">{item.a}</p>
                   </div>
                 ))}
               </div>
