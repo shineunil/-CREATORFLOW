@@ -62,7 +62,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-bold text-white mb-3">5. Refunds</h2>
             <p className="text-zinc-400">
-              You may request a full refund of your PRO plan payment within 7 days of the payment date, provided you have not used the Service during that period (i.e., you have not created any A/B test). Once you have created at least one test, or once 7 days have passed since payment, that payment becomes non-refundable, except where a refund is required by applicable law. To request a refund, contact us at the email address below; refunds are reviewed and processed through Paddle, our payment provider.
+              All payments are non-refundable. You may cancel your subscription at any time from the Settings page; cancellation takes effect at the end of the current billing period and you retain access to PRO features until that date. We do not provide refunds or credits for partial billing periods, unused time, or unused features, except where required by applicable law. For billing questions, contact us at the email address below.
             </p>
           </section>
 
@@ -83,7 +83,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-bold text-white mb-3">8. Contact</h2>
             <p className="text-zinc-400">
-              For questions about using the Service, please contact us at kising26903854@gmail.com.
+              For questions about using the Service, please contact us at admin@trythumbnailflow.com.
             </p>
           </section>
         </div>

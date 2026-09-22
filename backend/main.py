@@ -128,6 +128,7 @@ def _set_auth_cookie(response: JSONResponse, token: str):
         samesite="lax" if dev else "none",
         max_age=60 * 60 * 24 * JWT_EXPIRE_DAYS,
         path="/",
+        domain=None if dev else ".trythumbnailflow.com",
     )
 
 def _clear_auth_cookie(response: JSONResponse):
@@ -138,6 +139,7 @@ def _clear_auth_cookie(response: JSONResponse):
         secure=not dev,
         samesite="lax" if dev else "none",
         httponly=True,
+        domain=None if dev else ".trythumbnailflow.com",
     )
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:

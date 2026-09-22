@@ -8,7 +8,7 @@ import AnnouncementPopup from "@/components/AnnouncementPopup";
 import { API_BASE_URL } from "@/lib/config";
 
 // 로그인 없이 접근 가능한 공개 페이지 목록
-const PUBLIC_PATHS = ["/", "/login", "/privacy", "/terms", "/pricing-public"];
+const PUBLIC_PATHS = ["/", "/login", "/privacy", "/terms", "/pricing-public", "/faq"];
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

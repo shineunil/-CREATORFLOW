@@ -109,7 +109,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-bold text-white mb-3">7. Contact</h2>
             <p className="text-zinc-400">
-              For privacy-related inquiries, please contact us via the in-app Settings page or at kising26903854@gmail.com.
+              For privacy-related inquiries, please contact us via the in-app Settings page or at admin@trythumbnailflow.com.
             </p>
           </section>
         </div>
