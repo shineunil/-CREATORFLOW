@@ -353,7 +353,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="py-10 text-center border-t border-zinc-900 bg-zinc-950 relative z-10">
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm text-zinc-400">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm text-white">
           <span>© 2026 ThumbnailFlow</span>
           <a href="mailto:admin@trythumbnailflow.com" className="hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Support: admin@trythumbnailflow.com</a>
           <Link href="/privacy" className="hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Privacy Policy</Link>
