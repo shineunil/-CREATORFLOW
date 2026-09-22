@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Crown, TrendingUp, Upload, RefreshCw, Award, Check, Minus } from "lucide-react";
+import { ArrowRight, Crown, TrendingUp, Upload, RefreshCw, Award, Check, Minus, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function LandingPage() {
@@ -183,11 +183,11 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="max-w-xl mb-20">
             <h2 className="text-3xl md:text-4xl font-black mb-4">How it runs, end to end.</h2>
-            <p className="text-zinc-400 text-lg">Three steps, entirely automated once you hit start.</p>
+            <p className="text-zinc-400 text-lg">Five steps, entirely automated once you hit start.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-14 relative">
-            <div className="hidden md:block absolute top-6 left-[16.5%] right-[16.5%] h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent" aria-hidden="true" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-14 relative">
+            <div className="hidden lg:block absolute top-6 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-white to-transparent" aria-hidden="true" />
 
             <StepCard
               delay={0.05}
@@ -197,18 +197,32 @@ export default function LandingPage() {
               desc="Add up to five thumbnail and title candidates for a video you've already published. Takes under a minute."
             />
             <StepCard
-              delay={0.15}
+              delay={0.10}
               number="02"
+              icon={<Clock size={16} />}
+              title="Set rotation interval"
+              desc="Choose how often ThumbnailFlow swaps the thumbnail. Free plan: every 4 hours minimum. PRO: as fast as every 30 minutes."
+            />
+            <StepCard
+              delay={0.15}
+              number="03"
               icon={<RefreshCw size={16} />}
               title="It rotates on its own"
-              desc="ThumbnailFlow swaps the live thumbnail and title on a schedule — every 4+ hours on the free plan, as often as every 30 minutes on PRO — and discards the first few minutes after each swap so leftover exposure can't skew the count."
+              desc="ThumbnailFlow swaps the live thumbnail and title on your chosen schedule and discards the first few minutes after each swap so leftover exposure can't skew the count."
+            />
+            <StepCard
+              delay={0.20}
+              number="04"
+              icon={<TrendingUp size={16} />}
+              title="Performance is tracked"
+              desc="Views per hour (VPH) is measured for each variant across every rotation — raw view count alone can't tell you which thumbnail actually won."
             />
             <StepCard
               delay={0.25}
-              number="03"
+              number="05"
               icon={<Award size={16} />}
-              title="A winner gets locked in"
-              desc="Once every variant has had a fair, full rotation and enough views to be meaningful, the highest-VPH candidate is applied permanently — and stays there."
+              title="Winner auto-applied"
+              desc="Once every variant has had a fair rotation, the highest-VPH thumbnail is automatically applied to your YouTube video. No action needed."
             />
           </div>
 
@@ -390,7 +404,7 @@ function StepCard({ icon, number, title, desc, delay }: { icon: React.ReactNode,
       transition={{ duration: 0.5, delay }}
       className="relative"
     >
-      <div className="relative z-10 w-12 h-12 rounded-full bg-zinc-950 border border-zinc-800 flex items-center justify-center text-sm font-bold text-zinc-400 mb-6" aria-hidden="true">
+      <div className="relative z-10 w-12 h-12 rounded-full bg-zinc-950 border border-zinc-600 flex items-center justify-center text-sm font-bold text-white mb-6" aria-hidden="true">
         {number}
       </div>
       <div className="flex items-center gap-2 text-cyan-400 mb-3" aria-hidden="true">
