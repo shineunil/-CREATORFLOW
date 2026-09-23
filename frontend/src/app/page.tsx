@@ -431,13 +431,6 @@ export default function LandingPage() {
             </label>
 
             <div className="flex gap-3">
-              <Link
-                href="/login"
-                onClick={dismissPopup}
-                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-sm text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-              >
-                Sign Up Free
-              </Link>
               <button
                 onClick={dismissPopup}
                 className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
