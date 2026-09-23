@@ -488,8 +488,8 @@ function StepCard({ icon, number, title, desc, delay, isLast = false }: { icon: 
         <div className="hidden lg:block absolute top-6 left-[calc(50%+1.5rem)] -right-1/2" aria-hidden="true">
           <div className="h-px bg-white w-full" />
           <div className="absolute -top-[5px] right-1/2">
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-              <polyline points="2,1 9,5.5 2,10" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <polygon points="0,0 10,5 0,10" fill="white" />
             </svg>
           </div>
         </div>
