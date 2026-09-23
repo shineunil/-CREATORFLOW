@@ -80,7 +80,7 @@ export default function LandingPage() {
             One clear winner.
           </h1>
 
-          <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto mb-11 leading-relaxed">
+          <p className="text-lg md:text-xl text-white max-w-2xl mx-auto mb-11 leading-relaxed">
             Upload a few thumbnail and title variants. ThumbnailFlow rotates them on your
             live video and ranks each by views earned per hour — not raw view count —
             so a slow afternoon slot never gets mistaken for a loser.
@@ -250,12 +250,12 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-8">
-              <h3 className="text-base font-bold uppercase tracking-wider text-zinc-400 mb-6">YouTube Test and Compare</h3>
-              <ComparisonRow label="Candidates per test" value="Up to 3" muted />
-              <ComparisonRow label="Time to a result" value="2+ weeks, 1–5K views/variant" muted />
-              <ComparisonRow label="Manual override" value="Not available" negative />
-              <ComparisonRow label="Manage multiple channels" value="One at a time in Studio" negative />
+            <div className="rounded-2xl border border-cyan-500/40 bg-cyan-500/5 p-8 shadow-[0_0_30px_rgba(6,182,212,0.08)]">
+              <h3 className="text-base font-bold uppercase tracking-wider text-cyan-400 mb-6">YouTube Test and Compare</h3>
+              <ComparisonRow label="Candidates per test" value="Up to 3" />
+              <ComparisonRow label="Time to a result" value="2+ weeks, 1–5K views/variant" />
+              <ComparisonRow label="Manual override" value="Not available" />
+              <ComparisonRow label="Manage multiple channels" value="One at a time in Studio" />
             </div>
 
             <div className="rounded-2xl border border-cyan-500/40 bg-cyan-500/5 p-8 shadow-[0_0_30px_rgba(6,182,212,0.08)]">
@@ -295,19 +295,19 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {/* Basic Plan */}
-            <div className="rounded-3xl p-8 border border-zinc-800 bg-zinc-900/30 flex flex-col">
-              <h3 className="text-2xl font-bold mb-2">BASIC</h3>
-              <p className="text-zinc-400 text-sm mb-6">For creators who want to try the service</p>
+            <div className="rounded-3xl p-8 border border-cyan-500/50 bg-cyan-500/5 flex flex-col shadow-[0_0_40px_rgba(6,182,212,0.12)]">
+              <h3 className="text-2xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">BASIC</h3>
+              <p className="text-zinc-400 text-base mb-6">For creators who want to try the service</p>
               <div className="mb-8">
                 <span className="text-4xl font-bold">$0</span>
                 <span className="text-zinc-400"> / month</span>
               </div>
               <ul className="space-y-4 mb-10 flex-1">
-                <li className="flex items-center gap-3 text-sm text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> Max 4 tests per month</li>
-                <li className="flex items-center gap-3 text-sm text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> 1 concurrent test</li>
-                <li className="flex items-center gap-3 text-sm text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> Up to 3 thumbnail variants (A/B/C)</li>
-                <li className="flex items-center gap-3 text-sm text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> 4-hour minimum swap interval</li>
-                <li className="flex items-center gap-3 text-sm text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> Best thumbnail auto-applied at test end</li>
+                <li className="flex items-center gap-3 text-base text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> Max 4 tests per month</li>
+                <li className="flex items-center gap-3 text-base text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> 1 concurrent test</li>
+                <li className="flex items-center gap-3 text-base text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> Up to 3 thumbnail variants (A/B/C)</li>
+                <li className="flex items-center gap-3 text-base text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> 4-hour minimum swap interval</li>
+                <li className="flex items-center gap-3 text-base text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> Best thumbnail auto-applied at test end</li>
               </ul>
               <Link href="/login" className="w-full py-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
                 Start for free
@@ -320,18 +320,18 @@ export default function LandingPage() {
                 Most Popular
               </div>
               <h3 className="text-2xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">PRO Premium</h3>
-              <p className="text-zinc-400 text-sm mb-6">For serious creators who want to maximize views</p>
+              <p className="text-zinc-400 text-base mb-6">For serious creators who want to maximize views</p>
               <div className="mb-8">
                 <span className="text-4xl font-bold">$29</span>
                 <span className="text-zinc-400"> / month</span>
               </div>
               <ul className="space-y-4 mb-10 flex-1">
-                <li className="flex items-center gap-3 text-sm text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> <span className="font-semibold text-cyan-300">Unlimited</span> tests per month</li>
-                <li className="flex items-center gap-3 text-sm text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> <span className="font-semibold text-cyan-300">Unlimited</span> concurrent tests</li>
-                <li className="flex items-center gap-3 text-sm text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> Up to 5 thumbnail variants (A~E)</li>
-                <li className="flex items-center gap-3 text-sm text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> <span className="font-semibold text-cyan-300">30-minute</span> swap interval</li>
-                <li className="flex items-center gap-3 text-sm text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> Best thumbnail auto-applied at test end</li>
-                <li className="flex items-center gap-3 text-sm text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> Test completion <span className="font-semibold text-cyan-300">email notification</span></li>
+                <li className="flex items-center gap-3 text-base text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> <span className="font-semibold text-cyan-300">Unlimited</span> tests per month</li>
+                <li className="flex items-center gap-3 text-base text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> <span className="font-semibold text-cyan-300">Unlimited</span> concurrent tests</li>
+                <li className="flex items-center gap-3 text-base text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> Up to 5 thumbnail variants (A~E)</li>
+                <li className="flex items-center gap-3 text-base text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> <span className="font-semibold text-cyan-300">30-minute</span> swap interval</li>
+                <li className="flex items-center gap-3 text-base text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> Best thumbnail auto-applied at test end</li>
+                <li className="flex items-center gap-3 text-base text-zinc-100"><Check size={16} className="text-cyan-400 flex-shrink-0" aria-hidden="true" /> Test completion <span className="font-semibold text-cyan-300">email notification</span></li>
               </ul>
               <Link href="/login" className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-center transition-all shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
                 Get started
