@@ -22,7 +22,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // 정적 파일·이미지·API 라우트 제외, 나머지 모든 경로에 적용
-    "/((?!_next/static|_next/image|favicon.ico|api/).*)",
+    // _next 내부, API 라우트, 그리고 확장자 있는 정적 파일(이미지·폰트·css·js 등) 제외
+    "/((?!_next|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?|ttf|eot|map)$).*)",
   ],
 };
