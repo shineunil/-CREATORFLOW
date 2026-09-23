@@ -186,9 +186,7 @@ export default function LandingPage() {
             <p className="text-zinc-400 text-lg">Five steps, entirely automated once you hit start.</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-14 relative">
-            <div className="hidden lg:block absolute top-6 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-white to-transparent" aria-hidden="true" />
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-14">
             <StepCard
               delay={0.05}
               number="01"
@@ -223,6 +221,7 @@ export default function LandingPage() {
               icon={<Award size={16} />}
               title="Winner auto-applied"
               desc="Once every variant has had a fair rotation, the highest-VPH thumbnail is automatically applied to your YouTube video. No action needed."
+              isLast
             />
           </div>
 
@@ -395,7 +394,7 @@ function ComparisonRow({ label, value, muted, negative }: { label: string, value
   );
 }
 
-function StepCard({ icon, number, title, desc, delay }: { icon: React.ReactNode, number: string, title: string, desc: string, delay: number }) {
+function StepCard({ icon, number, title, desc, delay, isLast = false }: { icon: React.ReactNode, number: string, title: string, desc: string, delay: number, isLast?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -404,9 +403,19 @@ function StepCard({ icon, number, title, desc, delay }: { icon: React.ReactNode,
       transition={{ duration: 0.5, delay }}
       className="relative"
     >
-      <div className="relative z-10 w-12 h-12 rounded-full bg-zinc-950 border border-zinc-600 flex items-center justify-center text-sm font-bold text-white mb-6" aria-hidden="true">
+      <div className="relative z-10 w-12 h-12 rounded-full bg-zinc-950 border border-white flex items-center justify-center text-sm font-bold text-white mb-6" aria-hidden="true">
         {number}
       </div>
+      {!isLast && (
+        <div className="hidden lg:block absolute top-6 left-12 -right-6" aria-hidden="true">
+          <div className="h-px bg-white w-full" />
+          <div className="absolute -top-[5px] right-3">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <polyline points="2,1 9,5.5 2,10" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-2 text-cyan-400 mb-3" aria-hidden="true">
         {icon}
       </div>
