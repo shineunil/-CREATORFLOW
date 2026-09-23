@@ -481,11 +481,11 @@ function StepCard({ icon, number, title, desc, delay, isLast = false }: { icon: 
       transition={{ duration: 0.5, delay }}
       className="relative"
     >
-      <div className="relative z-10 w-12 h-12 rounded-full bg-zinc-950 border border-white flex items-center justify-center text-sm font-bold text-white mb-6" aria-hidden="true">
+      <div className="relative z-10 mx-auto w-12 h-12 rounded-full bg-zinc-950 border border-white flex items-center justify-center text-sm font-bold text-white mb-6" aria-hidden="true">
         {number}
       </div>
       {!isLast && (
-        <div className="hidden lg:block absolute top-6 left-12 -right-6" aria-hidden="true">
+        <div className="hidden lg:block absolute top-6 left-[calc(50%+1.5rem)] -right-6" aria-hidden="true">
           <div className="h-px bg-white w-full" />
           <div className="absolute -top-[5px] right-3">
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
