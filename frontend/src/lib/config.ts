@@ -16,7 +16,7 @@
 // Next.js SSR 환경에서도 100% 안정적으로 작동합니다.
 export const API_BASE_URL =
   process.env.NODE_ENV === "production"
-    ? "https://creatorflow-backend-iudj.onrender.com"  // 라이브 백엔드 주소
+    ? "https://api.trythumbnailflow.com"  // 라이브 백엔드 주소 (쿠키 도메인 .trythumbnailflow.com과 일치해야 함)
     : "http://localhost:8000";                     // 로컬 개발용 (자동 적용)
 
 // -------------------------------------------------------

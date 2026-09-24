@@ -10,6 +10,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // OAuth 콜백 후 auth_code 교환 중인 경우 — 쿠키 없어도 통과
+  if (pathname === "/dashboard" && request.nextUrl.searchParams.get("auth_code")) {
+    return NextResponse.next();
+  }
+
   // auth_token 쿠키가 없으면 로그인 페이지로 즉시 리다이렉트
   const authToken = request.cookies.get("auth_token");
   if (!authToken) {
