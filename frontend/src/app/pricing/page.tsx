@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Check, Crown, Zap, CreditCard, Sparkles, ShieldCheck, X, Loader2 } from "lucide-react";
 import Modal from "@/components/Modal";
 import { apiFetch } from "@/lib/api";
+import { openPaddleCheckout } from "@/lib/paddle";
 
 export default function PricingPage() {
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -71,18 +72,14 @@ export default function PricingPage() {
   const handlePaddleCheckout = async () => {
     setIsRedirecting(true);
     try {
-      const res = await apiFetch("/api/checkout/create-session", { method: "POST" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `Server error (${res.status})`);
-      }
-      const { checkout_url } = await res.json();
-      window.location.href = checkout_url;
+      await openPaddleCheckout();
+      setIsCheckoutModalOpen(false);
     } catch (err: any) {
       console.error("Paddle Checkout Error:", err);
-      setIsRedirecting(false);
       setIsCheckoutModalOpen(false);
       showAlert("Checkout Error", err.message || "Failed to start checkout. Please try again.", "error");
+    } finally {
+      setIsRedirecting(false);
     }
   };
 
@@ -246,7 +243,7 @@ export default function PricingPage() {
                 {isRedirecting ? (
                   <>
                     <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-                    <span>Redirecting to Paddle...</span>
+                    <span>Opening checkout...</span>
                   </>
                 ) : (
                   <>

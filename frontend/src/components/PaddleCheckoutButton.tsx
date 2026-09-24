@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CreditCard, Loader2 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { openPaddleCheckout } from "@/lib/paddle";
 
 export default function PaddleCheckoutButton() {
   const [isLoading, setIsLoading] = useState(false);
@@ -10,20 +10,13 @@ export default function PaddleCheckoutButton() {
   const handleCheckout = async () => {
     setIsLoading(true);
     try {
-      const res = await apiFetch("/api/checkout/create-session", { method: "POST" });
-      if (res.status === 401) {
-        window.location.href = "/login";
-        return;
-      }
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `Server error (${res.status})`);
-      }
-      const { checkout_url } = await res.json();
-      window.location.href = checkout_url;
-    } catch (err: any) {
+      await openPaddleCheckout();
+    } catch (err: unknown) {
       console.error("Paddle Checkout Error:", err);
-      alert(err.message || "Failed to start checkout. Please try again.");
+      if (!(err instanceof Error && err.message === "Unauthorized")) {
+        alert(err instanceof Error ? err.message : "Failed to start checkout. Please try again.");
+      }
+    } finally {
       setIsLoading(false);
     }
   };
@@ -37,7 +30,7 @@ export default function PaddleCheckoutButton() {
       {isLoading ? (
         <>
           <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-          <span>Redirecting to Paddle...</span>
+          <span>Opening checkout...</span>
         </>
       ) : (
         <>

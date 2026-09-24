@@ -1280,7 +1280,9 @@ def get_ab_tests(db: Session = Depends(get_db), channel: Channel = Depends(get_c
 import httpx as _httpx
 PADDLE_API_KEY   = os.getenv("PADDLE_API_KEY", "")
 PADDLE_PRICE_ID  = os.getenv("PADDLE_PRICE_ID", "")
-PADDLE_API_BASE  = "https://api.paddle.com"
+PADDLE_CLIENT_TOKEN = os.getenv("PADDLE_CLIENT_TOKEN", "")
+PADDLE_ENVIRONMENT  = "sandbox" if os.getenv("PADDLE_ENVIRONMENT", "").strip().lower() == "sandbox" else "production"
+PADDLE_API_BASE  = "https://sandbox-api.paddle.com" if PADDLE_ENVIRONMENT == "sandbox" else "https://api.paddle.com"
 
 @app.get("/api/user/me")
 def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
@@ -1321,16 +1323,14 @@ def update_user_preferences(
 
 @app.post("/api/checkout/create-session")
 async def create_checkout_session(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
-    """Paddle Checkout 트랜잭션 생성 - 호스팅된 결제 페이지 URL을 반환합니다."""
+    """Paddle 트랜잭션을 생성하고, 프론트가 Paddle.js 오버레이로 결제창을 열 수 있도록 ID와 client token을 반환합니다."""
     user = channel.user
-    if not PADDLE_API_KEY or not PADDLE_PRICE_ID:
+    if not PADDLE_API_KEY or not PADDLE_PRICE_ID or not PADDLE_CLIENT_TOKEN:
         raise HTTPException(status_code=503, detail="결제 시스템이 아직 설정되지 않았습니다.")
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
     payload: dict = {
         "items": [{"price_id": PADDLE_PRICE_ID, "quantity": 1}],
         "custom_data": {"user_id": str(user.id) if user else ""},
-        "checkout": {"url": f"{frontend_url}/dashboard?upgraded=true"},
     }
     if user and user.email:
         payload["customer"] = {"email": user.email}
@@ -1344,12 +1344,19 @@ async def create_checkout_session(db: Session = Depends(get_db), channel: Channe
             )
             resp.raise_for_status()
             data = resp.json()
-        checkout_url = data["data"]["checkout"]["url"]
+        transaction_id = data["data"]["id"]
+    except _httpx.HTTPStatusError as e:
+        logger.error(f"[Paddle Checkout] 트랜잭션 생성 실패: {e.response.status_code} {e.response.text}")
+        raise HTTPException(status_code=502, detail="결제 페이지를 여는 데 실패했습니다.")
     except Exception as e:
         logger.error(f"[Paddle Checkout] 트랜잭션 생성 실패: {e}")
         raise HTTPException(status_code=502, detail="결제 페이지를 여는 데 실패했습니다.")
 
-    return {"checkout_url": checkout_url}
+    return {
+        "transaction_id": transaction_id,
+        "client_token": PADDLE_CLIENT_TOKEN,
+        "environment": PADDLE_ENVIRONMENT,
+    }
 
 @app.post("/api/checkout/upgrade-test")
 def upgrade_user_plan_test(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):

@@ -3,6 +3,7 @@ import os, logging, hmac, hashlib, json
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, PlanType
+from env_utils import is_dev_environment
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -26,6 +27,10 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
     body = await request.body()
     sig_header = request.headers.get("Paddle-Signature", "")
     secret = os.getenv("PADDLE_WEBHOOK_SECRET", "")
+
+    if not secret and not is_dev_environment():
+        logger.error("[Paddle Webhook] PADDLE_WEBHOOK_SECRET 미설정 - 서명 검증 불가로 요청 거부")
+        raise HTTPException(status_code=503, detail="Webhook secret not configured")
 
     if secret:
         if not _verify_paddle_signature(body, sig_header, secret):
