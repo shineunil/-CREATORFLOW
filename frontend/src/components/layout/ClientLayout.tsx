@@ -75,20 +75,22 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     }
   }, [pathname, isNoSidebarPage, router, lp]);
 
-  if (!isAuthChecked) {
-    return (
-      <div className="flex h-screen w-full bg-[#09090b] items-center justify-center" role="status">
-        <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-        <span className="sr-only">{t.common.loading}</span>
-      </div>
-    );
-  }
-
+  // 공개 페이지는 로그인 확인이 필요 없으므로 기다리지 않고 바로 그린다.
+  // (서버가 보내는 첫 HTML에 본문이 들어가야 검색엔진이 내용을 읽을 수 있다)
   if (isNoSidebarPage) {
     return (
       <div className="flex-1 flex flex-col relative overflow-y-auto w-full min-h-screen bg-[#09090b] text-zinc-100 font-sans">
         {path === "/" && <TopHeader showLogo={true} />}
         <main>{children}</main>
+      </div>
+    );
+  }
+
+  if (!isAuthChecked) {
+    return (
+      <div className="flex h-screen w-full bg-[#09090b] items-center justify-center" role="status">
+        <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+        <span className="sr-only">{t.common.loading}</span>
       </div>
     );
   }
