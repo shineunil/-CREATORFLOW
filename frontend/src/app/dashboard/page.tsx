@@ -22,6 +22,11 @@ import Modal from "@/components/Modal";
 import ChannelSelect from "@/components/layout/ChannelSelect";
 import { apiFetch } from "@/lib/api";
 import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
+import { useI18n } from "@/i18n/I18nProvider";
+import RichText from "@/i18n/RichText";
+import { formatDate } from "@/i18n/format";
+import type { Dictionary } from "@/i18n/dictionaries";
+import type { Locale } from "@/i18n/config";
 
 const formatLocalDateTime = (iso: string | null | undefined): string => {
   if (!iso) return "-";
@@ -38,21 +43,23 @@ const formatLocalDateTime = (iso: string | null | undefined): string => {
   }
 };
 
-const formatTestDuration = (startIso: string | null | undefined, endIso: string | null | undefined, status: string) => {
-  if (!startIso) return "Not started";
+const formatTestDuration = (startIso: string | null | undefined, endIso: string | null | undefined, status: string, t: Dictionary, locale: Locale) => {
+  if (!startIso) return t.dashboard.notStarted;
   if (startIso && !startIso.endsWith('Z')) startIso += 'Z';
   const start = new Date(startIso);
   if (status === "STOPPED") {
-    return `Optimization Finished (Started: ${start.toLocaleDateString()})`;
+    return t.dashboard.finishedStarted(formatDate(start, locale));
   }
   let end = endIso ? new Date(endIso.endsWith('Z') ? endIso : endIso + 'Z') : new Date(start.getTime() + 24 * 60 * 60 * 1000);
   const now = new Date();
   const diffHours = Math.max(0, Math.floor((end.getTime() - now.getTime()) / (1000 * 60 * 60)));
-  return `Optimizing • Ends in ${diffHours}h and applies permanently`;
+  return t.dashboard.runningEnds(diffHours);
 };
 
 export default function Dashboard() {
   const router = useRouter();
+  const { t, locale } = useI18n();
+  const D = t.dashboard;
   const searchParams = useSearchParams();
   const [testData, setTestData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,11 +105,7 @@ export default function Dashboard() {
     const upgradedFromUrl = searchParams.get("upgraded");
 
     if (errorFromUrl === "channel_limit_reached") {
-      showAlert(
-        "Channel Limit Reached",
-        "You've reached the channel limit for your current plan. Please upgrade to PRO to connect more channels.",
-        "warning"
-      );
+      showAlert(D.channelLimitTitle, D.channelLimitMsg, "warning");
       router.replace("/dashboard");
     }
 
@@ -124,7 +127,7 @@ export default function Dashboard() {
             setUserProfile(data);
             attempts += 1;
             if (data.is_pro) {
-              showAlert("Welcome to PRO!", "Your account has been upgraded to PRO. Enjoy unlimited active tests and faster swap intervals.", "success", "OK");
+              showAlert(D.welcomeProTitle, D.welcomeProMsg, "success", t.common.ok);
             } else if (attempts < 5) {
               setTimeout(pollForPro, 2000);
             }
@@ -182,28 +185,28 @@ export default function Dashboard() {
       isOpen: true,
       type: "confirm",
       variant: "error",
-      title: "Cancel & Delete Test",
-      message: `Are you sure you want to cancel and delete this test?\nThe YouTube thumbnail will be safely restored to the original (A). This action cannot be undone.${isBasic ? "\n\n⚠️ Note: Cancelled tests still count toward your 4 tests/month limit." : ""}`,
-      confirmText: "Yes, delete permanently",
-      cancelText: "Cancel",
+      title: D.deleteTitle,
+      message: `${D.deleteMsg}${isBasic ? D.deleteBasicNote : ""}`,
+      confirmText: D.deleteConfirm,
+      cancelText: t.common.cancel,
       onConfirm: async () => {
-        setModalConfig(prev => ({ 
-          ...prev, 
-          type: "loading", 
-          title: "Deleting....",
-          message: "Restoring the YouTube thumbnail to the original and deleting the test.\nPlease wait..."
+        setModalConfig(prev => ({
+          ...prev,
+          type: "loading",
+          title: D.deletingTitle,
+          message: D.deletingMsg
         }));
-        
+
         try {
           const res = await apiFetch(`/api/tests/${testId}`, { method: "DELETE" });
           if (res.ok) {
-            showAlert("Deleted", "The test has been cancelled and the thumbnail has been restored to the original.", "success");
-            setTestData(prevData => prevData.filter(t => t.test_id !== testId));
+            showAlert(D.deletedTitle, D.deletedMsg, "success");
+            setTestData(prevData => prevData.filter(test => test.test_id !== testId));
           } else {
-            showAlert("Error", "An error occurred while deleting.", "error");
+            showAlert(t.common.error, D.deleteError, "error");
           }
         } catch(e) {
-          showAlert("Error", "A network error occurred.", "error");
+          showAlert(t.common.error, t.common.networkError, "error");
         }
       },
       onCancel: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
@@ -215,27 +218,27 @@ export default function Dashboard() {
       isOpen: true,
       type: "confirm",
       variant: "warning",
-      title: "End Test Early",
-      message: "Would you like to permanently apply the best-performing thumbnail so far and end the optimization?",
-      confirmText: "Apply Now",
-      cancelText: "Cancel",
+      title: D.stopTitle,
+      message: D.stopMsg,
+      confirmText: D.stopConfirm,
+      cancelText: t.common.cancel,
       onConfirm: async () => {
-        setModalConfig(prev => ({ 
-          ...prev, 
-          type: "loading", 
-          title: "Ending Test....", 
-          message: "Finalizing the winning thumbnail on YouTube.\nPlease wait..."
+        setModalConfig(prev => ({
+          ...prev,
+          type: "loading",
+          title: D.stoppingTitle,
+          message: D.stoppingMsg
         }));
         try {
           const res = await apiFetch(`/api/tests/${testId}/stop`, { method: "POST" });
           if (res.ok) {
-            showAlert("Success", "The test has ended and the best-performing thumbnail has been applied to YouTube.", "success");
-            setTestData(prevData => prevData.map(t => t.test_id === testId ? { ...t, status: "STOPPED" } : t));
+            showAlert(D.successTitle, D.stoppedMsg, "success");
+            setTestData(prevData => prevData.map(test => test.test_id === testId ? { ...test, status: "STOPPED" } : test));
           } else {
-            showAlert("Error", "An error occurred while ending the test.", "error");
+            showAlert(t.common.error, D.stopError, "error");
           }
         } catch(e) {
-          showAlert("Error", "A network error occurred.", "error");
+          showAlert(t.common.error, t.common.networkError, "error");
         }
       },
       onCancel: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
@@ -247,7 +250,7 @@ export default function Dashboard() {
     try {
       const res = await apiFetch(`/api/tests/${testId}/swap`, { method: "POST" });
       if (res.ok) {
-        showAlert("Swap Success", "Thumbnail swapped successfully.", "success");
+        showAlert(D.swapSuccessTitle, D.swapSuccessMsg, "success");
         const myToken = ++testsRefreshTokenRef.current;
         apiFetch("/api/tests").then(r => r.json()).then(d => {
           if (testsRefreshTokenRef.current !== myToken) return;
@@ -255,19 +258,18 @@ export default function Dashboard() {
         });
       } else if (res.status === 502) {
         const errData = await res.json().catch(() => ({}));
-        const isPermission = (errData.detail || "").includes("썸네일") || (errData.detail || "").includes("thumbnail");
+        // 전화번호 인증 안내 메시지에만 youtube.com/features 가 들어 있다 (영어·한국어 공통)
+        const isPermission = (errData.detail || "").includes("youtube.com/features");
         showAlert(
-          "썸네일 교체 실패",
-          isPermission
-            ? "YouTube 계정 인증이 필요합니다.\n\nyoutube.com/features 에서 전화번호 인증을 완료하면 바로 해결됩니다. (약 1분 소요)\n\n인증 후 테스트를 다시 시작해 주세요."
-            : (errData.detail || "YouTube 썸네일 교체에 실패했습니다. 잠시 후 자동으로 재시도됩니다."),
+          D.swapFailTitle,
+          isPermission ? D.swapPermissionMsg : (errData.detail || D.swapRetryMsg),
           "warning"
         );
       } else {
-        showAlert("Swap Failed", "Failed to swap thumbnail. Please try again.", "error");
+        showAlert(D.swapFailedTitle, D.swapFailedMsg, "error");
       }
     } catch(e) {
-      showAlert("Error", "A communication error occurred.", "error");
+      showAlert(t.common.error, D.commError, "error");
     } finally {
       setIsSwapping(null);
     }
@@ -280,9 +282,9 @@ export default function Dashboard() {
           <ChannelSelect />
         </div>
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">Optimization Dashboard</h1>
+          <h1 className="text-3xl font-black text-white tracking-tight">{D.title}</h1>
           <p className="text-sm text-zinc-400 mt-2">
-            Currently <span className="text-cyan-400 font-semibold">{testData.filter(t => t.status === "RUNNING").length}</span> videos are being optimized.
+            <RichText value={D.runningCount(testData.filter(test => test.status === "RUNNING").length)} strongClassName="text-cyan-400 font-semibold" />
           </p>
         </div>
       </div>
@@ -292,11 +294,11 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <AlertTriangle size={20} className="text-amber-400 flex-shrink-0" aria-hidden="true" />
             <p className="text-sm">
-              Your YouTube channel connection has expired and A/B tests are paused. Please reconnect your channel.
+              {D.reconnectMsg}
             </p>
           </div>
           <Link href="/login" className="px-4 py-2 bg-amber-500 text-black text-sm font-bold rounded-lg hover:bg-amber-400 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-            Reconnect Channel
+            {D.reconnectBtn}
           </Link>
         </div>
       )}
@@ -306,28 +308,27 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <AlertTriangle size={20} className="text-blue-400 flex-shrink-0" aria-hidden="true" />
             <p className="text-sm">
-              You're signed in with a YouTube Brand Account — test completion notifications may not reach your inbox.
-              Please set up a notification email to receive alerts.
+              {D.brandMsg}
             </p>
           </div>
           <Link href="/settings" className="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded-lg hover:bg-blue-400 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-            Set Notification Email →
+            {D.brandBtn}
           </Link>
         </div>
       )}
 
       <div className="p-8 w-full space-y-6">
         {isLoading ? (
-          <div className="text-zinc-400 text-center py-20 animate-pulse" role="status">Loading data...</div>
+          <div className="text-zinc-400 text-center py-20 animate-pulse" role="status">{D.loading}</div>
         ) : testData.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 text-center bg-zinc-900/30 rounded-3xl border border-zinc-800/50 border-dashed">
             <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mb-6" aria-hidden="true">
               <FlaskConical size={32} className="text-zinc-400" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">No active optimizations</h2>
-            <p className="text-zinc-400 mb-8 max-w-md">Create a thumbnail A/B test for your video and maximize your views.</p>
+            <h2 className="text-2xl font-bold text-white mb-2">{D.emptyTitle}</h2>
+            <p className="text-zinc-400 mb-8 max-w-md">{D.emptySub}</p>
             <Link href="/new" className="px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-              <Sparkles size={18} aria-hidden="true" /> Create New Test
+              <Sparkles size={18} aria-hidden="true" /> {D.createNew}
             </Link>
           </div>
         ) : (
@@ -338,21 +339,21 @@ export default function Dashboard() {
                   <div className="flex items-center gap-3 mb-2">
                     {test.status === "RUNNING" ? (
                       <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold border border-cyan-500/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" aria-hidden="true" /> Running
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" aria-hidden="true" /> {D.running}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20">
-                        <CheckCircle2 size={12} aria-hidden="true" /> Optimization Finished
+                        <CheckCircle2 size={12} aria-hidden="true" /> {D.finishedBadge}
                       </span>
                     )}
                   </div>
                   <h2 className="text-2xl font-bold mb-1 line-clamp-1">{test.video?.title || test.youtube_video_id}</h2>
-                  <p className="text-sm text-zinc-400">{formatTestDuration(test.start_time, test.end_time, test.status)}</p>
+                  <p className="text-sm text-zinc-400">{formatTestDuration(test.start_time, test.end_time, test.status, t, locale)}</p>
                 </div>
-                
+
                 <div className="flex gap-10 text-right">
-                  <Stat label="Extra Views Gained" value={`+${test.variations.length > 0 ? Math.max(...test.variations.map((v: any) => v.total_views_gained || 0)) : 0}  views`} highlight />
-                  <Stat label="Total Candidates" value={`${test.variations.length}`} />
+                  <Stat label={D.extraViews} value={D.viewsValue(test.variations.length > 0 ? Math.max(...test.variations.map((v: any) => v.total_views_gained || 0)) : 0)} highlight />
+                  <Stat label={D.totalCandidates} value={`${test.variations.length}`} />
                 </div>
 
                 {test.status === "RUNNING" && (
@@ -361,33 +362,33 @@ export default function Dashboard() {
                       <button
                         onClick={() => handleSwapTest(test.test_id)}
                         disabled={isSwapping === test.test_id || test.manual_swap_used}
-                        title={test.manual_swap_used ? "Already used once for this test" : undefined}
+                        title={test.manual_swap_used ? D.swapUsedTooltip : undefined}
                         className="px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                       >
                         {isSwapping === test.test_id ? (
                           <>
-                            <Loader2 size={16} className="animate-spin" aria-hidden="true" /> Swapping...
+                            <Loader2 size={16} className="animate-spin" aria-hidden="true" /> {D.swapping}
                           </>
                         ) : test.manual_swap_used ? (
                           <>
-                            <Settings2 size={16} aria-hidden="true" /> Swap Used
+                            <Settings2 size={16} aria-hidden="true" /> {D.swapUsed}
                           </>
                         ) : (
                           <>
-                            <Settings2 size={16} aria-hidden="true" /> Swap Thumbnail Now
+                            <Settings2 size={16} aria-hidden="true" /> {D.swapNow}
                           </>
                         )}
                       </button>
                       <button onClick={() => handleStopTest(test.test_id)} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-sm font-bold transition-colors cursor-pointer flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-                        <CheckCircle2 size={16} aria-hidden="true" /> Lock Winning Thumbnail
+                        <CheckCircle2 size={16} aria-hidden="true" /> {D.lockWinner}
                       </button>
-                      <button onClick={() => handleDeleteTest(test.test_id)} className="ml-auto px-4 py-2 bg-zinc-700/50 hover:bg-red-900/40 text-zinc-200 hover:text-red-400 border border-zinc-500/50 hover:border-red-500/50 rounded-lg text-sm font-black transition-all cursor-pointer flex items-center gap-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" title="Cancel test and restore original thumbnail">
-                        <Trash2 size={16} aria-hidden="true" /> Cancel & Delete Test
+                      <button onClick={() => handleDeleteTest(test.test_id)} className="ml-auto px-4 py-2 bg-zinc-700/50 hover:bg-red-900/40 text-zinc-200 hover:text-red-400 border border-zinc-500/50 hover:border-red-500/50 rounded-lg text-sm font-black transition-all cursor-pointer flex items-center gap-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" title={D.deleteBtnTooltip}>
+                        <Trash2 size={16} aria-hidden="true" /> {D.deleteBtn}
                       </button>
                     </div>
                     <div className="bg-zinc-800/30 rounded-lg p-3 text-xs text-zinc-400 leading-relaxed border border-zinc-800/50 space-y-1.5">
-                      <p><strong className="text-zinc-300">💡 Swap Thumbnail Now</strong> — Skips the scheduled wait and immediately rotates to the next thumbnail candidate. (1 use per test. YouTube cache may take 1–2 min to update.)</p>
-                      <p><strong className="text-zinc-300">🏆 Lock Winning Thumbnail</strong> — Ends the test early and permanently applies the current best-performing thumbnail to your video. <span className="text-red-400 font-semibold">This cannot be undone.</span></p>
+                      <p><strong className="text-zinc-300">{D.helpSwapStrong}</strong>{D.helpSwapText}</p>
+                      <p><strong className="text-zinc-300">{D.helpLockStrong}</strong>{D.helpLockText}<span className="text-red-400 font-semibold">{D.helpLockWarn}</span></p>
                     </div>
                   </div>
                 )}
@@ -400,7 +401,7 @@ export default function Dashboard() {
                     title={v.name}
                     videoTitle={v.title_text}
                     viewsGained={`+${v.total_views_gained || 0}`}
-                    views={`${v.total_views_gained || 0}  views`}
+                    views={t.common.views(String(v.total_views_gained || 0))}
                     data={v.chart_data || [{day: "Day 1", views_gained: 0}]}
                     color={index === 0 ? "#a1a1aa" : (v.is_winner ? "#06b6d4" : "#8b5cf6")}
                     isWinner={v.is_winner}
@@ -430,11 +431,13 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
 }
 
 function VariationCard({ title, videoTitle, viewsGained, views, data, color, isWinner, thumbnailUrl }: any) {
+  const { t } = useI18n();
+  const D = t.dashboard;
   return (
     <div className={`relative glass-panel rounded-2xl p-5 flex flex-col transition-all duration-300 border ${isWinner ? "winner-glow transform -translate-y-1 border-cyan-500/50" : "border-zinc-800"}`}>
       {isWinner && (
         <div className="absolute -top-3 -right-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-bold px-3 py-1 rounded-full shadow-lg shadow-cyan-500/20 flex items-center gap-1 border border-cyan-400/50 z-20">
-          <CheckCircle2 size={16} aria-hidden="true" /> Winner
+          <CheckCircle2 size={16} aria-hidden="true" /> {D.winner}
         </div>
       )}
       
@@ -445,11 +448,11 @@ function VariationCard({ title, videoTitle, viewsGained, views, data, color, isW
 
       <div className="w-full aspect-video bg-zinc-800 rounded-lg mb-4 border border-zinc-700/50 flex items-center justify-center relative overflow-hidden group">
          {thumbnailUrl && thumbnailUrl.startsWith("http") ? (
-           <img src={thumbnailUrl} alt={`${title} Thumbnail`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+           <img src={thumbnailUrl} alt={D.thumbnailAlt(title)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
          ) : (
            <>
              <div className="absolute inset-0 bg-gradient-to-tr from-zinc-800 to-zinc-700 group-hover:scale-105 transition-transform duration-500" />
-             <span className="relative z-10 text-zinc-400 font-medium">No Image</span>
+             <span className="relative z-10 text-zinc-400 font-medium">{t.common.noImage}</span>
            </>
          )}
       </div>
@@ -460,7 +463,7 @@ function VariationCard({ title, videoTitle, viewsGained, views, data, color, isW
 
       <div className="mt-auto">
         <div className="flex justify-between items-end mb-2">
-          <span className="text-sm text-zinc-400 uppercase font-medium tracking-wide">Views Gained</span>
+          <span className="text-sm text-zinc-400 uppercase font-medium tracking-wide">{D.viewsGained}</span>
           <span className={`text-xl font-bold ${isWinner ? "text-cyan-400" : "text-zinc-200"}`}>{viewsGained}</span>
         </div>
         <div className="h-24 w-full">
@@ -477,11 +480,11 @@ function VariationCard({ title, videoTitle, viewsGained, views, data, color, isW
         
         <div className="flex justify-between items-center mt-4 pt-4 border-t border-zinc-800/50">
            <div className="flex flex-col gap-1">
-              <span className="text-sm text-zinc-400 uppercase font-medium">Started At</span>
+              <span className="text-sm text-zinc-400 uppercase font-medium">{D.startedAt}</span>
               <span className="text-lg font-bold text-zinc-100">{formatLocalDateTime(data[0]?.day)}</span>
            </div>
            <div className="flex flex-col gap-1 text-right">
-              <span className="text-sm text-zinc-400 uppercase font-medium">Total Views</span>
+              <span className="text-sm text-zinc-400 uppercase font-medium">{D.totalViews}</span>
               <span className="text-lg font-bold text-zinc-100">{views}</span>
            </div>
         </div>

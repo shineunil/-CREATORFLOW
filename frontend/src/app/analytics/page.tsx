@@ -6,6 +6,8 @@ import { Trophy } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 import ChannelSelect from "@/components/layout/ChannelSelect";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatNumber } from "@/i18n/format";
 
 type BestVariation = {
   name: string;
@@ -16,6 +18,8 @@ type BestVariation = {
 };
 
 export default function AnalyticsPage() {
+  const { t, locale } = useI18n();
+  const A = t.analytics;
   const [data, setData] = useState<{ total_tests: number, active_tests: number, total_views_gained: number, trend: any[], best_variation: BestVariation | null }>({
     total_tests: 0,
     active_tests: 0,
@@ -49,33 +53,33 @@ export default function AnalyticsPage() {
         <ChannelSelect />
       </div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Channel Analytics Overview</h1>
-        <p className="text-zinc-400">Statistics of data optimized by THUMBNAILFLOW.</p>
+        <h1 className="text-3xl font-bold mb-2">{A.title}</h1>
+        <p className="text-zinc-400">{A.sub}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
-          <p className="text-zinc-400 text-sm mb-1">Total Optimizations</p>
+          <p className="text-zinc-400 text-sm mb-1">{A.totalTests}</p>
           <div className="text-4xl font-bold">{data.total_tests}</div>
         </div>
         <div className="glass-panel p-6 rounded-2xl border border-emerald-500/20 bg-emerald-950/10">
-          <p className="text-emerald-400/80 text-sm mb-1">Active Optimizations</p>
+          <p className="text-emerald-400/80 text-sm mb-1">{A.activeTests}</p>
           <div className="text-4xl font-bold text-emerald-400">{data.active_tests}</div>
         </div>
         <div className="glass-panel p-6 rounded-2xl border border-cyan-500/20 bg-cyan-950/10">
-          <p className="text-cyan-400/80 text-sm mb-1">Extra Views Gained from Optimization</p>
+          <p className="text-cyan-400/80 text-sm mb-1">{A.extraViews}</p>
           <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
-            +{data.total_views_gained.toLocaleString()}
+            +{formatNumber(data.total_views_gained, locale)}
           </div>
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 glass-panel p-8 rounded-2xl border border-zinc-800/50">
-          <h2 className="text-xl font-bold mb-6">Cumulative Extra Views Trend</h2>
+          <h2 className="text-xl font-bold mb-6">{A.trendTitle}</h2>
           {data.trend.length === 0 ? (
             <div className="h-64 flex items-center justify-center border-t border-zinc-800/50 pt-8">
-              <p className="text-zinc-400">Chart will appear when enough test data is accumulated.</p>
+              <p className="text-zinc-400">{A.trendEmpty}</p>
             </div>
           ) : (
             <div className="h-64">
@@ -100,7 +104,7 @@ export default function AnalyticsPage() {
 
         <div className="glass-panel p-8 rounded-2xl border border-zinc-800/50 flex flex-col">
           <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <Trophy size={18} className="text-amber-400" aria-hidden="true" /> Best Performing Thumbnail
+            <Trophy size={18} className="text-amber-400" aria-hidden="true" /> {A.bestTitle}
           </h2>
           {data.best_variation ? (
             <div className="flex flex-col gap-4">
@@ -108,21 +112,21 @@ export default function AnalyticsPage() {
                 {data.best_variation.thumbnail_image_url ? (
                   <img src={data.best_variation.thumbnail_image_url} alt={data.best_variation.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-zinc-400 text-xs">No image</div>
+                  <div className="w-full h-full flex items-center justify-center text-zinc-400 text-xs">{t.common.noImage}</div>
                 )}
               </div>
               <div>
                 <div className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-1">{data.best_variation.name}</div>
-                <h3 className="text-sm font-semibold text-zinc-100 line-clamp-2">{data.best_variation.title_text || "No title"}</h3>
+                <h3 className="text-sm font-semibold text-zinc-100 line-clamp-2">{data.best_variation.title_text || A.noTitle}</h3>
               </div>
               <div className="mt-auto pt-4 border-t border-zinc-800/50 flex justify-between items-end">
-                <span className="text-xs text-zinc-400 uppercase font-medium">Total Views Gained</span>
-                <span className="text-xl font-bold text-cyan-400">+{data.best_variation.total_views_gained.toLocaleString()}</span>
+                <span className="text-xs text-zinc-400 uppercase font-medium">{A.totalViewsGained}</span>
+                <span className="text-xl font-bold text-cyan-400">+{formatNumber(data.best_variation.total_views_gained, locale)}</span>
               </div>
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-center">
-              <p className="text-zinc-400 text-sm">No data yet.</p>
+              <p className="text-zinc-400 text-sm">{A.noData}</p>
             </div>
           )}
         </div>

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { AlertCircle, CheckCircle2, Info, AlertTriangle, X, Loader2 } from "lucide-react";
+import { useI18n } from "@/i18n/I18nProvider";
 
 export interface ModalProps {
   isOpen: boolean;
@@ -21,11 +22,12 @@ export default function Modal({
   variant = "info",
   title,
   message,
-  confirmText = "확인",
-  cancelText = "취소",
+  confirmText,
+  cancelText,
   onConfirm,
   onCancel,
 }: ModalProps) {
+  const { t } = useI18n();
   const handleClose = () => {
     if (type === "loading") return; // Prevent closing while loading
     if (onCancel) {
@@ -102,7 +104,7 @@ export default function Modal({
         {type !== "loading" && (
           <button
             onClick={handleClose}
-            aria-label="모달 닫기"
+            aria-label={t.common.closeDialog}
             className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded-lg p-1"
           >
             <X size={18} aria-hidden="true" />
@@ -128,14 +130,14 @@ export default function Modal({
                 onClick={onCancel}
                 className="px-5 py-2.5 text-sm font-bold text-zinc-200 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
               >
-                {cancelText}
+                {cancelText ?? t.common.cancel}
               </button>
             )}
             <button
               onClick={onConfirm}
               className={`px-5 py-2.5 text-sm font-bold text-white rounded-xl shadow-lg transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 ${getButtonBg()}`}
             >
-              {confirmText}
+              {confirmText ?? t.common.ok}
             </button>
           </div>
         )}

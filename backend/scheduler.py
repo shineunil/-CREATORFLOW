@@ -161,6 +161,7 @@ class AVSchedulerEngine:
                 if (
                     channel.user
                     and channel.user.plan == PlanType.PRO
+                    and channel.user.email_alerts_enabled
                 ):
                     send_to = (
                         channel.user.notification_email
@@ -174,7 +175,10 @@ class AVSchedulerEngine:
                             user_email=send_to,
                             video_title=winner_var.title_text or test.video.youtube_video_id,
                             winner_name=winner_var.name,
-                            views_gained=winner_total_views
+                            views_gained=winner_total_views,
+                            locale=channel.user.locale,
+                            thumbnail_url=winner_var.thumbnail_image_url,
+                            youtube_video_id=test.video.youtube_video_id,
                         )
 
             test.status = TestStatus.COMPLETED

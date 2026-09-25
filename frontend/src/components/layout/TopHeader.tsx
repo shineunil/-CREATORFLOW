@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/config";
 import { switchChannel, CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
+import { useI18n, saveLocalePreference } from "@/i18n/I18nProvider";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type ChannelSummary = {
   id: number;
@@ -19,6 +21,7 @@ type ChannelSummary = {
 
 export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?: boolean; onMenuClick?: () => void }) {
   const router = useRouter();
+  const { t, lp, locale } = useI18n();
   const [userProfile, setUserProfile] = useState<{ email: string; channel_title: string; is_pro: boolean; plan: string } | null>(null);
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [maxChannels, setMaxChannels] = useState(1);
@@ -38,7 +41,11 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
         if (res.ok) return res.json();
         throw new Error("Failed");
       })
-      .then((data) => setUserProfile(data))
+      .then((data) => {
+        setUserProfile(data);
+        // 아직 언어를 저장한 적 없는 계정이면 지금 보고 있는 언어로 저장 (알림 이메일 언어에 쓰임)
+        if (!data.locale) saveLocalePreference(locale);
+      })
       .catch(() => {});
 
     apiFetch("/api/channels")
@@ -95,7 +102,7 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("connectedChannel");
     setUserProfile(null);
-    router.replace("/");
+    router.replace(lp("/"));
   };
 
   const handleSwitchChannel = async (channelId: number) => {
@@ -125,18 +132,18 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
         {!showLogo && onMenuClick && (
           <button
             onClick={onMenuClick}
-            aria-label="메뉴 열기"
+            aria-label={t.header.openMenu}
             className="md:hidden mr-2 p-2 text-zinc-300 hover:text-white hover:bg-zinc-800/50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 flex-shrink-0"
           >
             <Menu size={22} aria-hidden="true" />
           </button>
         )}
         {showLogo && (
-          <Link href="/" className="flex items-center gap-2 md:gap-3 group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+          <Link href={lp("/")} className="flex items-center gap-2 md:gap-3 group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(6,182,212,0.5)] group-hover:shadow-[0_0_20px_rgba(6,182,212,0.8)] transition-all flex-shrink-0" aria-hidden="true">
               TF
             </div>
-            <span className="text-lg md:text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400 group-hover:text-white transition-colors">
+            <span className="text-[15px] sm:text-lg md:text-2xl font-black tracking-tight text-white transition-colors">
               THUMBNAILFLOW
             </span>
           </Link>
@@ -160,7 +167,7 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
                 </div>
                 <div className="hidden sm:flex flex-col items-start min-w-0">
                   <span className="text-base font-black text-white flex items-center gap-2">
-                    {userProfile.channel_title || "User"}
+                    {userProfile.channel_title || t.header.user}
                     {userProfile.plan === "PRO" && (
                       <span className="px-1.5 py-0.5 rounded bg-gradient-to-r from-emerald-500 to-teal-500 text-[10px] font-black text-white shadow-sm">
                         PRO
@@ -173,9 +180,9 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
               </button>
 
               {isMenuOpen && (
-                <div id="channel-switcher-menu" role="menu" aria-label="연동된 채널 전환" className="absolute right-0 top-full mt-2 w-[calc(100vw-1.5rem)] max-w-80 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-50">
+                <div id="channel-switcher-menu" role="menu" aria-label={t.header.switchChannelMenu} className="absolute right-0 top-full mt-2 w-[calc(100vw-1.5rem)] max-w-80 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-50">
                   <div className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-400 border-b border-zinc-800">
-                    연동된 채널 ({channels.length}/{maxChannels})
+                    {t.header.connectedChannels(channels.length, maxChannels)}
                   </div>
                   <div className="max-h-72 overflow-y-auto">
                     {channels.map((c) => (
@@ -191,14 +198,14 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
                           {c.channel_title ? c.channel_title.substring(0, 1).toUpperCase() : "?"}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold text-white truncate">{c.channel_title || "이름 없음"}</div>
+                          <div className="text-sm font-bold text-white truncate">{c.channel_title || t.header.unnamedChannel}</div>
                           {!c.is_connected ? (
-                            <span className="inline-flex text-[11px] font-bold text-zinc-300 bg-zinc-700/80 px-2 py-0.5 rounded-full">연동 해제됨</span>
+                            <span className="inline-flex text-[11px] font-bold text-zinc-300 bg-zinc-700/80 px-2 py-0.5 rounded-full">{t.header.disconnected}</span>
                           ) : c.needs_reconnect ? (
-                            <div className="text-xs text-amber-400 flex items-center gap-1"><AlertTriangle size={11} aria-hidden="true" /> 재연동 필요</div>
+                            <div className="text-xs text-amber-400 flex items-center gap-1"><AlertTriangle size={11} aria-hidden="true" /> {t.header.needsReconnect}</div>
                           ) : null}
                         </div>
-                        {c.is_active && <span className="text-xs font-bold text-cyan-400">사용 중</span>}
+                        {c.is_active && <span className="text-xs font-bold text-cyan-400">{t.header.active}</span>}
                       </button>
                     ))}
                   </div>
@@ -209,38 +216,42 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
                       className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-bold text-zinc-300 hover:bg-zinc-800/60 border-t border-zinc-800 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400"
                     >
                       <Plus size={16} className="text-cyan-400" aria-hidden="true" />
-                      다른 채널 연동하기
+                      {t.header.connectAnother}
                     </button>
                   )}
                 </div>
               )}
             </div>
 
+            <LanguageSwitcher className="hidden sm:inline-flex" />
+            <LanguageSwitcher compact className="sm:hidden" />
             <div className="hidden sm:block w-px h-8 bg-zinc-700/50" aria-hidden="true"></div>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-2.5 md:px-4 py-2.5 bg-zinc-800/40 hover:bg-zinc-700 hover:text-white rounded-xl text-base font-bold text-zinc-200 transition-all shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 flex-shrink-0"
-              aria-label="Log out"
+              aria-label={t.header.logOut}
             >
               <LogOut size={18} aria-hidden="true" />
-              <span className="hidden md:inline">Log out</span>
+              <span className="hidden md:inline whitespace-nowrap">{t.header.logOut}</span>
             </button>
             {showLogo && (
-              <button onClick={() => router.push("/dashboard")} className="ml-2 text-base font-black bg-white text-black px-6 py-2.5 rounded-full hover:bg-zinc-200 transition-colors shadow-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black">
-                Dashboard
+              <button onClick={() => router.push("/dashboard")} className="ml-2 text-base font-black bg-white text-black px-6 py-2.5 rounded-full hover:bg-zinc-200 transition-colors shadow-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black whitespace-nowrap">
+                {t.header.dashboard}
               </button>
             )}
           </div>
         ) : (
           <div className="flex items-center gap-1.5 md:gap-4">
-            <Link href="/faq" className="hidden sm:inline-block text-base font-bold text-white hover:text-zinc-300 transition-colors px-4 py-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 whitespace-nowrap">
-              FAQ
+            <LanguageSwitcher className="hidden sm:inline-flex" />
+            <LanguageSwitcher compact className="sm:hidden" />
+            <Link href={lp("/faq")} className="hidden sm:inline-block text-base font-bold text-white hover:text-zinc-300 transition-colors px-4 py-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 whitespace-nowrap">
+              {t.header.faq}
             </Link>
-            <button onClick={() => router.push("/login")} className="hidden sm:inline-block text-base font-bold text-zinc-200 hover:text-white transition-colors px-4 py-2 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-              Log in
+            <button onClick={() => router.push(lp("/login"))} className="hidden sm:inline-block text-base font-bold text-zinc-200 hover:text-white transition-colors px-4 py-2 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 whitespace-nowrap">
+              {t.header.logIn}
             </button>
-            <button onClick={() => router.push("/login")} className="text-sm md:text-base font-black bg-white text-black px-4 md:px-6 py-2 md:py-2.5 rounded-full hover:bg-zinc-200 transition-colors shadow-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black whitespace-nowrap">
-              Start for Free
+            <button onClick={() => router.push(lp("/login"))} className="text-sm md:text-base font-black bg-white text-black px-4 md:px-6 py-2 md:py-2.5 rounded-full hover:bg-zinc-200 transition-colors shadow-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black whitespace-nowrap">
+              {t.header.startForFree}
             </button>
           </div>
         )}

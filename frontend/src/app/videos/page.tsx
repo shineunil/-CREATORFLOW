@@ -6,8 +6,12 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 import ChannelSelect from "@/components/layout/ChannelSelect";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatDate, formatNumber } from "@/i18n/format";
 
 export default function VideosPage() {
+  const { t, locale } = useI18n();
+  const V = t.videos;
   const [videos, setVideos] = useState<any[]>([]);
   const [activeTestVideoIds, setActiveTestVideoIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -64,22 +68,22 @@ export default function VideosPage() {
       <div className="mb-10 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
-            <MonitorPlay className="text-red-500" size={32} aria-hidden="true" /> My Videos
+            <MonitorPlay className="text-red-500" size={32} aria-hidden="true" /> {V.title}
           </h1>
-          <p className="text-zinc-400">Browse recently uploaded videos from your connected YouTube channel and start optimizing.</p>
+          <p className="text-zinc-400">{V.sub}</p>
         </div>
 
         </div>
 
       {isLoading ? (
-        <div className="text-center py-20 text-zinc-400 animate-pulse" role="status">Loading videos from YouTube...</div>
+        <div className="text-center py-20 text-zinc-400 animate-pulse" role="status">{V.loading}</div>
       ) : videos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 text-center bg-zinc-900/30 rounded-3xl border border-zinc-800/50 border-dashed">
           <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mb-6" aria-hidden="true">
             <FolderOpen size={32} className="text-zinc-400" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">No videos found</h2>
-          <p className="text-zinc-400">No videos on this channel yet, or videos could not be loaded.</p>
+          <h2 className="text-2xl font-bold text-white mb-2">{V.emptyTitle}</h2>
+          <p className="text-zinc-400">{V.emptySub}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -106,11 +110,11 @@ export default function VideosPage() {
                   
                   {isTesting ? (
                     <div className="absolute top-3 left-3 px-2 py-1 bg-cyan-500/20 border border-cyan-500/40 rounded text-xs font-bold text-cyan-400 flex items-center gap-1 backdrop-blur-md">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" aria-hidden="true" /> Optimizing
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" aria-hidden="true" /> {V.optimizing}
                     </div>
                   ) : (
                     <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/80 rounded text-xs font-bold text-white flex items-center gap-1 backdrop-blur-sm">
-                      <PlayCircle size={12} aria-hidden="true" /> Video
+                      <PlayCircle size={12} aria-hidden="true" /> {V.video}
                     </div>
                   )}
                 </div>
@@ -124,8 +128,8 @@ export default function VideosPage() {
                   </h3>
                   
                   <div className="flex items-center justify-between text-xs text-zinc-400 font-medium mb-auto">
-                    <span>{parseInt(v.view_count || '0').toLocaleString()} views</span>
-                    <span>{new Date(v.published_at).toLocaleDateString()}</span>
+                    <span>{t.common.views(formatNumber(parseInt(v.view_count || '0'), locale))}</span>
+                    <span>{formatDate(v.published_at, locale)}</span>
                   </div>
 
                   <div className="pt-4 border-t border-zinc-800/50">
@@ -134,14 +138,14 @@ export default function VideosPage() {
                         href="/"
                         className="w-full py-2.5 bg-cyan-900/30 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-900/50 hover:border-cyan-500/50 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                       >
-                        <Activity size={16} className="animate-pulse" aria-hidden="true" /> ⏳ View Optimization Progress
+                        <Activity size={16} className="animate-pulse" aria-hidden="true" /> {V.viewProgress}
                       </Link>
                     ) : (
                       <Link
                         href={`/new?videoId=${v.id}`}
                         className="w-full py-2.5 bg-zinc-800/80 hover:bg-cyan-500/10 text-zinc-300 hover:text-cyan-400 border border-transparent hover:border-cyan-500/30 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                       >
-                        <Sparkles size={16} aria-hidden="true" /> Create Thumbnail Test
+                        <Sparkles size={16} aria-hidden="true" /> {V.createTest}
                       </Link>
                     )}
                   </div>

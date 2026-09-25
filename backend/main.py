@@ -32,6 +32,7 @@ from env_utils import is_dev_environment, allow_test_upgrade
 from metrics_utils import compute_variation_vph
 from storage import is_cloud_storage_configured, upload_thumbnail_to_cloud
 from test_policy import BASIC_MIN_SWAP_INTERVAL_MINUTES, MAX_CONCURRENT_TESTS_PER_CHANNEL
+from messages import msg, current_locale, set_request_locale, locale_from_accept_language, SUPPORTED_LOCALES
 
 load_dotenv()
 
@@ -189,7 +190,7 @@ def get_current_admin(request: Request, db: Session = Depends(get_db)) -> User:
         or (bool(user.google_user_id) and user.google_user_id in admin_gids)
     )
     if not is_admin:
-        raise HTTPException(status_code=403, detail="관리자 권한이 없습니다.")
+        raise HTTPException(status_code=403, detail=msg("admin_forbidden"))
     return user
 
 
@@ -230,6 +231,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def apply_request_locale(request: Request, call_next):
+    """프론트가 보낸 Accept-Language로 이 요청의 응답 메시지 언어를 정한다 (messages.msg가 읽음)."""
+    set_request_locale(locale_from_accept_language(request.headers.get("accept-language")))
+    return await call_next(request)
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
@@ -319,7 +326,7 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
         token_res = await client.post(token_url, data=token_data)
         if token_res.status_code != 200:
             logger.error(f"Token error: {token_res.text}")
-            raise HTTPException(status_code=400, detail="토큰 발급 실패")
+            raise HTTPException(status_code=400, detail=msg("oauth_token_failed"))
             
         token_json = token_res.json()
         access_token = token_json.get("access_token")
@@ -331,7 +338,7 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
         userinfo_res = await client.get("https://www.googleapis.com/oauth2/v2/userinfo", headers=headers)
         if userinfo_res.status_code != 200:
             logger.error(f"Userinfo error: {userinfo_res.text}")
-            raise HTTPException(status_code=400, detail="구글 사용자 정보 조회 실패")
+            raise HTTPException(status_code=400, detail=msg("google_userinfo_failed"))
         userinfo_json = userinfo_res.json()
         # 🔒 유저 식별은 반드시 이 "id"(OIDC sub와 동일, 계정당 고유·불변) 기준으로 해야 한다.
         # email은 브랜드 계정(유튜브 채널) 컨텍스트로 로그인하면 실제 이메일 대신
@@ -341,12 +348,12 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
         email = userinfo_json.get("email")
         if not google_user_id:
             logger.error("구글 userinfo 응답에 id(sub)가 없습니다.")
-            raise HTTPException(status_code=400, detail="구글 계정 정보를 가져오지 못했습니다.")
+            raise HTTPException(status_code=400, detail=msg("google_account_failed"))
         if not email:
             # User.email은 nullable=False라서, None인 채로 User를 만들면 여기서 잡지 않으면
             # DB commit 시점에 처리되지 않은 IntegrityError로 500이 난다.
             logger.error("구글 userinfo 응답에 email이 없습니다.")
-            raise HTTPException(status_code=400, detail="구글 계정에서 이메일 정보를 가져오지 못했습니다.")
+            raise HTTPException(status_code=400, detail=msg("google_email_missing"))
 
         # 3. 유튜브 채널 정보 가져오기
         yt_res = await client.get("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", headers=headers)
@@ -420,7 +427,7 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
 @app.post("/api/auth/logout")
 def logout_user():
     """유저 단순 세션 로그아웃 엔드포인트 (채널 연동 토큰은 유지되어 백그라운드 A/B 테스트가 계속 실행됩니다)"""
-    response = JSONResponse(content={"message": "성공적으로 로그아웃되었습니다."})
+    response = JSONResponse(content={"message": msg("logout_success")})
     _clear_auth_cookie(response)
     return response
 
@@ -434,7 +441,7 @@ def exchange_auth_code(code: str, db: Session = Depends(get_db)):
         .first()
     )
     if not entry:
-        raise HTTPException(status_code=400, detail="유효하지 않거나 만료된 인증 코드입니다.")
+        raise HTTPException(status_code=400, detail=msg("invalid_auth_code"))
     token = entry.token
     entry.used = True
     db.commit()
@@ -453,12 +460,12 @@ def disconnect_channel(target_channel_id: int, db: Session = Depends(get_db), ch
     """
     target = db.query(Channel).filter(Channel.id == target_channel_id).first()
     if not target or target.user_id != channel.user_id:
-        raise HTTPException(status_code=404, detail="채널을 찾을 수 없거나 이 계정 소유가 아닙니다.")
+        raise HTTPException(status_code=404, detail=msg("channel_not_owned"))
 
     target.oauth_refresh_token = None
     target.needs_reconnect = False  # 완전히 연동 해제된 상태이므로 "재연동 필요" 배너와는 구분
     db.commit()
-    return {"message": "YouTube 채널 연동이 해제되었습니다."}
+    return {"message": msg("channel_disconnected_ok")}
 
 @app.get("/api/channels")
 def list_channels(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
@@ -490,7 +497,7 @@ def switch_channel(target_channel_id: int, db: Session = Depends(get_db), channe
     """대시보드에서 다른 연동 채널로 전환 - 같은 계정 소유 채널일 때만 새 토큰을 발급한다."""
     target = db.query(Channel).filter(Channel.id == target_channel_id).first()
     if not target or target.user_id != channel.user_id:
-        raise HTTPException(status_code=404, detail="채널을 찾을 수 없거나 이 계정 소유가 아닙니다.")
+        raise HTTPException(status_code=404, detail=msg("channel_not_owned"))
 
     token = create_access_token(target.user_id, target.id)
     # L-3: JWT를 응답 body 대신 HttpOnly 쿠키에 설정한다.
@@ -509,9 +516,9 @@ async def check_channel_capabilities_endpoint(
 
     target = db.query(Channel).filter(Channel.id == target_channel_id).first()
     if not target or target.user_id != channel.user_id:
-        raise HTTPException(status_code=404, detail="채널을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail=msg("channel_not_found"))
     if not target.oauth_refresh_token:
-        raise HTTPException(status_code=400, detail="연동이 해제된 채널입니다.")
+        raise HTTPException(status_code=400, detail=msg("channel_is_disconnected"))
 
     try:
         result = await check_channel_capabilities(target.oauth_refresh_token)
@@ -526,10 +533,10 @@ async def check_channel_capabilities_endpoint(
     except TokenRevokedError:
         target.needs_reconnect = True
         db.commit()
-        raise HTTPException(status_code=401, detail="YouTube 연동이 만료되었습니다. 재연동이 필요합니다.")
+        raise HTTPException(status_code=401, detail=msg("youtube_reconnect_required"))
     except Exception as e:
         logger.error(f"[Capabilities] 예상치 못한 에러: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="권한 확인 중 오류가 발생했습니다.")
+        raise HTTPException(status_code=500, detail=msg("permission_check_failed"))
 
 
 @app.post("/api/settings/test-email")
@@ -541,16 +548,17 @@ def send_test_email(request: Request, db: Session = Depends(get_db), channel: Ch
     from email_service import send_test_completion_email
     result = send_test_completion_email(
         user_email=target_email,
-        video_title="사진 속 우리 (비하인드 스페셜)",
-        winner_name="Variation B (네온 자막 강조 썸네일)",
-        views_gained=458
+        video_title=msg("test_email_sample_title"),
+        winner_name=msg("test_email_sample_winner"),
+        views_gained=458,
+        locale=current_locale(),
     )
     if result["simulated"]:
-        message = f"SMTP가 설정되어 있지 않아 시뮬레이션 모드로 처리했습니다. '{target_email}'로 실제 이메일은 발송되지 않았습니다."
+        message = msg("test_email_simulated", email=target_email)
     elif result["sent"]:
-        message = f"'{target_email}' 주소로 A/B 테스트 승자 확정 이메일 알림이 실제로 발송되었습니다!"
+        message = msg("test_email_sent", email=target_email)
     else:
-        message = "이메일 발송에 실패했습니다."
+        message = msg("test_email_failed")
 
     return {
         "status": "ok" if result["sent"] else "error",
@@ -599,7 +607,7 @@ async def create_ab_test(request: Request, test_data: ABTestCreate, background_t
         ABTest.is_deleted == False
     ).count()
     if concurrent_count >= MAX_CONCURRENT_TESTS_PER_CHANNEL:
-        raise HTTPException(status_code=403, detail=f"채널당 동시 진행 가능한 테스트는 최대 {MAX_CONCURRENT_TESTS_PER_CHANNEL}개입니다.")
+        raise HTTPException(status_code=403, detail=msg("max_concurrent_per_channel", limit=MAX_CONCURRENT_TESTS_PER_CHANNEL))
 
     # [요금제 제한 로직 추가]
     user = channel.user
@@ -612,7 +620,7 @@ async def create_ab_test(request: Request, test_data: ABTestCreate, background_t
                 ABTest.is_deleted == False
             ).count()
             if active_count >= 1:
-                raise HTTPException(status_code=403, detail="BASIC plan allows only 1 active test at a time. Upgrade to PRO for unlimited concurrent tests.")
+                raise HTTPException(status_code=403, detail=msg("basic_one_active"))
                 
             # 2. 월간 누적 테스트 생성 횟수 제한 (4회)
             # M-5: YouTube 쿼터와 동일하게 PT 기준으로 월 시작을 계산한다.
@@ -626,15 +634,15 @@ async def create_ab_test(request: Request, test_data: ABTestCreate, background_t
                 ABTest.start_time >= first_day_of_month,
             ).count()
             if monthly_count >= 4:
-                raise HTTPException(status_code=403, detail="You've used all 4 free tests this month. Upgrade to PRO for unlimited tests.")
+                raise HTTPException(status_code=403, detail=msg("basic_monthly_limit"))
                 
             # 3. 교체 주기 제한 (짧은 주기는 시간대 편향이 커지고 Analytics 데이터와도 안 맞으므로 PRO 전용)
             if test_data.swap_interval_minutes < BASIC_MIN_SWAP_INTERVAL_MINUTES:
-                raise HTTPException(status_code=403, detail=f"BASIC plan requires a minimum {BASIC_MIN_SWAP_INTERVAL_MINUTES // 60}-hour swap interval. Shorter intervals are a PRO feature.")
+                raise HTTPException(status_code=403, detail=msg("basic_min_interval", hours=BASIC_MIN_SWAP_INTERVAL_MINUTES // 60))
                 
             # 3. 썸네일 후보 개수 제한 (A, B, C 까지만 허용 = 최대 3개)
             if len(test_data.variations) > 3:
-                raise HTTPException(status_code=403, detail="BASIC plan allows up to 3 thumbnail variants (A/B/C). Upgrade to PRO for up to 5 variants.")
+                raise HTTPException(status_code=403, detail=msg("basic_max_variants"))
 
     # 🔒 채널 범위로 조회해야 한다: Video.youtube_video_id는 DB 전역에서 unique라서, 채널 필터 없이
     # 조회하면 이미 다른 사용자가 등록해둔 영상 ID를 그대로 가져와 그 사람 채널에 테스트를 붙이게 된다
@@ -645,7 +653,7 @@ async def create_ab_test(request: Request, test_data: ABTestCreate, background_t
         # 방어적으로) 그 영상을 가로채 테스트를 붙이지 못하도록 명확히 거부한다.
         existing_elsewhere = db.query(Video).filter(Video.youtube_video_id == test_data.youtube_video_id).first()
         if existing_elsewhere:
-            raise HTTPException(status_code=403, detail="This video is already linked to another channel and cannot be used for a new test.")
+            raise HTTPException(status_code=403, detail=msg("video_other_channel"))
         video = Video(channel_id=channel.id, youtube_video_id=test_data.youtube_video_id)
         db.add(video)
         db.commit()
@@ -677,16 +685,16 @@ async def create_ab_test(request: Request, test_data: ABTestCreate, background_t
     # 응답을 막지 않도록 백그라운드로 돌린다 - 프론트 버튼이 몇 초씩 멈춰 보이는 것 방지.
     background_tasks.add_task(_apply_first_variant_in_background, new_test.id)
 
-    return ABTestResponse(id=new_test.id, status=new_test.status.name, message="A/B 테스트가 성공적으로 시작되었습니다!")
+    return ABTestResponse(id=new_test.id, status=new_test.status.name, message=msg("test_started"))
 
 @app.post("/api/tests/{test_id}/stop")
 async def stop_ab_test(test_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """진행 중인 A/B 테스트를 수동으로 중단하고 승자를 확정합니다."""
     test = db.query(ABTest).join(Video).filter(ABTest.id == test_id, Video.channel_id == channel.id).first()
     if not test:
-        raise HTTPException(status_code=404, detail="테스트를 찾을 수 없거나 권한이 없습니다.")
+        raise HTTPException(status_code=404, detail=msg("test_not_found_or_forbidden"))
     if test.is_deleted or test.status != TestStatus.RUNNING:
-        raise HTTPException(status_code=400, detail="진행 중인 테스트만 중단할 수 있습니다.")
+        raise HTTPException(status_code=400, detail=msg("only_running_can_stop"))
 
     test.status = TestStatus.COMPLETED
     test.end_time = datetime.now(timezone.utc)
@@ -713,11 +721,14 @@ async def stop_ab_test(test_id: int, db: Session = Depends(get_db), channel: Cha
                 user_email=to_email,
                 video_title=winner_var.title_text or test.video.youtube_video_id,
                 winner_name=winner_var.name,
-                views_gained=winner_total_views
+                views_gained=winner_total_views,
+                locale=channel.user.locale,
+                thumbnail_url=winner_var.thumbnail_image_url,
+                youtube_video_id=test.video.youtube_video_id,
             )
-        
+
     db.commit()
-    return {"message": "테스트가 성공적으로 중단 및 종료되었습니다.", "winner": winner_var.name if winner_var else None}
+    return {"message": msg("test_stopped"), "winner": winner_var.name if winner_var else None}
 
 @app.get("/api/tests/{test_id}/debug")
 async def debug_test_state(test_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
@@ -725,7 +736,7 @@ async def debug_test_state(test_id: int, db: Session = Depends(get_db), channel:
     from datetime import datetime, timezone
     test = db.query(ABTest).join(Video).filter(ABTest.id == test_id, Video.channel_id == channel.id).first()
     if not test:
-        raise HTTPException(status_code=404, detail="테스트를 찾을 수 없거나 권한이 없습니다.")
+        raise HTTPException(status_code=404, detail=msg("test_not_found_or_forbidden"))
 
     now = datetime.now(timezone.utc)
     last_swap = test.last_swapped_at
@@ -764,45 +775,45 @@ async def force_swap_ab_test(request: Request, test_id: int, db: Session = Depen
     """테스트 대기 시간을 기다리지 않고 즉시 다음 변인(썸네일/제목)으로 교체 테스트를 실행합니다."""
     test = db.query(ABTest).join(Video).filter(ABTest.id == test_id, Video.channel_id == channel.id).first()
     if not test:
-        raise HTTPException(status_code=404, detail="테스트를 찾을 수 없거나 권한이 없습니다.")
+        raise HTTPException(status_code=404, detail=msg("test_not_found_or_forbidden"))
     if test.status != TestStatus.RUNNING:
-        raise HTTPException(status_code=400, detail="진행 중인 테스트만 교체 가능합니다.")
+        raise HTTPException(status_code=400, detail=msg("only_running_can_swap"))
     if test.manual_swap_used:
-        raise HTTPException(status_code=429, detail="수동 즉시 교체는 테스트당 1회만 사용할 수 있습니다.")
+        raise HTTPException(status_code=429, detail=msg("manual_swap_once"))
 
     await scheduler_engine._do_swap(test, db)
     test.manual_swap_used = True
     db.commit()
 
     if channel.needs_reconnect:
-        raise HTTPException(status_code=409, detail="YouTube 연동이 만료되었습니다. 다시 로그인해 채널을 재연동해주세요.")
+        raise HTTPException(status_code=409, detail=msg("youtube_relogin_required"))
     if test.swap_failed:
         # 채널에 403 권한 오류가 기록됐으면 전용 메시지 반환
-        perm_denied = getattr(channel, "thumbnail_permission_denied", False)
+        perm_denied = channel.thumbnail_permission == "denied"
         if perm_denied:
             raise HTTPException(
                 status_code=502,
-                detail="YouTube 계정 인증이 필요합니다. youtube.com/features 에서 전화번호 인증을 완료해 주세요."
+                detail=msg("youtube_phone_verification")
             )
-        raise HTTPException(status_code=502, detail="YouTube 썸네일 교체에 실패했습니다. 잠시 후 스케줄러가 자동으로 재시도합니다.")
+        raise HTTPException(status_code=502, detail=msg("thumbnail_swap_failed"))
 
     current_var = db.query(Variation).filter(Variation.id == test.current_variation_id).first()
-    return {"message": "즉시 썸네일/제목 교체가 수행되었습니다.", "current_variation": current_var.name if current_var else None}
+    return {"message": msg("swap_done"), "current_variation": current_var.name if current_var else None}
 
 @app.delete("/api/tests/{test_id}")
 async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """테스트를 완전히 취소하고 삭제합니다. 유튜브 썸네일과 제목을 원본(Candidate A)으로 돌려놓습니다."""
     test = db.query(ABTest).filter(ABTest.id == test_id).first()
     if not test:
-        raise HTTPException(status_code=404, detail="테스트를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail=msg("test_not_found"))
         
     if not test.video or test.video.channel_id != channel.id:
-        raise HTTPException(status_code=403, detail="권한이 없습니다.")
+        raise HTTPException(status_code=403, detail=msg("forbidden"))
 
     # 재시도/더블클릭으로 같은 삭제 요청이 두 번 오면, 이미 삭제된 테스트에 대해 원본 복구
     # YouTube 요청(썸네일 다운로드+업로드, 제목 변경)을 매번 다시 실행하는 걸 막는다.
     if test.is_deleted:
-        return {"message": "테스트가 취소되고 원본으로 복구되었습니다."}
+        return {"message": msg("test_cancelled")}
 
     # 원본(Candidate A) 찾기
     original_var = db.query(Variation).filter(Variation.ab_test_id == test.id, Variation.is_control == True).first()
@@ -856,7 +867,7 @@ async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: C
     test.is_deleted = True
     test.status = TestStatus.STOPPED
     db.commit()
-    return {"message": "테스트가 취소되고 원본으로 복구되었습니다."}
+    return {"message": msg("test_cancelled")}
 
 @app.post("/api/upload")
 @limiter.limit("10/minute")
@@ -874,10 +885,10 @@ async def upload_thumbnail(
     
     file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
     if file_ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail=f"허용되지 않는 파일 형식입니다. 허용: {', '.join(ALLOWED_EXTENSIONS)}")
+        raise HTTPException(status_code=400, detail=msg("file_type_not_allowed", allowed=', '.join(ALLOWED_EXTENSIONS)))
     
     if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(status_code=400, detail="허용되지 않는 Content-Type입니다. 이미지 파일만 업로드 가능합니다.")
+        raise HTTPException(status_code=400, detail=msg("content_type_not_allowed"))
 
     upload_dir = "uploads"
     os.makedirs(upload_dir, exist_ok=True)
@@ -893,7 +904,7 @@ async def upload_thumbnail(
             if total_size > MAX_FILE_SIZE:
                 file_object.close()
                 os.remove(file_path)
-                raise HTTPException(status_code=400, detail="파일 크기가 10MB를 초과합니다.")
+                raise HTTPException(status_code=400, detail=msg("file_too_large"))
             file_object.write(chunk)
 
     # 🔒 확장자/Content-Type은 클라이언트가 조작 가능하므로, 실제 파일 바이트(매직 시그니처)로
@@ -905,11 +916,11 @@ async def upload_thumbnail(
             detected_format = img.format
     except Exception:
         os.remove(file_path)
-        raise HTTPException(status_code=400, detail="파일 내용이 올바른 이미지 형식이 아닙니다.")
+        raise HTTPException(status_code=400, detail=msg("invalid_image"))
 
     if detected_format not in ALLOWED_IMAGE_FORMATS:
         os.remove(file_path)
-        raise HTTPException(status_code=400, detail=f"허용되지 않는 이미지 형식입니다 (감지된 형식: {detected_format}).")
+        raise HTTPException(status_code=400, detail=msg("image_format_not_allowed", fmt=detected_format))
 
     # YouTube 규격에 맞게 자동 리사이즈 + 압축 (블로킹 I/O → 스레드 풀에서 실행)
     try:
@@ -948,13 +959,13 @@ async def generate_thumbnail_endpoint(
 
     file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
     if file_ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail=f"허용되지 않는 파일 형식입니다. 허용: {', '.join(ALLOWED_EXTENSIONS)}")
+        raise HTTPException(status_code=400, detail=msg("file_type_not_allowed", allowed=', '.join(ALLOWED_EXTENSIONS)))
 
     headline = headline.strip()
     if not headline:
-        raise HTTPException(status_code=400, detail="문구를 입력해주세요.")
+        raise HTTPException(status_code=400, detail=msg("headline_required"))
     if len(headline) > 60:
-        raise HTTPException(status_code=400, detail="문구는 60자 이내로 입력해주세요.")
+        raise HTTPException(status_code=400, detail=msg("headline_too_long"))
 
     upload_dir = "uploads"
     os.makedirs(upload_dir, exist_ok=True)
@@ -967,7 +978,7 @@ async def generate_thumbnail_endpoint(
             if total_size > MAX_FILE_SIZE:
                 f.close()
                 os.remove(temp_input_path)
-                raise HTTPException(status_code=400, detail="파일 크기가 10MB를 초과합니다.")
+                raise HTTPException(status_code=400, detail=msg("file_too_large"))
             f.write(chunk)
 
     try:
@@ -975,7 +986,7 @@ async def generate_thumbnail_endpoint(
             img.verify()
     except Exception:
         os.remove(temp_input_path)
-        raise HTTPException(status_code=400, detail="파일 내용이 올바른 이미지 형식이 아닙니다.")
+        raise HTTPException(status_code=400, detail=msg("invalid_image"))
 
     output_filename = f"{uuid.uuid4()}.jpg"
     output_path = os.path.join(upload_dir, output_filename)
@@ -985,7 +996,7 @@ async def generate_thumbnail_endpoint(
         generate_thumbnail(temp_input_path, headline, output_path)
     except Exception as e:
         logger.error(f"썸네일 자동 생성 실패: {e}")
-        raise HTTPException(status_code=500, detail="썸네일 생성 중 오류가 발생했습니다.")
+        raise HTTPException(status_code=500, detail=msg("thumbnail_generation_failed"))
     finally:
         if os.path.exists(temp_input_path):
             os.remove(temp_input_path)
@@ -1089,17 +1100,17 @@ async def api_analyze_thumbnail(request: Request, channel: Channel = Depends(get
     data = await request.json()
     filename = data.get("filename")
     if not filename:
-        raise HTTPException(status_code=400, detail="파일명이 제공되지 않았습니다.")
+        raise HTTPException(status_code=400, detail=msg("filename_missing"))
 
     # 🔒 filename은 클라이언트가 보내는 값이므로, os.path.basename으로 경로 조작(../ 등)을 제거하고
     # uploads/ 디렉터리 밖의 임의 파일을 열람하지 못하도록 막는다.
     safe_filename = os.path.basename(filename)
     if not safe_filename or safe_filename != filename:
-        raise HTTPException(status_code=400, detail="올바르지 않은 파일명입니다.")
+        raise HTTPException(status_code=400, detail=msg("filename_invalid"))
 
     file_path = os.path.join("uploads", safe_filename)
     if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail=msg("file_not_found"))
     result = analyze_thumbnail(file_path)
     return result
 
@@ -1110,14 +1121,14 @@ from youtube_api import get_recent_videos, TokenRevokedError
 async def get_channel_videos(request: Request, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """현재 연동된 채널의 최근 유튜브 영상 목록을 가져옵니다."""
     if not channel or not channel.oauth_refresh_token:
-        raise HTTPException(status_code=400, detail="연동된 채널이나 인증 토큰이 없습니다.")
+        raise HTTPException(status_code=400, detail=msg("no_channel_token"))
 
     try:
         videos = await get_recent_videos(channel.oauth_refresh_token)
     except TokenRevokedError:
         channel.needs_reconnect = True
         db.commit()
-        raise HTTPException(status_code=409, detail="YouTube 연동이 만료되었습니다. 다시 로그인해 채널을 재연동해주세요.")
+        raise HTTPException(status_code=409, detail=msg("youtube_relogin_required"))
 
     return {"videos": videos}
 
@@ -1304,6 +1315,7 @@ def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
         "notification_email": user.notification_email,
         "notification_email_verified": user.notification_email_verified,
         "email_alerts_enabled": user.email_alerts_enabled,
+        "locale": user.locale,
     }
 
 @app.patch("/api/user/preferences")
@@ -1315,18 +1327,22 @@ def update_user_preferences(
     """M-6: 이메일 알림 수신 여부 등 사용자 환경설정을 업데이트합니다."""
     user = db.query(User).filter(User.id == channel.user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail=msg("user_not_found"))
     if "email_alerts_enabled" in payload:
         user.email_alerts_enabled = bool(payload["email_alerts_enabled"])
+    if "locale" in payload:
+        if payload["locale"] not in SUPPORTED_LOCALES:
+            raise HTTPException(status_code=400, detail=msg("unsupported_locale"))
+        user.locale = payload["locale"]
     db.commit()
-    return {"ok": True, "email_alerts_enabled": user.email_alerts_enabled}
+    return {"ok": True, "email_alerts_enabled": user.email_alerts_enabled, "locale": user.locale}
 
 @app.post("/api/checkout/create-session")
 async def create_checkout_session(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """Paddle 트랜잭션을 생성하고, 프론트가 Paddle.js 오버레이로 결제창을 열 수 있도록 ID와 client token을 반환합니다."""
     user = channel.user
     if not PADDLE_API_KEY or not PADDLE_PRICE_ID or not PADDLE_CLIENT_TOKEN:
-        raise HTTPException(status_code=503, detail="결제 시스템이 아직 설정되지 않았습니다.")
+        raise HTTPException(status_code=503, detail=msg("payments_not_configured"))
 
     payload: dict = {
         "items": [{"price_id": PADDLE_PRICE_ID, "quantity": 1}],
@@ -1347,10 +1363,10 @@ async def create_checkout_session(db: Session = Depends(get_db), channel: Channe
         transaction_id = data["data"]["id"]
     except _httpx.HTTPStatusError as e:
         logger.error(f"[Paddle Checkout] 트랜잭션 생성 실패: {e.response.status_code} {e.response.text}")
-        raise HTTPException(status_code=502, detail="결제 페이지를 여는 데 실패했습니다.")
+        raise HTTPException(status_code=502, detail=msg("checkout_open_failed"))
     except Exception as e:
         logger.error(f"[Paddle Checkout] 트랜잭션 생성 실패: {e}")
-        raise HTTPException(status_code=502, detail="결제 페이지를 여는 데 실패했습니다.")
+        raise HTTPException(status_code=502, detail=msg("checkout_open_failed"))
 
     return {
         "transaction_id": transaction_id,
@@ -1362,7 +1378,7 @@ async def create_checkout_session(db: Session = Depends(get_db), channel: Channe
 def upgrade_user_plan_test(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """결제 테스트용: 현재 유저의 요금제를 즉시 PRO로 업그레이드합니다. 프로덕션에서는 비활성."""
     if not allow_test_upgrade():
-        raise HTTPException(status_code=403, detail="Test upgrade is disabled in production.")
+        raise HTTPException(status_code=403, detail=msg("upgrade_test_disabled"))
     user = channel.user
     if not user:
             user = User(email="test@creatorflow.io", plan=PlanType.BASIC)
@@ -1374,7 +1390,7 @@ def upgrade_user_plan_test(db: Session = Depends(get_db), channel: Channel = Dep
         
     user.plan = PlanType.PRO
     db.commit()
-    return {"status": "success", "message": "PRO 요금제로 성공적으로 업그레이드되었습니다!", "plan": user.plan.value}
+    return {"status": "success", "message": msg("upgraded_pro"), "plan": user.plan.value}
 
 @app.get("/api/billing/portal")
 async def get_billing_portal(channel: Channel = Depends(get_current_channel)):
@@ -1384,7 +1400,7 @@ async def get_billing_portal(channel: Channel = Depends(get_current_channel)):
     """
     user = channel.user
     if not user or not user.stripe_customer_id:
-        raise HTTPException(status_code=404, detail="결제 내역이 없습니다. PRO 결제를 진행한 뒤 다시 시도해주세요.")
+        raise HTTPException(status_code=404, detail=msg("no_billing_history"))
 
     try:
         async with _httpx.AsyncClient(timeout=15) as client:
@@ -1397,7 +1413,7 @@ async def get_billing_portal(channel: Channel = Depends(get_current_channel)):
         portal_url = f"https://customer.paddle.com?customerAuthToken={token}"
     except Exception as e:
         logger.error(f"[Paddle Portal] 포털 URL 발급 실패: {e}")
-        raise HTTPException(status_code=502, detail="결제 관리 페이지를 여는 데 실패했습니다.")
+        raise HTTPException(status_code=502, detail=msg("billing_portal_failed"))
 
     return {"url": portal_url}
 
@@ -1486,7 +1502,7 @@ def send_notification_email_code(
 
     email = (payload.get("email") or "").strip()
     if not email or "@" not in email or "." not in email.split("@")[-1] or len(email) > 254:
-        raise HTTPException(status_code=400, detail="Invalid email address.")
+        raise HTTPException(status_code=400, detail=msg("invalid_email"))
 
     now = datetime.now(timezone.utc)
     # 기존 미인증 코드 삭제 (유저당 1개 유지)
@@ -1504,10 +1520,10 @@ def send_notification_email_code(
     RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
     RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "ThumbnailFlow <onboarding@resend.dev>")
     html = f"""<div style="font-family:Arial,sans-serif;background:#09090b;color:#f4f4f5;padding:40px;border-radius:16px;">
-<h2 style="color:#06b6d4;">ThumbnailFlow Email Verification</h2>
-<p>Your verification code:</p>
+<h2 style="color:#06b6d4;">{msg('email_verify_heading')}</h2>
+<p>{msg('email_verify_code_label')}</p>
 <div style="font-size:36px;font-weight:900;letter-spacing:8px;color:#fff;background:#18181b;padding:20px 32px;border-radius:12px;display:inline-block;border:1px solid #06b6d4;">{code}</div>
-<p style="color:#a1a1aa;margin-top:16px;">This code expires in 10 minutes.</p>
+<p style="color:#a1a1aa;margin-top:16px;">{msg('email_verify_expires')}</p>
 </div>"""
 
     simulated = False
@@ -1516,18 +1532,18 @@ def send_notification_email_code(
             res = _httpx.post(
                 "https://api.resend.com/emails",
                 headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
-                json={"from": RESEND_FROM_EMAIL, "to": [email], "subject": "[ThumbnailFlow] Email Verification Code", "html": html},
+                json={"from": RESEND_FROM_EMAIL, "to": [email], "subject": msg("email_verify_subject"), "html": html},
                 timeout=10,
             )
             if res.status_code not in (200, 201):
                 logger.error(f"Resend error ({res.status_code}): {res.text}")
-                raise HTTPException(status_code=502, detail=f"이메일 발송에 실패했습니다. (Resend {res.status_code})")
+                raise HTTPException(status_code=502, detail=msg("email_send_failed", status=res.status_code))
             logger.info(f"[Resend] 인증 코드 발송 성공 → {email}")
         except HTTPException:
             raise
         except Exception as e:
             logger.error(f"Verification email send error: {e}")
-            raise HTTPException(status_code=502, detail="이메일 발송 중 오류가 발생했습니다.")
+            raise HTTPException(status_code=502, detail=msg("email_send_error"))
     else:
         simulated = True
         logger.info(f"[SIMULATE] Verification code for {email}: {code}")
@@ -1551,24 +1567,24 @@ def verify_notification_email(
         .first()
     )
     if not entry:
-        raise HTTPException(status_code=400, detail="No verification request found. Please request a new code.")
+        raise HTTPException(status_code=400, detail=msg("verification_not_found"))
     if now > entry.expires_at:
         db.delete(entry)
         db.commit()
-        raise HTTPException(status_code=400, detail="Verification code expired. Please request a new one.")
+        raise HTTPException(status_code=400, detail=msg("verification_expired"))
 
     # 브루트포스 방지: 5회 초과 시 코드 무효화
     entry.attempts += 1
     if entry.attempts > 5:
         db.delete(entry)
         db.commit()
-        raise HTTPException(status_code=429, detail="Too many attempts. Please request a new code.")
+        raise HTTPException(status_code=429, detail=msg("verification_too_many"))
 
     db.commit()  # attempts 증가 저장
 
     if not _hmac.compare_digest(entry.code, code):
         remaining = 5 - entry.attempts
-        raise HTTPException(status_code=400, detail=f"Incorrect verification code. {remaining} attempt(s) remaining.")
+        raise HTTPException(status_code=400, detail=msg("verification_incorrect", remaining=remaining))
 
     user = db.query(User).filter(User.id == channel.user_id).first()
     if user:

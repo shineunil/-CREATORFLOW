@@ -5,8 +5,12 @@ import { Check, Crown, Zap, CreditCard, Sparkles, ShieldCheck, X, Loader2 } from
 import Modal from "@/components/Modal";
 import { apiFetch } from "@/lib/api";
 import { openPaddleCheckout } from "@/lib/paddle";
+import { useI18n } from "@/i18n/I18nProvider";
+import RichText from "@/i18n/RichText";
 
 export default function PricingPage() {
+  const { t, locale } = useI18n();
+  const P = t.pricingApp;
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [userProfile, setUserProfile] = useState<{ email?: string; channel_title?: string; plan: string; is_pro: boolean }>({ plan: "BASIC", is_pro: false });
@@ -72,12 +76,12 @@ export default function PricingPage() {
   const handlePaddleCheckout = async () => {
     setIsRedirecting(true);
     try {
-      await openPaddleCheckout();
+      await openPaddleCheckout(locale);
       setIsCheckoutModalOpen(false);
     } catch (err: any) {
       console.error("Paddle Checkout Error:", err);
       setIsCheckoutModalOpen(false);
-      showAlert("Checkout Error", err.message || "Failed to start checkout. Please try again.", "error");
+      showAlert(P.errorTitle, err.message || t.checkout.failed, "error");
     } finally {
       setIsRedirecting(false);
     }
@@ -87,95 +91,63 @@ export default function PricingPage() {
     <>
       <div className="p-8 max-w-5xl mx-auto animate-fade-in-up">
         <div className="text-center mb-16">
-          <h1 className="text-4xl font-black mb-4">Pricing Plans</h1>
-          <p className="text-zinc-400 text-lg">Choose the best plan for your channel growth.</p>
+          <h1 className="text-4xl font-black mb-4">{P.title}</h1>
+          <p className="text-zinc-400 text-lg">{P.sub}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {/* Basic Plan */}
           <div className="glass-panel rounded-3xl p-8 border border-zinc-800/50 flex flex-col">
-            <h3 className="text-2xl font-bold mb-2">BASIC (Free)</h3>
-            <p className="text-zinc-400 text-sm mb-6 h-10">For creators who want to try the service</p>
+            <h3 className="text-2xl font-bold mb-2">{P.basicName}</h3>
+            <p className="text-zinc-400 text-sm mb-6 h-10">{t.plans.basicDesc}</p>
             <div className="mb-8">
               <span className="text-4xl font-bold">$0</span>
-              <span className="text-zinc-400"> / month</span>
+              <span className="text-zinc-400"> {t.common.perMonth}</span>
             </div>
 
             <ul className="space-y-4 mb-10 flex-1">
-              <li className="flex items-center gap-3 text-sm text-zinc-300">
-                <Check size={18} className="text-zinc-400 flex-shrink-0" aria-hidden="true" />
-                Max 4 tests per month
-              </li>
-              <li className="flex items-center gap-3 text-sm text-zinc-300">
-                <Check size={18} className="text-zinc-400 flex-shrink-0" aria-hidden="true" />
-                Max 1 concurrent test
-              </li>
-              <li className="flex items-center gap-3 text-sm text-zinc-300">
-                <Check size={18} className="text-zinc-400 flex-shrink-0" aria-hidden="true" />
-                Up to 3 thumbnail variants (A / B / C)
-              </li>
-              <li className="flex items-center gap-3 text-sm text-zinc-300">
-                <Check size={18} className="text-zinc-400 flex-shrink-0" aria-hidden="true" />
-                Minimum swap interval: 4 hours
-              </li>
-              <li className="flex items-center gap-3 text-sm text-zinc-300">
-                <Check size={18} className="text-zinc-400 flex-shrink-0" aria-hidden="true" />
-                Best thumbnail auto-applied at test end
-              </li>
+              {P.basicFeatures.map((feature) => (
+                <li key={feature} className="flex items-center gap-3 text-sm text-zinc-300">
+                  <Check size={18} className="text-zinc-400 flex-shrink-0" aria-hidden="true" />
+                  {feature}
+                </li>
+              ))}
             </ul>
 
             <button disabled className="w-full py-4 rounded-xl bg-zinc-900 text-zinc-400 font-bold border border-zinc-800 cursor-not-allowed">
-              {userProfile.is_pro ? "Free Plan" : "Current Plan"}
+              {userProfile.is_pro ? P.freePlan : P.currentPlan}
             </button>
           </div>
 
           {/* Pro Plan */}
           <div className="glass-panel rounded-3xl p-8 border border-cyan-500/50 flex flex-col relative overflow-hidden transition-transform hover:scale-105 duration-300 shadow-[0_0_40px_rgba(6,182,212,0.15)]">
             <div className="absolute top-0 right-0 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-xs font-bold px-4 py-1.5 rounded-bl-xl uppercase tracking-wider flex items-center gap-1">
-              <Zap size={14} fill="currentColor" aria-hidden="true" /> Most Popular
+              <Zap size={14} fill="currentColor" aria-hidden="true" /> {t.plans.mostPopular}
             </div>
 
             <h3 className="text-2xl font-bold mb-2 flex items-center gap-2 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">
               <Crown size={24} className="text-cyan-400" aria-hidden="true" />
-              PRO Premium
+              {t.plans.proName}
             </h3>
-            <p className="text-zinc-400 text-sm mb-6 h-10">For serious creators who want to maximize views</p>
+            <p className="text-zinc-400 text-sm mb-6 h-10">{t.plans.proDesc}</p>
             <div className="mb-8">
               <span className="text-4xl font-bold">$29</span>
-              <span className="text-zinc-400"> / month</span>
+              <span className="text-zinc-400"> {t.common.perMonth}</span>
             </div>
 
             <ul className="space-y-4 mb-10 flex-1">
-              <li className="flex items-center gap-3 text-sm text-zinc-100">
-                <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
-                <span className="font-semibold text-cyan-300">Unlimited</span> tests per month
-              </li>
-              <li className="flex items-center gap-3 text-sm text-zinc-100">
-                <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
-                <span className="font-semibold text-cyan-300">Unlimited</span> concurrent tests
-              </li>
-              <li className="flex items-center gap-3 text-sm text-zinc-100">
-                <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
-                Up to 5 thumbnail variants (A ~ E)
-              </li>
-              <li className="flex items-center gap-3 text-sm text-zinc-100">
-                <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
-                <span className="font-semibold text-cyan-300">Ultra-fast 30 mins</span> swap interval
-              </li>
-              <li className="flex items-center gap-3 text-sm text-zinc-100">
-                <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
-                Best thumbnail auto-applied at test end
-              </li>
-              <li className="flex items-center gap-3 text-sm text-zinc-100">
-                <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
-                Test completion <span className="font-semibold text-cyan-300">email notification</span>
-              </li>
+              <ProFeature><RichText value={t.plans.proFeatures.testsPerMonth} strongClassName="font-semibold text-cyan-300" /></ProFeature>
+              <ProFeature><RichText value={t.plans.proFeatures.concurrent} strongClassName="font-semibold text-cyan-300" /></ProFeature>
+              <ProFeature>{P.proVariants}</ProFeature>
+              <ProFeature><RichText value={P.proInterval} strongClassName="font-semibold text-cyan-300" /></ProFeature>
+              <ProFeature>{t.plans.proFeatures.autoApply}</ProFeature>
+              <ProFeature><RichText value={t.plans.proFeatures.email} strongClassName="font-semibold text-cyan-300" /></ProFeature>
             </ul>
 
             {userProfile.is_pro ? (
               <div className="w-full py-4 rounded-xl bg-gradient-to-r from-emerald-600/30 to-teal-600/30 border border-emerald-500/50 text-emerald-400 font-bold flex items-center justify-center gap-2 shadow-lg">
                 <ShieldCheck size={20} aria-hidden="true" />
-                <span>Currently on PRO (Unlimited Active)</span>
+                <span>{P.proActive}</span>
               </div>
             ) : (
               <button
@@ -184,7 +156,7 @@ export default function PricingPage() {
                 className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold transition-all shadow-lg hover:shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
               >
                 <CreditCard size={18} aria-hidden="true" />
-                <span>Upgrade to PRO</span>
+                <span>{P.upgrade}</span>
               </button>
             )}
           </div>
@@ -205,13 +177,13 @@ export default function PricingPage() {
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1">
-                  <Sparkles size={14} aria-hidden="true" /> Secure Paddle Checkout
+                  <Sparkles size={14} aria-hidden="true" /> {P.secureCheckout}
                 </span>
-                <h3 id="checkout-modal-title" className="text-2xl font-extrabold mt-1">PRO Premium Checkout</h3>
+                <h3 id="checkout-modal-title" className="text-2xl font-extrabold mt-1">{P.checkoutTitle}</h3>
               </div>
               <button
                 onClick={() => { if (!isRedirecting) { setIsCheckoutModalOpen(false); upgradeButtonRef.current?.focus(); } }}
-                aria-label="결제 창 닫기"
+                aria-label={P.closeCheckout}
                 disabled={isRedirecting}
                 className="text-zinc-400 hover:text-white p-1 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 disabled:opacity-50"
               >
@@ -221,16 +193,16 @@ export default function PricingPage() {
 
             <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Subscription Plan</span>
-                <span className="font-bold text-white">PRO Premium (Monthly)</span>
+                <span className="text-zinc-400">{P.planLabel}</span>
+                <span className="font-bold text-white">{P.planValue}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Total Amount</span>
-                <span className="font-bold text-emerald-400 text-base">$29.00 / month</span>
+                <span className="text-zinc-400">{P.amountLabel}</span>
+                <span className="font-bold text-emerald-400 text-base">{P.amountValue}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Billing</span>
-                <span className="text-zinc-300">Cancel anytime</span>
+                <span className="text-zinc-400">{P.billingLabel}</span>
+                <span className="text-zinc-300">{P.billingValue}</span>
               </div>
             </div>
 
@@ -243,18 +215,18 @@ export default function PricingPage() {
                 {isRedirecting ? (
                   <>
                     <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-                    <span>Opening checkout...</span>
+                    <span>{t.checkout.opening}</span>
                   </>
                 ) : (
                   <>
                     <CreditCard size={18} aria-hidden="true" />
-                    <span>Proceed to Paddle Checkout</span>
+                    <span>{P.proceed}</span>
                   </>
                 )}
               </button>
             </div>
             <p className="text-[11px] text-center text-zinc-400">
-              Powered by Paddle — secure, encrypted card processing. You will be redirected to Paddle&apos;s hosted checkout page.
+              {P.footnote}
             </p>
           </div>
         </div>
@@ -262,5 +234,14 @@ export default function PricingPage() {
 
       <Modal {...modalConfig} />
     </>
+  );
+}
+
+function ProFeature({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-center gap-3 text-sm text-zinc-100">
+      <Check size={18} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
+      <span>{children}</span>
+    </li>
   );
 }

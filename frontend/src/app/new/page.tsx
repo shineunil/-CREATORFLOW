@@ -8,9 +8,13 @@ import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 import { useRouter, useSearchParams } from "next/navigation";
 import Modal from "@/components/Modal";
 import ChannelSelect from "@/components/layout/ChannelSelect";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatDate, formatNumber } from "@/i18n/format";
 
 function NewTestContent() {
   const router = useRouter();
+  const { t, locale } = useI18n();
+  const N = t.newTest;
   const searchParams = useSearchParams();
   const videoIdFromUrl = searchParams.get("videoId");
   
@@ -192,22 +196,18 @@ function NewTestContent() {
         // 자동 조정 안내
         if (data.was_processed) {
           const mb = data.file_size_bytes ? (data.file_size_bytes / (1024 * 1024)).toFixed(1) : "?";
-          showAlert(
-            "이미지 자동 조정 완료",
-            `YouTube 규격에 맞게 자동으로 조정했습니다.\n최종 해상도: ${data.width}×${data.height} / 파일 크기: ${mb}MB`,
-            "info"
-          );
+          showAlert(N.autoAdjustTitle, N.autoAdjustMsg(data.width, data.height, mb), "info");
         }
       } else {
         if (isStale()) return;
         const errData = await response.json().catch(() => ({}));
-        showAlert("업로드 실패", errData.detail || "이미지 업로드에 실패했습니다.", "error");
+        showAlert(N.uploadFailTitle, errData.detail || N.uploadFailMsg, "error");
         setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: false } : v));
       }
     } catch (error) {
       console.error("Upload error:", error);
       if (isStale()) return;
-      showAlert("Error Occurred", "An error occurred while uploading the image.", "error");
+      showAlert(N.errorOccurred, N.uploadError, "error");
       setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: false } : v));
     }
   };
@@ -228,7 +228,7 @@ function NewTestContent() {
     const targetVar = variations.find(v => v.id === targetVarId);
     const headline = (targetVar?.generateHeadline || "").trim();
     if (!headline) {
-      showAlert("Enter Text", "Please enter a short headline for the thumbnail before selecting a base image.", "warning");
+      showAlert(N.enterTextTitle, N.enterTextMsg, "warning");
       e.target.value = "";
       return;
     }
@@ -263,29 +263,24 @@ function NewTestContent() {
       } else {
         const err = await response.json().catch(() => ({}));
         if (isStale()) return;
-        showAlert("Generation Failed", err.detail || "Failed to generate thumbnail.", "error");
+        showAlert(N.genFailTitle, err.detail || N.genFailMsg, "error");
         setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: false } : v));
       }
     } catch (error) {
       console.error("Generate thumbnail error:", error);
       if (isStale()) return;
-      showAlert("Error", "An error occurred while generating the thumbnail.", "error");
+      showAlert(t.common.error, N.genError, "error");
       setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, analyzing: false } : v));
     }
   };
 
   const addVariation = () => {
     if (!userProfile.is_pro && variations.length >= 2) {
-      showAlert(
-        "Candidate Limit Reached", 
-        "BASIC plan allows up to 2 additional candidates (B, C).\nUpgrade to PRO to test more thumbnails simultaneously.",
-        "warning",
-        () => router.push("/pricing")
-      );
+      showAlert(N.candLimitTitle, N.candLimitMsg, "warning", () => router.push("/pricing"));
       return;
     }
     if (variations.length >= 4) {
-      showAlert("Maximum Limit Reached", "Even on PRO plan, you can only test up to 4 extra candidates (5 total) simultaneously.", "warning");
+      showAlert(N.maxLimitTitle, N.maxLimitMsg, "warning");
       return;
     }
     
@@ -312,7 +307,7 @@ function NewTestContent() {
 
   const handleStartTest = async () => {
     if (!selectedVideo) {
-      showAlert("Select a Video", "Please select an original video to optimize.", "warning");
+      showAlert(N.selectVideoTitle, N.selectVideoMsg, "warning");
       return;
     }
     if (isSubmittingTest) return;
@@ -346,15 +341,10 @@ function NewTestContent() {
       if (!response.ok) {
         if (response.status === 403) {
            const errData = await response.json();
-           showAlert(
-             "Plan Limit Exceeded",
-             errData.detail || "You have reached the BASIC plan limit.\nUpgrade to PRO for unlimited optimizations.",
-             "warning",
-             () => router.push("/pricing")
-           );
+           showAlert(N.planLimitTitle, errData.detail || N.planLimitMsg, "warning", () => router.push("/pricing"));
         } else {
            const errData = await response.json().catch(() => ({}));
-           showAlert("Execution Error", errData.detail || "An error occurred while executing the optimization.", "error");
+           showAlert(N.execErrorTitle, errData.detail || N.execErrorMsg, "error");
         }
         return;
       }
@@ -365,7 +355,7 @@ function NewTestContent() {
       setStep(3); // Success step
     } catch (e) {
       console.error(e);
-      showAlert("Error Occurred", "A server communication error occurred. Please check your connection and try again.", "error");
+      showAlert(N.errorOccurred, N.serverCommError, "error");
     } finally {
       setIsSubmittingTest(false);
     }
@@ -376,25 +366,25 @@ function NewTestContent() {
       <div className="mb-4">
         <ChannelSelect />
       </div>
-      <Link href="/" className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors mb-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+      <Link href="/dashboard" className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors mb-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
         <ArrowLeft size={20} aria-hidden="true" />
-        <span className="font-semibold">Back to Dashboard</span>
+        <span className="font-semibold">{N.backToDashboard}</span>
       </Link>
 
       <div className="mb-10">
         <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
-          <Sparkles className="text-cyan-400" size={28} aria-hidden="true" /> Start New Thumbnail Optimization
+          <Sparkles className="text-cyan-400" size={28} aria-hidden="true" /> {N.title}
         </h1>
-        <p className="text-zinc-400">Upload multiple thumbnails and titles. We will find the best performing combination.</p>
+        <p className="text-zinc-400">{N.sub}</p>
       </div>
 
       {step === 1 && (
         <div className="space-y-6">
-          <h2 className="text-xl font-bold border-b border-zinc-800 pb-4">1. Select Original Video</h2>
+          <h2 className="text-xl font-bold border-b border-zinc-800 pb-4">{N.step1}</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {videos.length === 0 ? (
               <div className="col-span-full text-center p-12 text-zinc-400 glass-panel rounded-2xl border border-zinc-800/50" role="status">
-                Loading recent videos from your connected YouTube channel...
+                {N.loadingVideos}
               </div>
             ) : (
               videos.map((v) => {
@@ -409,7 +399,7 @@ function NewTestContent() {
                       <img src={v.thumbnail_url} alt={v.title} className={`w-full h-full object-cover transition-transform ${!isTesting && 'group-hover:scale-105'}`} />
                       {isTesting && (
                         <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/90 text-white text-xs font-bold shadow-lg backdrop-blur-md">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" aria-hidden="true" /> Testing
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" aria-hidden="true" /> {N.testing}
                         </div>
                       )}
                     </div>
@@ -417,8 +407,8 @@ function NewTestContent() {
                     <div className="p-4 flex-1 flex flex-col">
                       <h3 className="font-bold text-sm text-zinc-200 line-clamp-2 mb-2 group-hover:text-cyan-400 transition-colors flex-1">{v.title}</h3>
                       <div className="flex justify-between items-center text-xs text-zinc-400 mb-4">
-                        <span>{parseInt(v.view_count || '0').toLocaleString()} views</span>
-                        <span>{new Date(v.published_at).toLocaleDateString()}</span>
+                        <span>{t.common.views(formatNumber(parseInt(v.view_count || '0'), locale))}</span>
+                        <span>{formatDate(v.published_at, locale)}</span>
                       </div>
 
                       <button
@@ -430,7 +420,7 @@ function NewTestContent() {
                             : 'bg-zinc-800/80 hover:bg-cyan-500 hover:text-white text-zinc-300'
                         }`}
                       >
-                        {isTesting ? 'Optimization in progress' : 'Select for Test'}
+                        {isTesting ? N.inProgress : N.selectForTest}
                       </button>
                     </div>
                   </div>
@@ -444,26 +434,26 @@ function NewTestContent() {
       {step === 2 && (
         <div className="space-y-8 animate-fade-in-up">
           <div className="glass-panel p-6 rounded-2xl border border-zinc-800/50 flex gap-6 items-center bg-zinc-900/30">
-            <img src={selectedVideo?.thumbnail_url} alt="Original" className="w-48 rounded-xl" />
+            <img src={selectedVideo?.thumbnail_url} alt={N.originalAlt} className="w-48 rounded-xl" />
             <div>
-              <div className="text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">Original Video (Candidate A)</div>
+              <div className="text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">{N.originalLabel}</div>
               <h3 className="text-lg font-bold mb-1">{selectedVideo?.title}</h3>
-              <p className="text-sm text-zinc-400">{parseInt(selectedVideo?.view_count || '0').toLocaleString()} views</p>
+              <p className="text-sm text-zinc-400">{t.common.views(formatNumber(parseInt(selectedVideo?.view_count || '0'), locale))}</p>
             </div>
             <button 
               onClick={() => { router.replace("/videos"); }} 
               className="ml-auto flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-xl hover:bg-zinc-700 hover:text-white hover:border-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 transition-all cursor-pointer"
-              aria-label="Change original video"
+              aria-label={N.changeAria}
             >
               <RefreshCcw size={16} aria-hidden="true" />
-              <span>Change</span>
+              <span className="whitespace-nowrap">{N.change}</span>
             </button>
           </div>
 
           <div>
             <div className="mb-4 border-b border-zinc-800 pb-4">
               <h2 className="text-xl font-bold flex items-center gap-2">
-                2. Add Candidates
+                {N.step2}
               </h2>
             </div>
 
@@ -471,15 +461,15 @@ function NewTestContent() {
               {variations.map((v) => (
                 <div key={v.id} className="glass-panel p-6 rounded-2xl border border-zinc-800/50 relative group">
                   <div className="absolute top-0 left-0 bg-zinc-800 text-white font-bold px-5 py-2 rounded-br-2xl rounded-tl-2xl text-base">
-                    Candidate {v.id}
+                    {N.candidate(v.id)}
                   </div>
                   
                   {variations.length > 1 && (
                     <button 
                       onClick={() => removeVariation(v.id)}
                       className="absolute -top-4 -right-4 w-11 h-11 bg-zinc-900 border border-zinc-700 rounded-full flex items-center justify-center text-zinc-400 hover:text-red-400 hover:border-red-600 hover:bg-red-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 transition-all z-10 shadow-lg cursor-pointer"
-                      aria-label={`Delete Candidate ${v.id}`}
-                      title={`Delete Candidate ${v.id}`}
+                      aria-label={N.deleteCandidate(v.id)}
+                      title={N.deleteCandidate(v.id)}
                     >
                       <Trash2 size={20} aria-hidden="true" />
                     </button>
@@ -487,13 +477,13 @@ function NewTestContent() {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
                     <div>
-                      <label className="block text-base font-bold text-white mb-2">Test Thumbnail Image</label>
+                      <label className="block text-base font-bold text-white mb-2">{N.thumbLabel}</label>
 
                       <div className="flex items-start gap-2 mb-3 px-3 py-2.5 bg-amber-950/40 border border-amber-500/30 rounded-lg">
                         <span className="text-amber-400 text-xs mt-0.5 flex-shrink-0">⚠️</span>
                         <p className="text-xs text-amber-300 leading-relaxed">
-                          <strong>YouTube 정책:</strong> 맞춤 썸네일을 사용하려면 YouTube 계정{" "}
-                          <strong>전화번호 인증</strong>이 필요합니다. (YouTube 자체 보안 정책이며 저희 앱과 무관합니다){" "}
+                          <strong>{N.policyLabel}</strong>{N.policyBefore}
+                          <strong>{N.policyStrong}</strong>{N.policyMiddle}
                           <a
                             href={`https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(userProfile.email || "")}&continue=https%3A%2F%2Fwww.youtube.com%2Ffeatures`}
                             target="_blank"
@@ -502,7 +492,7 @@ function NewTestContent() {
                           >
                             youtube.com/features
                           </a>
-                          {" "}에서 1분 내로 완료할 수 있어요.
+                          {N.policyAfter}
                         </p>
                       </div>
 
@@ -515,10 +505,10 @@ function NewTestContent() {
                             accept="image/png, image/jpeg, image/webp, image/jpg"
                             className="hidden"
                           />
-                          <img src={v.thumbnail_image_url} alt={`Thumbnail ${v.id}`} className={`w-full aspect-video object-cover ${v.analyzing ? 'opacity-50 blur-sm' : ''}`} />
+                          <img src={v.thumbnail_image_url} alt={N.thumbAlt(v.id)} className={`w-full aspect-video object-cover ${v.analyzing ? 'opacity-50 blur-sm' : ''}`} />
                           {!v.analyzing && (
                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm">
-                              <span className="font-bold text-white flex items-center gap-2"><Upload size={18} aria-hidden="true" /> Re-upload</span>
+                              <span className="font-bold text-white flex items-center gap-2"><Upload size={18} aria-hidden="true" /> {N.reupload}</span>
                             </div>
                           )}
                         </label>
@@ -526,18 +516,18 @@ function NewTestContent() {
                       ) : v.analyzing ? (
                         <div className="w-full aspect-video rounded-xl border-2 border-dashed border-zinc-700 bg-zinc-900/50 flex flex-col items-center justify-center" role="status">
                           <span className="w-8 h-8 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin mb-3" aria-hidden="true"></span>
-                          <span className="font-bold text-cyan-400">{v.showGenerator ? "Generating thumbnail..." : "Uploading & analyzing..."}</span>
+                          <span className="font-bold text-cyan-400">{v.showGenerator ? N.generating : N.uploading}</span>
                         </div>
                       ) : v.showGenerator ? (
                         <div className="w-full aspect-video rounded-xl border-2 border-dashed border-violet-500/40 bg-violet-950/10 flex flex-col items-center justify-center p-5 gap-3">
                           <div className="flex items-center gap-2 text-violet-300 text-sm font-bold">
-                            <Wand2 size={16} aria-hidden="true" /> AI Thumbnail Assist
+                            <Wand2 size={16} aria-hidden="true" /> {N.aiAssist}
                           </div>
                           <input
                             type="text"
                             value={v.generateHeadline}
                             onChange={(e) => handleGenerateHeadlineChange(v.id, e.target.value)}
-                            placeholder="Short headline for thumbnail (e.g. I BUILT THE ULTIMATE PC)"
+                            placeholder={N.headlinePlaceholder}
                             maxLength={60}
                             className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
                           />
@@ -549,11 +539,11 @@ function NewTestContent() {
                               className="hidden"
                             />
                             <div className="flex items-center justify-center gap-2 w-full py-2.5 bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 rounded-lg text-sm font-bold text-violet-200 transition-colors">
-                              <UploadCloud size={16} aria-hidden="true" /> Select base image &amp; generate
+                              <UploadCloud size={16} aria-hidden="true" /> {N.selectBase}
                             </div>
                           </label>
                           <button onClick={() => toggleGenerator(v.id)} className="text-xs text-zinc-400 hover:text-zinc-300 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded">
-                            Back to manual upload
+                            {N.backToManual}
                           </button>
                         </div>
                       ) : (
@@ -565,14 +555,14 @@ function NewTestContent() {
                             className="hidden"
                           />
                           <UploadCloud size={48} className="text-zinc-400 group-hover/upload:text-cyan-400 mb-4 transition-colors" aria-hidden="true" />
-                          <span className="text-lg font-bold text-zinc-300 group-hover/upload:text-white">Click to upload image</span>
-                          <span className="text-sm font-medium text-zinc-400 mt-2">Recommended: 1280x720 (Max 10MB)</span>
+                          <span className="text-lg font-bold text-zinc-300 group-hover/upload:text-white">{N.clickUpload}</span>
+                          <span className="text-sm font-medium text-zinc-400 mt-2">{N.recommended}</span>
                           <button
                             type="button"
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleGenerator(v.id); }}
                             className="mt-3 flex items-center gap-1.5 text-xs font-bold text-violet-400 hover:text-violet-300 px-3 py-1.5 rounded-full bg-violet-950/40 border border-violet-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                           >
-                            <Wand2 size={12} aria-hidden="true" /> Auto-generate with AI
+                            <Wand2 size={12} aria-hidden="true" /> {N.autoGenerate}
                           </button>
                         </label>
                       )}
@@ -580,12 +570,12 @@ function NewTestContent() {
                     
                     <div className="space-y-6">
                       <div>
-                        <label className="block text-base font-bold text-white mb-3">Test Title</label>
-                        <input 
-                          type="text" 
+                        <label className="block text-base font-bold text-white mb-3">{N.titleLabel}</label>
+                        <input
+                          type="text"
                           value={v.title_text}
                           onChange={(e) => handleTitleChange(v.id, e.target.value)}
-                          placeholder="Same as original or try a new one"
+                          placeholder={N.titlePlaceholder}
                           className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
                         />
                       </div>
@@ -594,7 +584,7 @@ function NewTestContent() {
                         <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
                           <div className="flex items-center gap-2 mb-2">
                             <Sparkles size={16} className="text-emerald-400" aria-hidden="true" />
-                            <span className="font-bold text-emerald-400 text-sm">AI Thumbnail Analysis Complete (Score: {v.ml_score})</span>
+                            <span className="font-bold text-emerald-400 text-sm">{N.analysisDone(String(v.ml_score))}</span>
                           </div>
                           <p className="text-xs text-emerald-200/70">{v.ml_feedback}</p>
                         </div>
@@ -609,86 +599,68 @@ function NewTestContent() {
                   onClick={addVariation}
                   className="w-full py-5 rounded-2xl border-2 border-dashed border-zinc-700 hover:border-cyan-500/50 bg-zinc-900/30 hover:bg-cyan-950/10 text-zinc-400 hover:text-cyan-400 font-bold flex items-center justify-center gap-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                 >
-                  <Plus size={20} aria-hidden="true" /> Add Candidate <span className="text-xs font-normal opacity-60">({variations.length + 1} / 5)</span>
+                  <Plus size={20} aria-hidden="true" /> {N.addCandidate} <span className="text-xs font-normal opacity-60">({variations.length + 1} / 5)</span>
                 </button>
               )}
             </div>
           </div>
 
           <div>
-            <h2 className="text-xl font-bold mb-4 border-b border-zinc-800 pb-4">3. Optimization Settings</h2>
+            <h2 className="text-xl font-bold mb-4 border-b border-zinc-800 pb-4">{N.step3}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
-                  <label className="block text-sm font-bold text-zinc-300 mb-2">Swap Interval</label>
+                  <label className="block text-sm font-bold text-zinc-300 mb-2">{N.swapIntervalLabel}</label>
                   <select
                     value={swapInterval}
                     onChange={(e) => {
                       // BASIC 요금제는 최소 4시간(240분) 주기부터 선택 가능 - backend/test_policy.py의
                       // BASIC_MIN_SWAP_INTERVAL_MINUTES와 동일한 기준
                       if (parseInt(e.target.value) < 240 && !userProfile.is_pro) {
-                        showAlert("Plan Restriction", "Swap intervals shorter than 4 hours are a PRO feature.\nPlease upgrade to PRO to use this.", "warning", () => router.push("/pricing"));
+                        showAlert(N.planRestrictTitle, N.planRestrictMsg, "warning", () => router.push("/pricing"));
                         return;
                       }
                       setSwapInterval(e.target.value);
                     }}
                     className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 appearance-none"
                   >
-                    <option value="240">Swap every 4 hours (Recommended)</option>
-                    <option value="720">Swap every 12 hours</option>
-                    <option value="1440">Swap every 24 hours</option>
-                    <option value="120" disabled={!userProfile.is_pro} className="text-orange-500 font-bold">
-                      🔑 Swap every 2 hours (PRO Only)
-                    </option>
-                    <option value="60" disabled={!userProfile.is_pro} className="text-orange-500 font-bold">
-                      🔑 Swap every 1 hour (PRO Only)
-                    </option>
-                    <option value="30" disabled={!userProfile.is_pro} className="text-orange-500 font-bold">
-                      🔑 Swap every 30 mins (PRO Only)
-                    </option>
+                    {["240", "720", "1440"].map(value => (
+                      <option key={value} value={value}>{N.intervalOptions[value]}</option>
+                    ))}
+                    {["120", "60", "30"].map(value => (
+                      <option key={value} value={value} disabled={!userProfile.is_pro} className="text-orange-500 font-bold">
+                        {N.intervalOptions[value]}
+                      </option>
+                    ))}
                   </select>
-                  <p className="text-xs text-zinc-400 mt-2">Candidates are rotated on YouTube and compared by views gained per hour (VPH).</p>
+                  <p className="text-xs text-zinc-400 mt-2">{N.intervalHelp}</p>
                   <div className="mt-3 flex flex-col gap-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">BASIC</span>
-                      {["4h", "12h", "24h"].map(t => (
-                        <span key={t} className="text-[11px] font-bold text-zinc-300 bg-zinc-800/60 border border-zinc-700 px-2 py-0.5 rounded-full">{t}</span>
+                      {[4, 12, 24].map(h => N.hoursChip(h)).map(label => (
+                        <span key={label} className="text-[11px] font-bold text-zinc-300 bg-zinc-800/60 border border-zinc-700 px-2 py-0.5 rounded-full">{label}</span>
                       ))}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded">PRO</span>
-                      {["30min", "1h", "2h", "4h", "12h", "24h"].map(t => (
-                        <span key={t} className="text-[11px] font-bold text-cyan-300 bg-cyan-950/30 border border-cyan-800/50 px-2 py-0.5 rounded-full">{t}</span>
+                      {[N.minutesChip(30), ...[1, 2, 4, 12, 24].map(h => N.hoursChip(h))].map(label => (
+                        <span key={label} className="text-[11px] font-bold text-cyan-300 bg-cyan-950/30 border border-cyan-800/50 px-2 py-0.5 rounded-full">{label}</span>
                       ))}
                     </div>
                   </div>
                 </div>
 
               <div className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
-                <label className="block text-sm font-bold text-zinc-300 mb-2">Total Optimization Duration</label>
+                <label className="block text-sm font-bold text-zinc-300 mb-2">{N.durationLabel}</label>
                 <select
                   value={durationHours}
                   onChange={(e) => setDurationHours(e.target.value)}
                   className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 appearance-none"
                 >
-                  <option value="24">Apply best thumbnail permanently after 24 hours</option>
-                  <option value="48">Apply best thumbnail permanently after 48 hours</option>
-                  <option value="72">Apply best thumbnail permanently after 72 hours</option>
+                  {[24, 48, 72].map(h => (
+                    <option key={h} value={String(h)}>{N.durationOption(h)}</option>
+                  ))}
                 </select>
-                <p className="text-xs text-zinc-400 mt-2">When the test ends, the winning thumbnail will be applied permanently.</p>
-                <div className="mt-3 flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">BASIC</span>
-                    {["24h", "48h", "72h"].map(t => (
-                      <span key={t} className="text-[11px] font-bold text-zinc-300 bg-zinc-800/60 border border-zinc-700 px-2 py-0.5 rounded-full">{t}</span>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded">PRO</span>
-                    {["24h", "48h", "72h"].map(t => (
-                      <span key={t} className="text-[11px] font-bold text-cyan-300 bg-cyan-950/30 border border-cyan-800/50 px-2 py-0.5 rounded-full">{t}</span>
-                    ))}
-                  </div>
-                </div>
+                <p className="text-xs text-zinc-400 mt-2">{N.durationHelp}</p>
               </div>
             </div>
           </div>
@@ -702,17 +674,17 @@ function NewTestContent() {
               {isSubmittingTest ? (
                 <>
                   <Loader2 size={20} className="animate-spin" aria-hidden="true" />
-                  Applying to YouTube...
+                  {N.applying}
                 </>
               ) : (
                 <>
                   <Play size={20} className="fill-white" aria-hidden="true" />
-                  Start Real-time Optimization Campaign
+                  {N.startButton}
                 </>
               )}
             </button>
             {isSubmittingTest && (
-              <p className="text-xs text-zinc-400" role="status">Creating test...</p>
+              <p className="text-xs text-zinc-400" role="status">{N.creating}</p>
             )}
           </div>
         </div>
@@ -723,15 +695,14 @@ function NewTestContent() {
           <div className="w-24 h-24 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mb-8" aria-hidden="true">
             <CheckCircle2 size={48} className="text-emerald-400" />
           </div>
-          <h2 className="text-4xl font-black mb-4">Optimization Campaign Started!</h2>
-          <p className="text-xl text-zinc-400 max-w-lg mb-10">
-            Your first candidate is being applied to YouTube right now — it may take a few seconds
-            to show up on your video. From here, ThumbnailFlow rotates candidates automatically.
+          <h2 className="text-4xl font-black mb-4">{N.successTitle}</h2>
+          <p className="text-xl text-zinc-400 max-w-lg mb-10 break-keep">
+            {N.successMsg}
           </p>
 
           <div className="flex gap-4">
             <Link href="/dashboard" className="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-bold border border-zinc-800 transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-              <LayoutDashboard size={18} aria-hidden="true" /> View Status on Dashboard
+              <LayoutDashboard size={18} aria-hidden="true" /> {N.viewStatus}
             </Link>
           </div>
         </div>
@@ -743,8 +714,9 @@ function NewTestContent() {
 }
 
 export default function NewTestPage() {
+  const { t } = useI18n();
   return (
-    <Suspense fallback={<div className="p-12 text-center text-zinc-400" role="status">Loading...</div>}>
+    <Suspense fallback={<div className="p-12 text-center text-zinc-400" role="status">{t.common.loading}</div>}>
       <NewTestContent />
     </Suspense>
   );

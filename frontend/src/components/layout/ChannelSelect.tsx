@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { apiFetch } from "@/lib/api";
 import { switchChannel, CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
+import { useI18n } from "@/i18n/I18nProvider";
 
 type ChannelSummary = {
   id: number;
@@ -15,6 +16,7 @@ type ChannelSummary = {
 // select box. TopHeader 우측 상단 드롭다운과 기능은 같고(둘 다 channelSwitch.ts를 공유),
 // 이 페이지들에서 더 눈에 띄게 좌측에 두기 위한 용도다.
 export default function ChannelSelect() {
+  const { t } = useI18n();
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [isSwitching, setIsSwitching] = useState(false);
   const isSwitchingRef = useRef(false);
@@ -54,7 +56,7 @@ export default function ChannelSelect() {
   return (
     <div className="inline-flex items-center gap-2">
       <label htmlFor="channel-select" className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-        Channel
+        {t.channelSelect.label}
       </label>
       <select
         id="channel-select"
@@ -65,7 +67,7 @@ export default function ChannelSelect() {
       >
         {channels.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.channel_title || "이름 없음"}{!c.is_connected ? " (연동 해제됨)" : ""}
+            {c.channel_title || t.common.untitled}{!c.is_connected ? t.channelSelect.disconnectedSuffix : ""}
           </option>
         ))}
       </select>

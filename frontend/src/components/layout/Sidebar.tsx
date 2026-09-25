@@ -17,18 +17,20 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { useI18n } from "@/i18n/I18nProvider";
 
 const MENUS = [
-  { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-  { name: "New Test", icon: FolderOpen, href: "/new" },
-  { name: "Analytics", icon: BarChart3, href: "/analytics" },
-  { name: "History", icon: History, href: "/history" },
-  { name: "Pricing", icon: CreditCard, href: "/pricing" },
-  { name: "Settings", icon: Settings, href: "/settings" },
-];
+  { key: "dashboard", icon: LayoutDashboard, href: "/dashboard" },
+  { key: "newTest", icon: FolderOpen, href: "/new" },
+  { key: "analytics", icon: BarChart3, href: "/analytics" },
+  { key: "history", icon: History, href: "/history" },
+  { key: "pricing", icon: CreditCard, href: "/pricing" },
+  { key: "settings", icon: Settings, href: "/settings" },
+] as const;
 
 export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   const [userProfile, setUserProfile] = React.useState<{ email: string | null; plan: string; is_pro: boolean; channel_title: string | null; is_admin: boolean }>({
     email: null,
@@ -57,9 +59,9 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
       .catch(console.error);
   }, []);
 
-  const menus = userProfile.is_admin
-    ? [...MENUS, { name: "Admin", icon: ShieldAlert, href: "/admin" }]
-    : MENUS;
+  const menus: { key: keyof typeof t.sidebar.menu; icon: typeof ShieldAlert; href: string }[] = userProfile.is_admin
+    ? [...MENUS, { key: "admin", icon: ShieldAlert, href: "/admin" }]
+    : [...MENUS];
 
   return (
     <>
@@ -85,20 +87,20 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
           </Link>
           <button
             onClick={onClose}
-            aria-label="메뉴 닫기"
+            aria-label={t.sidebar.closeMenu}
             className="md:hidden p-1.5 text-zinc-400 hover:text-white rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
           >
             <X size={20} aria-hidden="true" />
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto" aria-label="주 메뉴">
+        <nav className="flex-1 space-y-1 overflow-y-auto" aria-label={t.sidebar.mainMenu}>
           {menus.map((menu) => {
             // exact match OR sub-routes
             const isActive = pathname === menu.href || pathname.startsWith(`${menu.href}/`);
             return (
               <Link
-                key={menu.name}
+                key={menu.key}
                 href={menu.href}
                 onClick={onClose}
                 aria-current={isActive ? "page" : undefined}
@@ -113,7 +115,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
                   aria-hidden="true"
                   className={isActive ? "text-cyan-400" : "text-zinc-400"}
                 />
-                {menu.name}
+                {t.sidebar.menu[menu.key]}
               </Link>
             );
           })}
@@ -123,14 +125,14 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
           <div className="p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                Your Plan
+                {t.sidebar.yourPlan}
               </span>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${userProfile.is_pro ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-400" : "border-zinc-700 bg-zinc-800 text-zinc-400"}`}>
                 {userProfile.plan}
               </span>
             </div>
             <div className="text-sm font-semibold mb-1">
-              {userProfile.is_pro ? "Unlimited active tests" : "1 active test limit"}
+              {userProfile.is_pro ? t.sidebar.unlimitedTests : t.sidebar.oneTestLimit}
             </div>
             <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-3" aria-hidden="true">
               <div className={`h-full ${userProfile.is_pro ? "bg-cyan-500 w-full" : "bg-zinc-500 w-[100%]"}`} />

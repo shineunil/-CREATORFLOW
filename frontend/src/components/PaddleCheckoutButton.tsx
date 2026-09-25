@@ -3,18 +3,20 @@
 import { useState } from "react";
 import { CreditCard, Loader2 } from "lucide-react";
 import { openPaddleCheckout } from "@/lib/paddle";
+import { useI18n } from "@/i18n/I18nProvider";
 
 export default function PaddleCheckoutButton() {
+  const { t, locale } = useI18n();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleCheckout = async () => {
     setIsLoading(true);
     try {
-      await openPaddleCheckout();
+      await openPaddleCheckout(locale);
     } catch (err: unknown) {
       console.error("Paddle Checkout Error:", err);
       if (!(err instanceof Error && err.message === "Unauthorized")) {
-        alert(err instanceof Error ? err.message : "Failed to start checkout. Please try again.");
+        alert(err instanceof Error ? err.message : t.checkout.failed);
       }
     } finally {
       setIsLoading(false);
@@ -30,12 +32,12 @@ export default function PaddleCheckoutButton() {
       {isLoading ? (
         <>
           <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-          <span>Opening checkout...</span>
+          <span>{t.checkout.opening}</span>
         </>
       ) : (
         <>
           <CreditCard size={18} aria-hidden="true" />
-          <span>Upgrade to PRO — $29/mo</span>
+          <span>{t.checkout.upgrade}</span>
         </>
       )}
     </button>
