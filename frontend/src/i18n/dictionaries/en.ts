@@ -80,8 +80,8 @@ export const en = {
     heroLine1: "Same video.",
     heroGradient: "Different thumbnails.",
     heroLine3: "One clear winner.",
-    /** 데스크톱에서 heroLine3 앞에서 줄을 바꿀지 (한국어는 문장이 길어 어절 중간에서 끊기는 걸 막기 위함) */
-    heroBreakBeforeLine3: false,
+    /** 데스크톱에서 heroLine3 앞에서 줄을 바꿀지 (마지막 구절이 줄 끝에서 쪼개져 한 단어만 남는 걸 막기 위함) */
+    heroBreakBeforeLine3: true,
     heroSub:
       "Upload a few thumbnail and title variants. ThumbnailFlow rotates them on your live video and ranks each by views earned per hour — not raw view count — so a slow afternoon slot never gets mistaken for a loser.",
     heroCta: "Start testing — free",

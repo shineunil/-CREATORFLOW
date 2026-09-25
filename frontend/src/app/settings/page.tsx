@@ -23,7 +23,7 @@ type ChannelSummary = {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const S = t.settings;
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [userEmail, setUserEmail] = useState<string>(t.common.loading);
@@ -139,7 +139,7 @@ export default function SettingsPage() {
 
   const handleConnectAnotherChannel = () => {
     // L-3: JWT를 URL에 노출할 필요 없음 — 백엔드가 HttpOnly 쿠키에서 현재 유저를 직접 읽음
-    window.location.href = `${API_BASE_URL}/api/auth/login`;
+    window.location.href = `${API_BASE_URL}/api/auth/login?locale=${locale}`;
   };
 
   const handleOpenBillingPortal = async () => {

@@ -512,7 +512,7 @@ export const ko: Dictionary = {
     minutesChip: (m: number) => `${m}분`,
     durationLabel: "전체 최적화 기간",
     durationOption: (h: number) => `${h}시간 뒤 유튜브 썸네일 자동 적용`,
-    durationHelp: "테스트가 끝나면 이긴 썸네일이 영구 적용됩니다.",
+    durationHelp: "테스트가 끝나면 이긴 썸네일이 유튜브에 자동 적용됩니다.",
     applying: "유튜브에 적용하는 중...",
     startButton: "실시간 최적화 시작하기",
     creating: "테스트를 만드는 중...",

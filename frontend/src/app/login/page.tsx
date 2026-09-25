@@ -9,13 +9,13 @@ import { useI18n } from "@/i18n/I18nProvider";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 function LoginContent() {
-  const { t, lp } = useI18n();
+  const { t, lp, locale } = useI18n();
   const searchParams = useSearchParams();
   const errorCode = searchParams.get("error");
   const errorMessage = errorCode ? t.login.errors[errorCode] : null;
 
   const handleGoogleLogin = () => {
-    window.location.href = `${API_BASE_URL}/api/auth/login`;
+    window.location.href = `${API_BASE_URL}/api/auth/login?locale=${locale}`;
   };
 
   return (

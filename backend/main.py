@@ -252,8 +252,17 @@ def get_system_status():
     return {"status": "online"}
 
 # --- Google OAuth 로직 ---
+OAUTH_LOCALE_COOKIE = "oauth_locale"
+
+
+def _login_locale(request: Request) -> str:
+    """로그인을 시작한 화면의 언어(쿠키) → 없으면 브라우저 언어(Accept-Language)."""
+    chosen = request.cookies.get(OAUTH_LOCALE_COOKIE)
+    return chosen if chosen in SUPPORTED_LOCALES else locale_from_accept_language(request.headers.get("accept-language"))
+
+
 @app.get("/api/auth/login")
-def login_via_google(request: Request, state: str | None = None):
+def login_via_google(request: Request, state: str | None = None, locale: str | None = None):
     """
     구글 로그인 페이지로 리다이렉트합니다.
     이미 로그인된 상태에서 "채널 추가"로 들어온 경우, HttpOnly 쿠키에서 현재 유저를 읽는다.
@@ -287,7 +296,14 @@ def login_via_google(request: Request, state: str | None = None):
             pass
     if linking_user_id:
         auth_url += f"&state={urllib.parse.quote(_make_state_nonce(linking_user_id))}"
-    return RedirectResponse(auth_url)
+    response = RedirectResponse(auth_url)
+    # 구글을 다녀오는 동안 로그인을 시작한 화면 언어를 기억해 두었다가, 콜백에서 계정 언어로 저장한다.
+    if locale in SUPPORTED_LOCALES:
+        response.set_cookie(
+            OAUTH_LOCALE_COOKIE, locale, max_age=600, path="/api/auth",
+            httponly=True, samesite="lax", secure=not is_dev_environment(),
+        )
+    return response
 
 @app.get("/api/auth/callback")
 async def google_auth_callback(request: Request, code: str | None = None, error: str | None = None, state: str | None = None, db: Session = Depends(get_db)):
@@ -420,9 +436,18 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
     # 만료된 코드 정리 (최대 행 수 제어)
     db.query(OAuthAuthCode).filter(OAuthAuthCode.expires_at < now).delete()
     db.add(OAuthAuthCode(code=auth_code, token=token, expires_at=now + timedelta(minutes=5)))
+
+    # 언어를 아직 저장한 적 없는 계정이면 로그인 순간의 언어로 채운다 (알림 메일 언어에 쓰임).
+    # 브랜드 계정처럼 채널 소유자가 로그인한 계정과 다를 수 있어, 세션 주인(channel.user)까지 챙긴다.
+    login_locale = _login_locale(request)
+    for account in (user, channel.user):
+        if account is not None and not account.locale:
+            account.locale = login_locale
     db.commit()
     channel_title_encoded = urllib.parse.quote(channel_title)
-    return RedirectResponse(f"{FRONTEND_URL}/dashboard?auth_code={auth_code}&connected_channel={channel_title_encoded}")
+    response = RedirectResponse(f"{FRONTEND_URL}/dashboard?auth_code={auth_code}&connected_channel={channel_title_encoded}")
+    response.delete_cookie(OAUTH_LOCALE_COOKIE, path="/api/auth")
+    return response
 
 @app.post("/api/auth/logout")
 def logout_user():
