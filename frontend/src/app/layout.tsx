@@ -42,6 +42,12 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: home.openGraph,
     twitter: home.twitter,
     ...(path === "/" ? { alternates: home.alternates } : {}),
+    verification: {
+      other: {
+        // 네이버 서치어드바이저 사이트 소유 확인
+        "naver-site-verification": "7b49e4a5793d6a9c92125a13dda335fb8226d246",
+      },
+    },
     robots: {
       index: true,
       follow: true,
