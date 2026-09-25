@@ -297,10 +297,9 @@ export default function LandingPage() {
                 <span className="text-zinc-400"> {t.common.perMonth}</span>
               </div>
               <ul className="space-y-4 mb-10 flex-1">
-                {[t.plans.basicFeatures.testsPerMonth, t.plans.basicFeatures.concurrent, t.plans.basicFeatures.variants, t.plans.basicFeatures.interval].map((feature) => (
+                {Object.values(t.plans.basicFeatures).map((feature) => (
                   <li key={feature} className="flex items-center gap-3 text-base text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> {feature}</li>
                 ))}
-                <li className="flex items-center gap-3 text-base text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> <span><RichText value={t.plans.autoApplyRich} strongClassName="font-semibold text-cyan-300" /></span></li>
               </ul>
               <Link href={lp("/login")} className="w-full py-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
                 {t.plans.startForFree}

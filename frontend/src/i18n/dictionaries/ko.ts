@@ -99,7 +99,7 @@ export const ko: Dictionary = {
     processSub: "시작 버튼만 누르면 다섯 단계가 모두 자동으로 진행됩니다.",
     steps: [
       {
-        title: "후보 올리기",
+        title: "후보 썸네일 업로드",
         desc: "이미 공개한 영상에 썸네일과 제목 후보를 최대 5개까지 추가하세요. 1분이면 충분합니다.",
       },
       {
