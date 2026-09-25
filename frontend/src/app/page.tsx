@@ -89,11 +89,8 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="relative pt-36 pb-20 px-6 max-w-6xl mx-auto text-center z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-        >
+        {/* 첫 화면은 HTML이 오자마자 보이도록 JS 애니메이션 대신 CSS 애니메이션 사용 */}
+        <div className="hero-rise">
           <div className="inline-flex items-center gap-2 text-base font-semibold tracking-[0.12em] uppercase text-cyan-400/90 mb-7">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" aria-hidden="true" />
             {L.eyebrow}
@@ -122,14 +119,11 @@ export default function LandingPage() {
               <ArrowRight size={20} className="relative z-10 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
             </Link>
           </div>
-        </motion.div>
+        </div>
 
         {/* Visual A/B Test Showcase (Authentic YouTube UI) */}
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.9, delay: 0.25 }}
-          className="mt-24 relative max-w-5xl mx-auto"
+        <div
+          className="hero-rise-late mt-24 relative max-w-5xl mx-auto"
           aria-hidden="true"
         >
           <div className="relative bg-zinc-900/70 backdrop-blur-2xl border border-zinc-800 rounded-[2rem] p-6 md:p-10 shadow-2xl">
@@ -202,7 +196,7 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* Process Section */}
