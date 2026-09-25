@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Settings, Mail, Bell, Shield, LogOut, PlaySquare, Plus, AlertTriangle, CreditCard, Loader2, CheckCircle2, Trash2, RefreshCw, Image, Type, ExternalLink } from "lucide-react";
+import { Settings, Mail, Bell, Shield, LogOut, PlaySquare, Plus, AlertTriangle, CreditCard, Loader2, CheckCircle2, Trash2, RefreshCw, Image, Type, ExternalLink, Languages } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
 import { apiFetch } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/config";
 import { switchChannel, CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
+import { useI18n } from "@/i18n/I18nProvider";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type ChannelSummary = {
   id: number;
@@ -21,8 +23,10 @@ type ChannelSummary = {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { t } = useI18n();
+  const S = t.settings;
   const [emailAlerts, setEmailAlerts] = useState(true);
-  const [userEmail, setUserEmail] = useState<string>("Loading...");
+  const [userEmail, setUserEmail] = useState<string>(t.common.loading);
   const [isPro, setIsPro] = useState(false);
   const [plan, setPlan] = useState<string>("BASIC");
 
@@ -93,7 +97,7 @@ export default function SettingsPage() {
       })
       .then((data) => {
         if (data.email) setUserEmail(data.email);
-        else setUserEmail("No connected email");
+        else setUserEmail(S.noEmail);
         setIsPro(!!data.is_pro);
         setPlan(data.plan || "BASIC");
         setNotifEmail(data.notification_email || null);
@@ -103,7 +107,7 @@ export default function SettingsPage() {
       })
       .catch((err) => {
         console.error(err);
-        setUserEmail("No connected email");
+        setUserEmail(S.noEmail);
       });
 
     apiFetch("/api/channels")
@@ -128,7 +132,7 @@ export default function SettingsPage() {
     isSwitchingRef.current = true;
     setIsSwitching(true);
     const ok = await switchChannel(channelId);
-    if (!ok) showAlert("Error", "Something went wrong while switching channels.", "error");
+    if (!ok) showAlert(t.common.error, S.switchError, "error");
     isSwitchingRef.current = false;
     setIsSwitching(false);
   };
@@ -145,14 +149,14 @@ export default function SettingsPage() {
       const res = await apiFetch("/api/billing/portal");
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        showAlert("Can't open billing portal", err.detail || "Please try again in a moment.", "error");
+        showAlert(S.portalErrorTitle, err.detail || S.portalRetry, "error");
         return;
       }
       const data = await res.json();
       window.open(data.url, "_blank", "noopener,noreferrer");
     } catch (e) {
       console.error(e);
-      showAlert("Error", "Something went wrong opening the billing portal.", "error");
+      showAlert(t.common.error, S.portalError, "error");
     } finally {
       setIsOpeningPortal(false);
     }
@@ -164,8 +168,8 @@ export default function SettingsPage() {
       localStorage.removeItem("isLoggedIn");
       localStorage.removeItem("connectedChannel");
       showAlert(
-        "🔑 Logged Out",
-        "You've been logged out.\n(Background A/B tests keep running normally.)",
+        S.loggedOutTitle,
+        S.loggedOutMsg,
         "info",
         () => {
           window.location.href = "/";
@@ -189,11 +193,11 @@ export default function SettingsPage() {
       } else {
         const msg = typeof data.detail === "string" ? data.detail
           : data.error ? String(data.error)
-          : `서버 오류 (${res.status})`;
-        showAlert("Error", msg, "error");
+          : S.serverError(res.status);
+        showAlert(t.common.error, msg, "error");
       }
     } catch {
-      showAlert("Error", "Something went wrong.", "error");
+      showAlert(t.common.error, S.genericError, "error");
     } finally {
       setCheckingCapabilities(prev => ({ ...prev, [channelId]: false }));
     }
@@ -201,8 +205,8 @@ export default function SettingsPage() {
 
   const handleDisconnectChannel = (channelId: number, channelTitle: string) => {
     showConfirm(
-      "⚠️ Disconnect YouTube Channel",
-      `Disconnect "${channelTitle || "this channel"}"?\nAll running A/B tests on this channel will stop immediately. Other connected channels and your account login are not affected.`,
+      S.disconnectConfirmTitle,
+      S.disconnectConfirmMsg(channelTitle || S.thisChannel),
       async () => {
         try {
           const res = await apiFetch(`/api/channels/${channelId}/disconnect`, { method: "POST" });
@@ -210,10 +214,10 @@ export default function SettingsPage() {
           // 로그아웃하지 않고 채널 목록만 새로고침한다 - 해제된 건 이 채널 하나뿐이고
           // 계정·다른 채널 연동은 그대로 유지되므로 세션을 끊을 이유가 없다.
           loadAccountInfo();
-          showAlert("🔒 Channel Disconnected", "YouTube access for this channel has been removed. Reconnect anytime from the list above.", "success");
+          showAlert(S.disconnectedTitle, S.disconnectedMsg, "success");
         } catch (e) {
           console.error(e);
-          showAlert("Error", "Something went wrong while disconnecting the channel.", "error");
+          showAlert(t.common.error, S.disconnectError, "error");
         }
       },
       "error"
@@ -222,7 +226,7 @@ export default function SettingsPage() {
 
   const handleSendVerifyCode = async () => {
     if (!notifEmailInput.trim() || !notifEmailInput.includes("@")) {
-      setNotifMsg({ text: "Please enter a valid email address.", type: "err" });
+      setNotifMsg({ text: S.invalidEmail, type: "err" });
       return;
     }
     setNotifLoading(true);
@@ -236,12 +240,12 @@ export default function SettingsPage() {
       const data = await res.json();
       if (res.ok) {
         setNotifStep("code_sent");
-        setNotifMsg({ text: data.simulated ? "Code generated (simulation — check server logs)." : "Verification code sent! Check your inbox.", type: "ok" });
+        setNotifMsg({ text: data.simulated ? S.codeSimulated : S.codeSent, type: "ok" });
       } else {
-        setNotifMsg({ text: data.detail || "Failed to send code.", type: "err" });
+        setNotifMsg({ text: data.detail || S.sendFailed, type: "err" });
       }
     } catch {
-      setNotifMsg({ text: "Error sending code.", type: "err" });
+      setNotifMsg({ text: S.sendError, type: "err" });
     } finally {
       setNotifLoading(false);
     }
@@ -249,7 +253,7 @@ export default function SettingsPage() {
 
   const handleVerifyCode = async () => {
     if (!notifCodeInput.trim()) {
-      setNotifMsg({ text: "Please enter the verification code.", type: "err" });
+      setNotifMsg({ text: S.enterCode, type: "err" });
       return;
     }
     setNotifLoading(true);
@@ -265,13 +269,13 @@ export default function SettingsPage() {
         setNotifEmail(data.notification_email);
         setNotifEmailVerified(true);
         setNotifStep("done");
-        setNotifMsg({ text: "Email verified and saved!", type: "ok" });
+        setNotifMsg({ text: S.verifiedMsg, type: "ok" });
         setNotifCodeInput("");
       } else {
-        setNotifMsg({ text: data.detail || "Incorrect code.", type: "err" });
+        setNotifMsg({ text: data.detail || S.wrongCode, type: "err" });
       }
     } catch {
-      setNotifMsg({ text: "Error verifying code.", type: "err" });
+      setNotifMsg({ text: S.verifyError, type: "err" });
     } finally {
       setNotifLoading(false);
     }
@@ -286,9 +290,9 @@ export default function SettingsPage() {
       setNotifEmailVerified(false);
       setNotifEmailInput("");
       setNotifStep("idle");
-      setNotifMsg({ text: "Notification email removed.", type: "ok" });
+      setNotifMsg({ text: S.removed, type: "ok" });
     } catch {
-      setNotifMsg({ text: "Error removing email.", type: "err" });
+      setNotifMsg({ text: S.removeError, type: "err" });
     } finally {
       setNotifLoading(false);
     }
@@ -299,15 +303,15 @@ export default function SettingsPage() {
       const res = await apiFetch("/api/settings/test-email", { method: "POST" });
       const data = await res.json();
       if (data.simulated) {
-        showAlert("📧 Simulation Mode (not actually sent)", data.message, "warning");
+        showAlert(S.simulationTitle, data.message, "warning");
       } else if (data.status === "ok") {
-        showAlert("📧 Email Sent", data.message, "success");
+        showAlert(S.sentTitle, data.message, "success");
       } else {
-        showAlert("Error", data.message || "Something went wrong sending the test email.", "error");
+        showAlert(t.common.error, data.message || S.testEmailError, "error");
       }
     } catch (e) {
       console.error(e);
-      showAlert("Error", "Something went wrong sending the test email.", "error");
+      showAlert(t.common.error, S.testEmailError, "error");
     }
   };
 
@@ -317,20 +321,20 @@ export default function SettingsPage() {
       <div className="max-w-7xl w-full mx-auto p-8 pb-20">
         <div className="mb-10">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Settings className="text-zinc-400" aria-hidden="true" /> Settings
+            <Settings className="text-zinc-400" aria-hidden="true" /> {S.title}
           </h1>
-          <p className="text-zinc-400 mt-2">Manage your account and notification preferences.</p>
+          <p className="text-zinc-400 mt-2">{S.sub}</p>
         </div>
 
         <div className="space-y-6">
           {/* Account Settings */}
           <section className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Shield size={18} className="text-cyan-400" aria-hidden="true" /> Account
+              <Shield size={18} className="text-cyan-400" aria-hidden="true" /> {S.account}
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Connected Google Email</label>
+                <label className="block text-sm text-zinc-400 mb-1">{S.googleEmail}</label>
                 <input type="text" disabled value={userEmail} className="w-full bg-zinc-900/50 border border-zinc-800 text-cyan-400 font-semibold rounded-lg p-3 text-sm cursor-not-allowed" />
               </div>
               <div className="pt-2">
@@ -339,21 +343,30 @@ export default function SettingsPage() {
                   className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold rounded-xl transition-colors cursor-pointer border border-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                 >
                   <LogOut size={16} aria-hidden="true" />
-                  <span>Log Out (this session only)</span>
+                  <span>{S.logout}</span>
                 </button>
                 <p className="text-[12px] text-zinc-400 mt-1.5">
-                  Logging out only ends this session — background A/B tests keep running.
+                  {S.logoutNote}
                 </p>
               </div>
             </div>
           </section>
 
+          {/* Language */}
+          <section className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <Languages size={18} className="text-cyan-400" aria-hidden="true" /> {S.languageTitle}
+            </h2>
+            <p className="text-xs text-zinc-400 mb-4">{S.languageSub}</p>
+            <LanguageSwitcher />
+          </section>
+
           {/* Connected Channels */}
           <section className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
             <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
-              <PlaySquare size={18} className="text-cyan-400" aria-hidden="true" /> Connected Channels ({channels.length}/{maxChannels})
+              <PlaySquare size={18} className="text-cyan-400" aria-hidden="true" /> {S.channelsTitle(channels.length, maxChannels)}
             </h2>
-            <p className="text-xs text-zinc-400 mb-4">Connect and switch between multiple YouTube channels on one account. PRO/AGENCY plans support more channels.</p>
+            <p className="text-xs text-zinc-400 mb-4">{S.channelsSub}</p>
             <div className="space-y-2">
               {channels.map((c) => (
                 <div key={c.id} className={`flex items-center gap-3 p-3 rounded-xl border ${c.is_active ? "bg-cyan-500/5 border-cyan-500/30" : "bg-zinc-900/40 border-zinc-800"}`}>
@@ -361,18 +374,18 @@ export default function SettingsPage() {
                     {c.channel_title ? c.channel_title.substring(0, 1).toUpperCase() : "?"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold text-white truncate">{c.channel_title || "Untitled"}</div>
+                    <div className="text-sm font-bold text-white truncate">{c.channel_title || t.common.untitled}</div>
                     {!c.is_connected ? (
                       <div className="mt-1 flex items-center gap-1.5">
-                        <span className="inline-flex text-[11px] font-bold text-zinc-300 bg-zinc-700/80 px-2 py-0.5 rounded-full">Disconnected</span>
-                        <span className="text-xs text-zinc-400">Reconnect anytime below</span>
+                        <span className="inline-flex text-[11px] font-bold text-zinc-300 bg-zinc-700/80 px-2 py-0.5 rounded-full">{S.disconnected}</span>
+                        <span className="text-xs text-zinc-400">{S.reconnectBelow}</span>
                       </div>
                     ) : c.needs_reconnect ? (
-                      <div className="text-xs text-amber-400 flex items-center gap-1"><AlertTriangle size={11} aria-hidden="true" /> Reconnect needed</div>
+                      <div className="text-xs text-amber-400 flex items-center gap-1"><AlertTriangle size={11} aria-hidden="true" /> {S.reconnectNeeded}</div>
                     ) : null}
                   </div>
                   {c.is_active && (
-                    <span className="text-xs font-bold text-cyan-400 px-2.5 py-1">Active</span>
+                    <span className="text-xs font-bold text-cyan-400 px-2.5 py-1 whitespace-nowrap">{S.active}</span>
                   )}
                   {!c.is_active && c.is_connected && (
                     <button
@@ -380,18 +393,18 @@ export default function SettingsPage() {
                       disabled={isSwitching}
                       className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                     >
-                      Switch
+                      {S.switch}
                     </button>
                   )}
                   {c.is_connected && (
                     <button
                       onClick={() => handleDisconnectChannel(c.id, c.channel_title)}
-                      title="Disconnect this channel"
-                      aria-label={`Disconnect ${c.channel_title || "this channel"}`}
+                      title={S.disconnectTooltip}
+                      aria-label={S.disconnectAria(c.channel_title || S.thisChannel)}
                       className="flex items-center gap-1.5 text-xs font-bold text-red-400/80 hover:text-red-300 bg-red-950/20 hover:bg-red-950/40 border border-red-500/20 hover:border-red-500/40 px-3 py-1.5 rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                     >
                       <LogOut size={14} aria-hidden="true" />
-                      Disconnect
+                      <span className="whitespace-nowrap">{S.disconnect}</span>
                     </button>
                   )}
                 </div>
@@ -401,21 +414,20 @@ export default function SettingsPage() {
               onClick={handleConnectAnotherChannel}
               disabled={channels.length >= maxChannels}
               className="mt-3 flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold rounded-xl transition-colors cursor-pointer border border-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-              title={channels.length >= maxChannels ? "You've reached your plan's channel limit" : ""}
+              title={channels.length >= maxChannels ? S.limitTooltip : ""}
             >
               <Plus size={16} aria-hidden="true" />
-              <span>{channels.length >= maxChannels ? "Channel limit reached (upgrade needed)" : "Connect Another Channel"}</span>
+              <span>{channels.length >= maxChannels ? S.limitReached : S.connectAnother}</span>
             </button>
           </section>
 
           {/* Channel Capabilities */}
           <section className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
             <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
-              <Shield size={18} className="text-cyan-400" aria-hidden="true" /> Channel Capabilities
+              <Shield size={18} className="text-cyan-400" aria-hidden="true" /> {S.capTitle}
             </h2>
             <p className="text-xs text-zinc-400 mb-4">
-              Available features depend on your YouTube account verification status.{" "}
-              Custom thumbnails require phone number verification per YouTube policy.
+              {S.capSub}
             </p>
             <div className="space-y-4">
               {channels.filter(c => c.is_connected).map((c) => {
@@ -427,8 +439,8 @@ export default function SettingsPage() {
                       <div className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-300 flex-shrink-0" aria-hidden="true">
                         {c.channel_title ? c.channel_title.substring(0, 1).toUpperCase() : "?"}
                       </div>
-                      <span className="font-semibold text-sm text-white">{c.channel_title || "Untitled"}</span>
-                      {c.is_active && <span className="text-[11px] font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">Active</span>}
+                      <span className="font-semibold text-sm text-white">{c.channel_title || t.common.untitled}</span>
+                      {c.is_active && <span className="text-[11px] font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">{S.active}</span>}
                     </div>
 
                     <div className="space-y-2">
@@ -436,23 +448,23 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Type size={14} className="text-zinc-400" aria-hidden="true" />
-                          <span className="text-sm text-zinc-300">Title Change (A/B Test)</span>
+                          <span className="text-sm text-zinc-300">{S.titleChange}</span>
                         </div>
-                        <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">✓ Available</span>
+                        <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full whitespace-nowrap">{S.available}</span>
                       </div>
 
                       {/* 맞춤 썸네일 */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Image size={14} className="text-zinc-400" aria-hidden="true" />
-                          <span className="text-sm text-zinc-300">Custom Thumbnail Upload</span>
+                          <span className="text-sm text-zinc-300">{S.customThumb}</span>
                         </div>
                         {perm === "allowed" ? (
-                          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">✓ Verified</span>
+                          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full whitespace-nowrap">{S.verified}</span>
                         ) : perm === "denied" ? (
-                          <span className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full">✗ Verification Required</span>
+                          <span className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full whitespace-nowrap">{S.verificationRequired}</span>
                         ) : (
-                          <span className="text-xs font-bold text-zinc-400 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-full">— Not Checked</span>
+                          <span className="text-xs font-bold text-zinc-400 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-full whitespace-nowrap">{S.notChecked}</span>
                         )}
                       </div>
                     </div>
@@ -461,7 +473,7 @@ export default function SettingsPage() {
                       <div className="mt-3 flex items-start gap-2 px-3 py-2.5 bg-amber-950/40 border border-amber-500/30 rounded-lg">
                         <AlertTriangle size={13} className="text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
                         <p className="text-xs text-amber-300 leading-relaxed">
-                          Custom thumbnails require phone number verification per YouTube policy. You can complete it in about 1 minute at{" "}
+                          {S.deniedBefore}
                           <a
                             href={`https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(userEmail || "")}&continue=https%3A%2F%2Fwww.youtube.com%2Ffeatures`}
                             target="_blank"
@@ -469,7 +481,7 @@ export default function SettingsPage() {
                             className="inline-flex items-center gap-1 underline text-amber-200 hover:text-white font-semibold"
                           >
                             youtube.com/features <ExternalLink size={11} aria-hidden="true" />
-                          </a>.
+                          </a>{S.deniedAfter}
                         </p>
                       </div>
                     )}
@@ -480,13 +492,13 @@ export default function SettingsPage() {
                       className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                     >
                       {isChecking ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={12} aria-hidden="true" />}
-                      {isChecking ? "Checking..." : "Check Now"}
+                      {isChecking ? S.checking : S.checkNow}
                     </button>
                   </div>
                 );
               })}
               {channels.filter(c => c.is_connected).length === 0 && (
-                <p className="text-sm text-zinc-500 py-2">No connected channels.</p>
+                <p className="text-sm text-zinc-500 py-2">{S.noChannels}</p>
               )}
             </div>
           </section>
@@ -494,11 +506,11 @@ export default function SettingsPage() {
           {/* Billing */}
           <section className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
             <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
-              <CreditCard size={18} className="text-cyan-400" aria-hidden="true" /> Billing
+              <CreditCard size={18} className="text-cyan-400" aria-hidden="true" /> {S.billingTitle}
             </h2>
             <p className="text-xs text-zinc-400 mb-4">
-              Current plan: <span className="font-bold text-zinc-200">{plan}</span>
-              {isPro && " — manage cancellations, payment methods, and invoices through Paddle's billing portal."}
+              {S.currentPlan}<span className="font-bold text-zinc-200">{plan}</span>
+              {isPro && S.portalNote}
             </p>
             {isPro ? (
               <button
@@ -511,7 +523,7 @@ export default function SettingsPage() {
                 ) : (
                   <CreditCard size={16} aria-hidden="true" />
                 )}
-                <span>Manage Subscription (Paddle)</span>
+                <span>{S.manageSub}</span>
               </button>
             ) : (
               <Link
@@ -519,7 +531,7 @@ export default function SettingsPage() {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-sm font-semibold rounded-xl transition-colors border border-cyan-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
               >
                 <CreditCard size={16} aria-hidden="true" />
-                <span>Upgrade to PRO</span>
+                <span>{S.upgrade}</span>
               </Link>
             )}
           </section>
@@ -527,22 +539,21 @@ export default function SettingsPage() {
           {/* Notification Settings */}
           <section className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Bell size={18} className="text-violet-400" aria-hidden="true" /> Notifications
+              <Bell size={18} className="text-violet-400" aria-hidden="true" /> {S.notifTitle}
             </h2>
 
             {!isPro ? (
               <div className="flex flex-col items-start gap-3 py-4 px-5 rounded-xl bg-zinc-900/60 border border-zinc-700/50">
                 <p className="text-sm text-zinc-400">
-                  <span className="text-zinc-200 font-semibold">Test completion email alerts</span> are a{" "}
-                  <span className="text-cyan-400 font-bold">PRO</span> feature.
-                  Upgrade to receive a notification email whenever an A/B test finishes.
+                  <span className="text-zinc-200 font-semibold">{S.proOnlyStrong}</span>{S.proOnlyMiddle}
+                  <span className="text-cyan-400 font-bold">PRO</span>{S.proOnlyAfter}
                 </p>
                 <Link
                   href="/pricing"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-sm font-semibold rounded-xl transition-colors border border-cyan-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                 >
                   <CreditCard size={15} aria-hidden="true" />
-                  Upgrade to PRO
+                  {S.upgrade}
                 </Link>
               </div>
             ) : (
@@ -550,29 +561,30 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between py-2 border-b border-zinc-800/50 pb-4">
                   <div>
                     <div className="font-medium text-zinc-200 flex items-center gap-2">
-                      <span>Test Completion Alerts</span>
+                      <span>{S.alertsTitle}</span>
                       <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                        🟢 Live
+                        {S.live}
                       </span>
                     </div>
                     <div className="text-sm text-zinc-400 mt-1">
-                      When a test finishes, a report is sent to{" "}
+                      {S.reportBefore}
                       <span className="text-cyan-400 font-medium">
                         {notifEmail && notifEmailVerified ? notifEmail : userEmail}
                       </span>
                       {notifEmail && notifEmailVerified && (
-                        <span className="ml-1.5 text-[11px] px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold">custom</span>
+                        <span className="ml-1.5 text-[11px] px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold">{S.custom}</span>
                       )}
+                      {S.reportAfter}
                     </div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4" htmlFor="email-alert-toggle">
-                    <span className="sr-only">Toggle test-completion email alerts</span>
+                    <span className="sr-only">{S.toggleSr}</span>
                     <input
                       type="checkbox"
                       id="email-alert-toggle"
                       role="switch"
                       aria-checked={emailAlerts}
-                      aria-label="Enable test-completion alerts"
+                      aria-label={S.toggleAria}
                       className="sr-only peer"
                       checked={emailAlerts}
                       onChange={async () => {
@@ -597,10 +609,10 @@ export default function SettingsPage() {
                 <div className="pt-4 border-b border-zinc-800/50 pb-5">
                   <div className="font-medium text-zinc-200 mb-1 flex items-center gap-2">
                     <Mail size={14} className="text-cyan-400" aria-hidden="true" />
-                    Notification Email
+                    {S.notifEmailTitle}
                   </div>
                   <p className="text-xs text-zinc-400 mb-3">
-                    Set a different email for notifications (e.g. your personal Gmail instead of a brand account email).
+                    {S.notifEmailSub}
                   </p>
 
                   {notifEmail && notifEmailVerified ? (
@@ -624,7 +636,7 @@ export default function SettingsPage() {
                           disabled={notifLoading || notifStep === "code_sent"}
                           className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-bold transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                         >
-                          {notifLoading && notifStep === "idle" ? <Loader2 size={14} className="animate-spin" /> : "Send Code"}
+                          {notifLoading && notifStep === "idle" ? <Loader2 size={14} className="animate-spin" /> : S.sendCode}
                         </button>
                       </div>
 
@@ -634,7 +646,7 @@ export default function SettingsPage() {
                             type="text"
                             value={notifCodeInput}
                             onChange={e => setNotifCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                            placeholder="6-digit code"
+                            placeholder={S.codePlaceholder}
                             maxLength={6}
                             className="flex-1 bg-zinc-900 border border-cyan-500/50 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500 tracking-widest font-mono"
                           />
@@ -643,7 +655,7 @@ export default function SettingsPage() {
                             disabled={notifLoading || notifCodeInput.length < 6}
                             className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-sm font-bold transition-all disabled:opacity-50 cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                           >
-                            {notifLoading ? <Loader2 size={14} className="animate-spin" /> : "Verify"}
+                            {notifLoading ? <Loader2 size={14} className="animate-spin" /> : S.verify}
                           </button>
                         </div>
                       )}

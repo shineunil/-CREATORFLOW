@@ -14,13 +14,16 @@
   
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
+
+  /* Tailwind 기본 font-sans와 같되, 한글 글자만 Noto Sans KR로 보이도록 system-ui 뒤에 끼워 넣음 */
+  --font-sans: ui-sans-serif, system-ui, var(--font-noto-kr), sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
 @layer base {
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+    font-family: var(--font-geist-sans), system-ui, -apple-system, var(--font-noto-kr), sans-serif;
   }
 }
 

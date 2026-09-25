@@ -39,6 +39,8 @@ class User(Base):
     notification_email_verified = Column(Boolean, default=False)
     # M-6: 이메일 알림 수신 여부 (기본값 True — 명시적으로 끄기 전까지 수신)
     email_alerts_enabled = Column(Boolean, default=True, nullable=False, server_default="1")
+    # 화면·이메일 언어 ("en" | "ko"). null이면 아직 고르지 않은 것 → 영어로 취급
+    locale = Column(String, nullable=True)
 
     # 1:N relationship with Channels
     channels = relationship("Channel", back_populates="user", cascade="all, delete-orphan")

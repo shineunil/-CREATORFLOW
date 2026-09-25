@@ -1,33 +1,28 @@
 import type { MetadataRoute } from "next";
+import { LOCALES } from "@/i18n/config";
+import { absoluteUrl } from "@/i18n/metadata";
+
+const PAGES: { path: string; changeFrequency: "weekly" | "monthly" | "yearly"; priority: number }[] = [
+  { path: "/", changeFrequency: "weekly", priority: 1.0 },
+  { path: "/pricing-public", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/faq", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/terms", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
+];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = "https://trythumbnailflow.com";
   const now = new Date();
 
-  return [
-    {
-      url: base,
+  // 언어별 주소를 모두 싣고, 각 항목에 서로의 번역 주소(hreflang)를 알려준다.
+  return PAGES.flatMap(({ path, changeFrequency, priority }) =>
+    LOCALES.map((locale) => ({
+      url: absoluteUrl(path, locale),
       lastModified: now,
-      changeFrequency: "weekly",
-      priority: 1.0,
-    },
-    {
-      url: `${base}/pricing-public`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${base}/terms`,
-      lastModified: now,
-      changeFrequency: "yearly",
-      priority: 0.3,
-    },
-    {
-      url: `${base}/privacy`,
-      lastModified: now,
-      changeFrequency: "yearly",
-      priority: 0.3,
-    },
-  ];
+      changeFrequency,
+      priority,
+      alternates: {
+        languages: Object.fromEntries(LOCALES.map((l) => [l, absoluteUrl(path, l)])),
+      },
+    }))
+  );
 }

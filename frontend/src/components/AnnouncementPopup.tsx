@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { X, Megaphone } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useI18n } from "@/i18n/I18nProvider";
 
 type Announcement = {
   id: number;
@@ -17,6 +18,7 @@ function todayStr() {
 }
 
 export default function AnnouncementPopup() {
+  const { t } = useI18n();
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [visible, setVisible] = useState(false);
   const [hideToday, setHideToday] = useState(false);
@@ -61,11 +63,11 @@ export default function AnnouncementPopup() {
         <div className="flex justify-between items-start mb-4">
           <div className="flex items-center gap-2">
             <Megaphone size={20} className="text-cyan-400" aria-hidden="true" />
-            <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">Notice</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">{t.common.notice}</span>
           </div>
           <button
             onClick={dismiss}
-            aria-label="Close notice"
+            aria-label={t.common.closeNotice}
             className="text-zinc-400 hover:text-white p-1 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
           >
             <X size={18} aria-hidden="true" />
@@ -87,7 +89,7 @@ export default function AnnouncementPopup() {
             className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 accent-cyan-500 cursor-pointer"
           />
           <span className="text-xs text-zinc-400 group-hover:text-zinc-300 transition-colors">
-            Don&apos;t show again today
+            {t.common.hideToday}
           </span>
         </label>
 
@@ -107,7 +109,7 @@ export default function AnnouncementPopup() {
             onClick={dismiss}
             className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
           >
-            Close
+            {t.common.close}
           </button>
         </div>
       </div>

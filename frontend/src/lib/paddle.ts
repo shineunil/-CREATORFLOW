@@ -6,7 +6,7 @@ type PaddleGlobal = {
   Checkout: {
     open: (options: {
       transactionId: string;
-      settings?: { displayMode?: "overlay"; successUrl?: string };
+      settings?: { displayMode?: "overlay"; successUrl?: string; locale?: string };
     }) => void;
   };
 };
@@ -41,7 +41,7 @@ function loadPaddle(): Promise<PaddleGlobal> {
   return paddleLoad;
 }
 
-export async function openPaddleCheckout(): Promise<void> {
+export async function openPaddleCheckout(locale: string = "en"): Promise<void> {
   const res = await apiFetch("/api/checkout/create-session", { method: "POST" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -62,6 +62,7 @@ export async function openPaddleCheckout(): Promise<void> {
     settings: {
       displayMode: "overlay",
       successUrl: `${window.location.origin}/dashboard?upgraded=true`,
+      locale,
     },
   });
 }

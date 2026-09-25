@@ -1,6 +1,7 @@
 import os
 from PIL import Image, ImageStat
 import math
+from messages import msg
 
 def calculate_brightness(stat):
     # R, G, B 평균으로 명도 계산
@@ -36,7 +37,7 @@ def analyze_thumbnail(image_path: str) -> dict:
     """
     try:
         if not os.path.exists(image_path):
-            return {"score": 50, "feedback": "이미지를 찾을 수 없습니다."}
+            return {"score": 50, "feedback": msg("score_image_missing")}
 
         with Image.open(image_path) as img:
             img = img.convert('RGB')
@@ -61,19 +62,19 @@ def analyze_thumbnail(image_path: str) -> dict:
             # 피드백 생성
             feedback = []
             if total_score >= 80:
-                feedback.append("전반적으로 시선을 사로잡는 매우 훌륭한 썸네일입니다!")
+                feedback.append(msg("score_great"))
             elif total_score >= 60:
-                feedback.append("무난한 썸네일이지만 조금 더 대비를 주면 눈에 띌 수 있습니다.")
+                feedback.append(msg("score_ok"))
             else:
-                feedback.append("어둡거나 눈에 띄지 않아 스크롤 시 묻힐 확률이 높습니다.")
-                
+                feedback.append(msg("score_weak"))
+
             if brightness < 90:
-                feedback.append("명도가 너무 낮아(어두움) 모바일에서 잘 안 보일 수 있습니다. 밝기를 올리세요.")
+                feedback.append(msg("score_too_dark"))
             elif brightness > 220:
-                feedback.append("명도가 너무 높아 눈이 부십니다. 톤다운이 필요합니다.")
-                
+                feedback.append(msg("score_too_bright"))
+
             if colorfulness > 80:
-                feedback.append("색채가 화려하여 시선을 끌기 좋습니다.")
+                feedback.append(msg("score_colorful"))
                 
             return {
                 "score": total_score,
@@ -85,4 +86,4 @@ def analyze_thumbnail(image_path: str) -> dict:
                 }
             }
     except Exception as e:
-        return {"score": 0, "feedback": f"분석 중 오류 발생: {e}"}
+        return {"score": 0, "feedback": msg("score_error", error=e)}
