@@ -11,7 +11,7 @@ const LAUNCH_POPUP_KEY = "launch_popup_hidden";
 const STEP_ICONS = [<Upload key="upload" size={16} />, <Clock key="clock" size={16} />, <RefreshCw key="rotate" size={16} />, <TrendingUp key="track" size={16} />, <Award key="award" size={16} />];
 
 export default function LandingPage() {
-  const { t, lp } = useI18n();
+  const { t, lp, locale } = useI18n();
   const L = t.landing;
   const [vph, setVph] = useState(42);
   const [popupVisible, setPopupVisible] = useState(false);
@@ -99,11 +99,13 @@ export default function LandingPage() {
             {L.eyebrow}
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-7 leading-[1.08] break-keep">
+          {/* 한글은 글자 폭이 넓어 휴대폰에서 한 단계 작게 (데스크톱 크기는 같음) */}
+          <h1 className={`${locale === "ko" ? "text-4xl" : "text-5xl"} md:text-7xl font-black tracking-tight mb-7 leading-[1.08] break-keep`}>
             {L.heroLine1}<br className="hidden md:block" />{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-violet-400">
               {L.heroGradient}
-            </span>{" "}
+            </span>
+            {L.heroBreakBeforeLine3 && <br className="hidden md:block" />}{" "}
             {L.heroLine3}
           </h1>
 
@@ -295,9 +297,10 @@ export default function LandingPage() {
                 <span className="text-zinc-400"> {t.common.perMonth}</span>
               </div>
               <ul className="space-y-4 mb-10 flex-1">
-                {Object.values(t.plans.basicFeatures).map((feature) => (
+                {[t.plans.basicFeatures.testsPerMonth, t.plans.basicFeatures.concurrent, t.plans.basicFeatures.variants, t.plans.basicFeatures.interval].map((feature) => (
                   <li key={feature} className="flex items-center gap-3 text-base text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> {feature}</li>
                 ))}
+                <li className="flex items-center gap-3 text-base text-zinc-300"><Check size={16} className="text-zinc-400 flex-shrink-0" aria-hidden="true" /> <span><RichText value={t.plans.autoApplyRich} strongClassName="font-semibold text-cyan-300" /></span></li>
               </ul>
               <Link href={lp("/login")} className="w-full py-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
                 {t.plans.startForFree}
@@ -320,7 +323,7 @@ export default function LandingPage() {
                 <ProFeature><RichText value={t.plans.proFeatures.concurrent} strongClassName="font-semibold text-cyan-300" /></ProFeature>
                 <ProFeature>{t.plans.proFeatures.variants}</ProFeature>
                 <ProFeature><RichText value={t.plans.proFeatures.interval} strongClassName="font-semibold text-cyan-300" /></ProFeature>
-                <ProFeature>{t.plans.proFeatures.autoApply}</ProFeature>
+                <ProFeature><RichText value={t.plans.autoApplyRich} strongClassName="font-semibold text-cyan-300" /></ProFeature>
                 <ProFeature><RichText value={t.plans.proFeatures.email} strongClassName="font-semibold text-cyan-300" /></ProFeature>
               </ul>
               <Link href={lp("/login")} className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-center transition-all shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
@@ -341,7 +344,7 @@ export default function LandingPage() {
           transition={{ duration: 0.5 }}
           className="max-w-3xl mx-auto px-6 relative z-10"
         >
-          <h2 className="text-4xl md:text-5xl font-black text-white mb-6 break-keep">
+          <h2 className={`${locale === "ko" ? "text-[28px]" : "text-4xl"} md:text-5xl font-black text-white mb-6 break-keep whitespace-pre-line`}>
             {L.finalTitle}
           </h2>
           <p className="text-xl text-zinc-400 mb-10 break-keep">

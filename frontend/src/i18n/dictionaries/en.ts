@@ -66,6 +66,7 @@ export const en = {
     },
     startForFree: "Start for free",
     getStarted: "Get started",
+    autoApplyRich: { before: "", strong: "Best thumbnail auto-applied", after: " at test end" } as Rich,
   },
 
   checkout: {
@@ -79,6 +80,8 @@ export const en = {
     heroLine1: "Same video.",
     heroGradient: "Different thumbnails.",
     heroLine3: "One clear winner.",
+    /** 데스크톱에서 heroLine3 앞에서 줄을 바꿀지 (한국어는 문장이 길어 어절 중간에서 끊기는 걸 막기 위함) */
+    heroBreakBeforeLine3: false,
     heroSub:
       "Upload a few thumbnail and title variants. ThumbnailFlow rotates them on your live video and ranks each by views earned per hour — not raw view count — so a slow afternoon slot never gets mistaken for a loser.",
     heroCta: "Start testing — free",

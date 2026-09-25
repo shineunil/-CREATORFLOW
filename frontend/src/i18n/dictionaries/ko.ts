@@ -65,6 +65,7 @@ export const ko: Dictionary = {
     },
     startForFree: "무료로 시작하기",
     getStarted: "시작하기",
+    autoApplyRich: { before: "테스트 종료 시 최고 ", strong: "썸네일 자동 적용", after: "" },
   },
 
   checkout: {
@@ -75,9 +76,10 @@ export const ko: Dictionary = {
 
   landing: {
     eyebrow: "유튜브 크리에이터를 위한 썸네일 테스트",
-    heroLine1: "같은 영상.",
-    heroGradient: "다른 썸네일.",
-    heroLine3: "승자는 단 하나.",
+    heroLine1: "영상은 그대로,",
+    heroGradient: "썸네일만 바꿔서",
+    heroLine3: "조회수로 답을 찾습니다.",
+    heroBreakBeforeLine3: true,
     heroSub:
       "썸네일과 제목 후보를 몇 개 올려 주세요. ThumbnailFlow가 공개 중인 영상에 번갈아 적용하고, 총 조회수가 아니라 시간당 조회수로 순위를 매깁니다. 그래서 조회수가 적은 시간대에 걸렸다는 이유만으로 좋은 썸네일이 탈락하는 일이 없습니다.",
     heroCta: "무료로 테스트 시작하기",
@@ -146,7 +148,7 @@ export const ko: Dictionary = {
     compareCta: "첫 테스트 시작하기",
     pricingTitle: "간단하고 투명한 요금제.",
     pricingSub: "무료로 시작하고, 제한 없이 쓰고 싶을 때 업그레이드하세요.",
-    finalTitle: "어떤 썸네일이 이길지, 이제 추측하지 마세요.",
+    finalTitle: "감으로 고르던 썸네일,\n이제 데이터로 고르세요.",
     finalSub: "모든 테스트는 백그라운드에서 진행됩니다. 승자가 정해지면 확인만 하세요.",
     finalCta: "무료로 테스트 시작하기",
     popup: {
