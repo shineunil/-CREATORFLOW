@@ -99,7 +99,7 @@ export default function LandingPage() {
           </div>
 
           {/* 한글은 글자 폭이 넓어 휴대폰에서 한 단계 작게 (데스크톱 크기는 같음) */}
-          <h1 className={`${locale === "ko" ? "text-4xl" : "text-5xl"} md:text-7xl font-black tracking-tight mb-7 leading-[1.08] break-keep`}>
+          <h1 className={`${locale === "ko" ? "text-4xl" : "text-5xl"} md:text-7xl font-black tracking-tight mb-7 leading-[1.2] break-keep`}>
             {L.heroLine1}<br className="hidden md:block" />{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-violet-400">
               {L.heroGradient}
@@ -205,7 +205,7 @@ export default function LandingPage() {
       <section className="py-28 md:py-32 bg-zinc-950 border-t border-zinc-900 relative z-10">
         <div className="max-w-6xl mx-auto px-6">
           <div className="max-w-xl mb-20">
-            <h2 className="text-3xl md:text-4xl font-black mb-4 break-keep">{L.processTitle}</h2>
+            <h2 className="text-3xl md:text-4xl font-black leading-[1.3] mb-4 break-keep">{L.processTitle}</h2>
             <p className="text-zinc-400 text-lg break-keep">{L.processSub}</p>
           </div>
 
@@ -239,7 +239,7 @@ export default function LandingPage() {
       <section className="py-28 md:py-32 relative z-10">
         <div className="max-w-5xl mx-auto px-6">
           <div className="max-w-xl mb-16">
-            <h2 className="text-3xl md:text-4xl font-black mb-4 break-keep">{L.compareTitle}</h2>
+            <h2 className="text-3xl md:text-4xl font-black leading-[1.3] mb-4 break-keep">{L.compareTitle}</h2>
             <p className="text-zinc-400 text-lg break-keep">{L.compareSub}</p>
           </div>
 
@@ -279,7 +279,7 @@ export default function LandingPage() {
       <section id="pricing" className="py-28 md:py-32 bg-zinc-950 border-t border-zinc-900 relative z-10">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-black mb-4 break-keep">{L.pricingTitle}</h2>
+            <h2 className="text-3xl md:text-4xl font-black leading-[1.3] mb-4 break-keep">{L.pricingTitle}</h2>
             <p className="text-zinc-400 text-lg break-keep">{L.pricingSub}</p>
           </div>
 
@@ -339,7 +339,7 @@ export default function LandingPage() {
           transition={{ duration: 0.5 }}
           className="max-w-3xl mx-auto px-6 relative z-10"
         >
-          <h2 className={`${locale === "ko" ? "text-[28px]" : "text-4xl"} md:text-5xl font-black text-white mb-6 break-keep whitespace-pre-line`}>
+          <h2 className={`${locale === "ko" ? "text-[28px]" : "text-4xl"} md:text-5xl font-black text-white leading-[1.3] mb-6 break-keep whitespace-pre-line`}>
             {L.finalTitle}
           </h2>
           <p className="text-xl text-zinc-400 mb-10 break-keep">
