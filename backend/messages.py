@@ -113,6 +113,10 @@ MESSAGES: dict[str, dict[str, str]] = {
     "upgraded_pro": {"en": "You've been upgraded to the PRO plan!", "ko": "PRO 요금제로 업그레이드되었습니다!"},
     "no_billing_history": {"en": "No billing history found. Please complete a PRO payment first.", "ko": "결제 내역이 없습니다. PRO 결제를 진행한 뒤 다시 시도해 주세요."},
     "billing_portal_failed": {"en": "Couldn't open the billing portal.", "ko": "결제 관리 페이지를 여는 데 실패했습니다."},
+    "billing_owner_only": {
+        "en": "Only the account owner can manage billing. Sign in with the Google account (channel) you first signed up with.",
+        "ko": "결제 관리는 계정 주인만 할 수 있습니다. 처음 가입한 구글 계정(채널)으로 로그인해 주세요.",
+    },
 
     # --- 알림 이메일 ---
     "invalid_email": {"en": "Invalid email address.", "ko": "올바르지 않은 이메일 주소입니다."},

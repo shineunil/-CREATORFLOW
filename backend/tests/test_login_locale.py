@@ -179,3 +179,41 @@ def test_auth_code_can_only_be_exchanged_by_the_browser_that_logged_in(session_f
 
     # 한 번 쓴 코드는 다시 쓸 수 없다
     assert client.get(f"/api/auth/exchange?code={auth_code}").status_code == 400
+
+
+# --- 결제 관리는 계정 주인만 ---
+
+def _log_in(client):
+    state = _start_login(client)
+    res = _callback(client, state)
+    auth_code = urllib.parse.parse_qs(urllib.parse.urlparse(res.headers["location"]).query)["auth_code"][0]
+    assert client.get(f"/api/auth/exchange?code={auth_code}").status_code == 200
+
+
+def test_owner_session_passes_the_billing_owner_check(session_factory):
+    client = TestClient(main.app)
+    _log_in(client)
+    res = client.get("/api/billing/portal")
+    # 주인 확인은 통과하고, 결제 내역이 없어서 404가 난다
+    assert res.status_code == 404
+
+
+def test_channel_manager_session_cannot_open_billing(session_factory):
+    # 채널 주인은 다른 구글 계정으로 가입해 두었고, 관리자가 같은 채널을 골라 로그인한 상황
+    db = session_factory()
+    owner = User(google_user_id="owner-google-id", email="owner@example.com")
+    db.add(owner)
+    db.commit()
+    db.add(Channel(user_id=owner.id, youtube_channel_id=CHANNEL_ID, channel_title="Test Channel"))
+    db.add(Channel(user_id=owner.id, youtube_channel_id="UC-other", channel_title="Other"))
+    db.commit()
+    other_channel_id = db.query(Channel).filter(Channel.youtube_channel_id == "UC-other").one().id
+    db.close()
+
+    client = TestClient(main.app)
+    _log_in(client)
+    assert client.get("/api/billing/portal").status_code == 403
+
+    # 채널을 바꿔도 주인 권한이 생기지 않는다
+    assert client.post(f"/api/channels/{other_channel_id}/switch").status_code == 200
+    assert client.get("/api/billing/portal").status_code == 403

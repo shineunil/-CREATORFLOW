@@ -86,17 +86,20 @@ def _verify_state_nonce(state: str) -> int | None:
     except Exception:
         return None
 
-def create_access_token(user_id: int, channel_id: int) -> str:
+def create_access_token(user_id: int, channel_id: int, is_owner: bool) -> str:
     """
     한 계정(User)이 여러 YouTube 채널을 연동할 수 있으므로, 토큰에는 유저 신원(sub)과
     "지금 보고 있는 채널"(channel_id)을 함께 담는다. 채널 전환은 /api/channels/{id}/switch로
     channel_id만 다른 새 토큰을 재발급받는 방식으로 처리한다 (기존 엔드포인트들은 변경 없이
     Depends(get_current_channel)만으로 계속 동작함).
+    "own"은 계정을 만든 구글 계정 본인으로 로그인했는지 여부다. 채널 관리자(브랜드 계정 공동 관리자)가
+    그 채널을 골라 로그인하면 주인 계정으로 들어오게 되는데, 이때는 False라서 결제 관리를 막는다.
     """
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
         "channel_id": channel_id,
+        "own": is_owner,
         "iat": now,
         "exp": now + timedelta(days=JWT_EXPIRE_DAYS),
     }
@@ -117,6 +120,17 @@ def _decode_token(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+def _session_is_owner(request: Request, user_id: int) -> bool:
+    """지금 로그인 쿠키가 이 유저 계정의 주인 본인 세션인지 (토큰의 "own" 값). 없거나 무효면 False."""
+    token = request.cookies.get("auth_token")
+    if not token:
+        return False
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError:
+        return False
+    return payload.get("sub") == str(user_id) and payload.get("own") is True
 
 def _set_auth_cookie(response: JSONResponse, token: str):
     """HttpOnly 쿠키에 JWT를 설정한다.
@@ -442,7 +456,14 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
     # 대신 단기(5분) 일회용 auth_code를 생성해 URL에 실어 보내고,
     # 프론트엔드가 해당 코드를 /api/auth/exchange로 교환해 JWT를 받도록 한다.
     import secrets as _secrets
-    token = create_access_token(channel.user_id, channel.id)
+    if linking_user_id:
+        # 채널 추가는 이미 로그인한 세션에서 시작하므로, 그 세션의 주인 여부를 그대로 이어받는다
+        # (관리자로 들어온 세션이 채널 추가를 거쳐 주인 권한을 얻지 못하게).
+        is_owner = channel.user_id == linking_user_id and _session_is_owner(request, linking_user_id)
+    else:
+        # 이번에 로그인한 구글 계정이 곧 이 채널을 가진 계정일 때만 주인이다.
+        is_owner = channel.user_id == user.id and user.google_user_id == google_user_id
+    token = create_access_token(channel.user_id, channel.id, is_owner)
     auth_code = _secrets.token_urlsafe(32)
     now = datetime.now(timezone.utc)
     # 만료된 코드 정리 (최대 행 수 제어)
@@ -536,13 +557,14 @@ def list_channels(db: Session = Depends(get_db), channel: Channel = Depends(get_
     }
 
 @app.post("/api/channels/{target_channel_id}/switch")
-def switch_channel(target_channel_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+def switch_channel(request: Request, target_channel_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """대시보드에서 다른 연동 채널로 전환 - 같은 계정 소유 채널일 때만 새 토큰을 발급한다."""
     target = db.query(Channel).filter(Channel.id == target_channel_id).first()
     if not target or target.user_id != channel.user_id:
         raise HTTPException(status_code=404, detail=msg("channel_not_owned"))
 
-    token = create_access_token(target.user_id, target.id)
+    # 채널만 바꾸고 주인 여부는 지금 세션 그대로 유지한다.
+    token = create_access_token(target.user_id, target.id, _session_is_owner(request, target.user_id))
     # L-3: JWT를 응답 body 대신 HttpOnly 쿠키에 설정한다.
     response = JSONResponse(content={"ok": True, "channel_title": target.channel_title})
     _set_auth_cookie(response, token)
@@ -1436,11 +1458,14 @@ def upgrade_user_plan_test(db: Session = Depends(get_db), channel: Channel = Dep
     return {"status": "success", "message": msg("upgraded_pro"), "plan": user.plan.value}
 
 @app.get("/api/billing/portal")
-async def get_billing_portal(channel: Channel = Depends(get_current_channel)):
+async def get_billing_portal(request: Request, channel: Channel = Depends(get_current_channel)):
     """
     Paddle Customer Portal URL 발급. Paddle 고객 ID로 인증 토큰을 발급받아
     구독 관리 페이지로 리다이렉트한다.
+    결제 정보 조회·구독 취소가 가능한 페이지라, 채널 관리자로 들어온 세션에는 열어주지 않는다.
     """
+    if not _session_is_owner(request, channel.user_id):
+        raise HTTPException(status_code=403, detail=msg("billing_owner_only"))
     user = channel.user
     if not user or not user.stripe_customer_id:
         raise HTTPException(status_code=404, detail=msg("no_billing_history"))
