@@ -67,7 +67,7 @@ function LoginContent() {
           </button>
 
           <p className="mt-8 text-center text-xs text-zinc-400 leading-relaxed break-keep">
-            {t.login.agreeBefore}<Link href={lp("/terms")} className="text-cyan-500 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded">{t.login.agreeTerms}</Link>{t.login.agreeMiddle}<Link href={lp("/privacy")} className="text-cyan-500 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded">{t.login.agreePrivacy}</Link>{t.login.agreeAfter}
+            {t.login.agreeBefore}<Link href={lp("/terms")} className="text-cyan-400 underline underline-offset-2 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded">{t.login.agreeTerms}</Link>{t.login.agreeMiddle}<Link href={lp("/privacy")} className="text-cyan-400 underline underline-offset-2 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded">{t.login.agreePrivacy}</Link>{t.login.agreeAfter}
           </p>
         </div>
       </div>

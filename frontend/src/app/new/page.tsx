@@ -525,6 +525,7 @@ function NewTestContent() {
                           </div>
                           <input
                             type="text"
+                            aria-label={N.headlinePlaceholder}
                             value={v.generateHeadline}
                             onChange={(e) => handleGenerateHeadlineChange(v.id, e.target.value)}
                             placeholder={N.headlinePlaceholder}
@@ -570,8 +571,9 @@ function NewTestContent() {
                     
                     <div className="space-y-6">
                       <div>
-                        <label className="block text-base font-bold text-white mb-3">{N.titleLabel}</label>
+                        <label htmlFor={`variation-title-${v.id}`} className="block text-base font-bold text-white mb-3">{N.titleLabel}</label>
                         <input
+                          id={`variation-title-${v.id}`}
                           type="text"
                           value={v.title_text}
                           onChange={(e) => handleTitleChange(v.id, e.target.value)}
@@ -609,8 +611,9 @@ function NewTestContent() {
             <h2 className="text-xl font-bold mb-4 border-b border-zinc-800 pb-4">{N.step3}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
-                  <label className="block text-sm font-bold text-zinc-300 mb-2">{N.swapIntervalLabel}</label>
+                  <label htmlFor="swap-interval" className="block text-sm font-bold text-zinc-300 mb-2">{N.swapIntervalLabel}</label>
                   <select
+                    id="swap-interval"
                     value={swapInterval}
                     onChange={(e) => {
                       // BASIC 요금제는 최소 4시간(240분) 주기부터 선택 가능 - backend/test_policy.py의
@@ -650,8 +653,9 @@ function NewTestContent() {
                 </div>
 
               <div className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
-                <label className="block text-sm font-bold text-zinc-300 mb-2">{N.durationLabel}</label>
+                <label htmlFor="test-duration" className="block text-sm font-bold text-zinc-300 mb-2">{N.durationLabel}</label>
                 <select
+                  id="test-duration"
                   value={durationHours}
                   onChange={(e) => setDurationHours(e.target.value)}
                   className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 appearance-none"

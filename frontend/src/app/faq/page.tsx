@@ -26,11 +26,11 @@ export default async function FAQPage() {
         </div>
 
         <h1 className="text-3xl font-black text-white mb-2">{t.faq.title}</h1>
-        <p className="text-base text-zinc-500 mb-12 break-keep">
+        <p className="text-base text-zinc-400 mb-12 break-keep">
           {t.faq.introBefore}
           <a
             href="mailto:admin@trythumbnailflow.com"
-            className="text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            className="text-cyan-400 underline underline-offset-2 hover:text-cyan-300 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
           >
             {t.faq.introLink}
           </a>
@@ -55,14 +55,14 @@ export default async function FAQPage() {
           ))}
         </div>
 
-        <div className="mt-16 pt-10 border-t border-zinc-800 text-sm text-zinc-500 space-y-1">
+        <div className="mt-16 pt-10 border-t border-zinc-800 text-sm text-zinc-400 space-y-1">
           <p>
             {t.faq.seeAlso}{" "}
-            <Link href={localizePath("/terms", locale)} className="text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            <Link href={localizePath("/terms", locale)} className="text-cyan-400 underline underline-offset-2 hover:text-cyan-300 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
               {t.faq.terms}
             </Link>{" "}
             &amp;{" "}
-            <Link href={localizePath("/privacy", locale)} className="text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            <Link href={localizePath("/privacy", locale)} className="text-cyan-400 underline underline-offset-2 hover:text-cyan-300 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
               {t.faq.privacy}
             </Link>
           </p>

@@ -9,7 +9,7 @@ export function generateMetadata() {
   return publicPageMetadata("/terms", (m) => ({ title: m.termsTitle, description: m.termsDescription }));
 }
 
-const linkClass = "text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400";
+const linkClass = "text-cyan-400 underline underline-offset-2 hover:text-cyan-300 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400";
 
 export default async function TermsPage() {
   const { locale, t } = await getI18n();

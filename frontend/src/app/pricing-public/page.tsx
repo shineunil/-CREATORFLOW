@@ -83,8 +83,8 @@ export default async function PricingPublicPage() {
           </div>
         </div>
 
-        <div className="mt-12 text-center text-sm text-zinc-500">
-          <RichText value={t.pricingPublic.paddleNote} strongClassName="text-zinc-400 font-medium" />
+        <div className="mt-12 text-center text-sm text-zinc-400">
+          <RichText value={t.pricingPublic.paddleNote} strongClassName="text-zinc-300 font-medium" />
         </div>
       </div>
     </div>

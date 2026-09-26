@@ -334,8 +334,8 @@ export default function SettingsPage() {
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">{S.googleEmail}</label>
-                <input type="text" disabled value={userEmail} className="w-full bg-zinc-900/50 border border-zinc-800 text-cyan-400 font-semibold rounded-lg p-3 text-sm cursor-not-allowed" />
+                <label htmlFor="account-email" className="block text-sm text-zinc-400 mb-1">{S.googleEmail}</label>
+                <input id="account-email" type="text" disabled value={userEmail} className="w-full bg-zinc-900/50 border border-zinc-800 text-cyan-400 font-semibold rounded-lg p-3 text-sm cursor-not-allowed" />
               </div>
               <div className="pt-2">
                 <button
@@ -498,7 +498,7 @@ export default function SettingsPage() {
                 );
               })}
               {channels.filter(c => c.is_connected).length === 0 && (
-                <p className="text-sm text-zinc-500 py-2">{S.noChannels}</p>
+                <p className="text-sm text-zinc-400 py-2">{S.noChannels}</p>
               )}
             </div>
           </section>
@@ -625,6 +625,7 @@ export default function SettingsPage() {
                       <div className="flex gap-2">
                         <input
                           type="email"
+                          aria-label={S.notifEmailTitle}
                           value={notifEmailInput}
                           onChange={e => setNotifEmailInput(e.target.value)}
                           placeholder="your@gmail.com"
@@ -644,6 +645,8 @@ export default function SettingsPage() {
                         <div className="flex gap-2">
                           <input
                             type="text"
+                            inputMode="numeric"
+                            aria-label={S.codePlaceholder}
                             value={notifCodeInput}
                             onChange={e => setNotifCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
                             placeholder={S.codePlaceholder}

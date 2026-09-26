@@ -9,7 +9,7 @@ export function generateMetadata() {
   return publicPageMetadata("/privacy", (m) => ({ title: m.privacyTitle, description: m.privacyDescription }));
 }
 
-const linkClass = "text-cyan-500 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400";
+const linkClass = "text-cyan-400 underline underline-offset-2 hover:text-cyan-300 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400";
 
 export default async function PrivacyPolicyPage() {
   const { locale, t } = await getI18n();
