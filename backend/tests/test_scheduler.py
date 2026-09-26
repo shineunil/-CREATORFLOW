@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -30,10 +30,10 @@ def make_running_test(session, num_variations=2, swap_interval_minutes=60, last_
         video_id=video.id,
         status=TestStatus.RUNNING,
         swap_interval_minutes=swap_interval_minutes,
-        last_swapped_at=last_swapped_at or datetime.utcnow(),
+        last_swapped_at=last_swapped_at or datetime.now(timezone.utc),
         last_views_snapshot=0,
-        start_time=datetime.utcnow(),
-        end_time=datetime.utcnow() + timedelta(days=1),
+        start_time=datetime.now(timezone.utc),
+        end_time=datetime.now(timezone.utc) + timedelta(days=1),
     )
     session.add(test)
     session.commit()
@@ -53,23 +53,24 @@ def engine():
     return AVSchedulerEngine(db_session_maker=lambda: None)  # 실제로 세션을 만들지 않음 (테스트에서 직접 세션을 넘기므로)
 
 
-def test_get_next_variation_cycles_a_b_c_a(engine, db_session):
+def test_get_next_variation_cycles_b_c_a_b(engine, db_session):
     test, channel, video, variations = make_running_test(db_session, num_variations=3)
 
+    # 원본(A)은 이미 유튜브에 적용된 상태라 첫 교체는 B부터
     first = engine._get_next_variation(variations, None)
-    assert first.id == variations[0].id
+    assert first.id == variations[1].id
 
-    second = engine._get_next_variation(variations, variations[0])
-    assert second.id == variations[1].id
-
-    third = engine._get_next_variation(variations, variations[1])
-    assert third.id == variations[2].id
+    second = engine._get_next_variation(variations, variations[1])
+    assert second.id == variations[2].id
 
     wraps_around = engine._get_next_variation(variations, variations[2])
     assert wraps_around.id == variations[0].id
 
+    back_to_b = engine._get_next_variation(variations, variations[0])
+    assert back_to_b.id == variations[1].id
 
-def test_first_swap_applies_first_variation_and_sets_swap_count(engine, db_session, monkeypatch):
+
+def test_first_swap_applies_first_new_variation_and_sets_swap_count(engine, db_session, monkeypatch):
     test, channel, video, variations = make_running_test(db_session)
 
     monkeypatch.setattr(scheduler_module, "get_video_views", lambda *a, **k: _async_return(500))
@@ -78,7 +79,7 @@ def test_first_swap_applies_first_variation_and_sets_swap_count(engine, db_sessi
 
     run(engine._do_swap(test, db_session))
 
-    assert test.current_variation_id == variations[0].id
+    assert test.current_variation_id == variations[1].id  # 원본(A)을 건너뛰고 B 적용
     assert test.swap_count == 1
     assert test.swap_failed is False
     assert test.warmup_captured is False  # 새로 적용된 변인의 워밍업 재캡처 대기 상태
@@ -115,6 +116,7 @@ def test_swap_records_metric_log_regardless_of_swap_outcome(engine, db_session, 
     monkeypatch.setattr(scheduler_module, "update_youtube_title", lambda *a, **k: _async_return(False))  # 스왑은 실패
 
     run(engine._do_swap(test, db_session))
+    db_session.commit()  # 실제 스케줄러도 _do_swap 뒤에 커밋한다 (세션이 autoflush=False라 커밋 전엔 조회되지 않음)
 
     logs = variations[0].metric_logs
     assert len(logs) == 1
@@ -125,7 +127,7 @@ def test_warmup_exclusion_narrows_hours_exposed(engine, db_session, monkeypatch)
     test, channel, video, variations = make_running_test(db_session)
     test.current_variation_id = variations[0].id
     test.last_views_snapshot = 0
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     # 워밍업이 이미 캡처된 상태: exposure_start_at이 last_swapped_at보다 30분 늦음
     test.last_swapped_at = now - timedelta(minutes=60)
     test.exposure_start_at = now - timedelta(minutes=30)
@@ -137,6 +139,7 @@ def test_warmup_exclusion_narrows_hours_exposed(engine, db_session, monkeypatch)
     monkeypatch.setattr(scheduler_module, "update_youtube_title", lambda *a, **k: _async_return(True))
 
     run(engine._do_swap(test, db_session))
+    db_session.commit()
 
     logs = variations[0].metric_logs
     assert len(logs) == 1

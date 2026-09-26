@@ -3,11 +3,32 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from datetime import timezone
+
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import DateTime, create_engine, event, inspect
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm.attributes import set_committed_value
 
 from models import Base
+
+
+def _restore_utc(target, *_):
+    """
+    SQLite는 저장할 때 시간대 정보를 버려서, DateTime(timezone=True) 칸을 다시 읽으면 시간대 없는 시각이 된다.
+    실제 DB(Postgres timestamptz)처럼 UTC 시간대를 붙여 돌려준다 - 그래야 코드의 datetime.now(timezone.utc)와 계산할 수 있다.
+    """
+    for attr in inspect(target).mapper.column_attrs:
+        column = attr.columns[0]
+        if not (isinstance(column.type, DateTime) and column.type.timezone):
+            continue
+        value = target.__dict__.get(attr.key)
+        if value is not None and value.tzinfo is None:
+            set_committed_value(target, attr.key, value.replace(tzinfo=timezone.utc))
+
+
+event.listen(Base, "load", _restore_utc, propagate=True)
+event.listen(Base, "refresh", _restore_utc, propagate=True)
 
 
 @pytest.fixture()
