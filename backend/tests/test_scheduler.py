@@ -162,5 +162,82 @@ def test_token_revoked_marks_channel_needs_reconnect(engine, db_session, monkeyp
     assert test.current_variation_id is None
 
 
+YT_ORIGINAL = "https://i.ytimg.com/vi/vid123/hqdefault.jpg"
+KEPT_ORIGINAL = "https://res.cloudinary.com/demo/image/upload/original_vid123.jpg"
+
+
+def _stub_youtube(monkeypatch, calls):
+    monkeypatch.setattr(scheduler_module, "get_video_views", lambda *a, **k: _async_return(500))
+
+    async def fake_thumbnail(*a, **k):
+        calls.append("thumbnail")
+        return True
+
+    async def fake_title(*a, **k):
+        calls.append("title")
+        return True
+
+    monkeypatch.setattr(scheduler_module, "update_youtube_thumbnail", fake_thumbnail)
+    monkeypatch.setattr(scheduler_module, "update_youtube_title", fake_title)
+
+
+def test_first_swap_keeps_the_original_thumbnail_before_applying_b(engine, db_session, monkeypatch):
+    test, channel, video, variations = make_running_test(db_session)
+    variations[0].thumbnail_image_url = YT_ORIGINAL  # 원본(A)은 유튜브 주소로 들어온다
+    db_session.commit()
+
+    kept_for = []
+
+    async def fake_snapshot(video_id):
+        kept_for.append(video_id)
+        return KEPT_ORIGINAL
+
+    monkeypatch.setattr(scheduler_module, "snapshot_original_thumbnail", fake_snapshot)
+    calls = []
+    _stub_youtube(monkeypatch, calls)
+
+    run(engine._do_swap(test, db_session))
+
+    assert kept_for == ["vid123"]
+    assert variations[0].thumbnail_image_url == KEPT_ORIGINAL  # 이후 A 교체·복구는 보관한 원본을 쓴다
+    assert test.current_variation_id == variations[1].id
+
+
+def test_first_swap_waits_when_the_original_cannot_be_kept(engine, db_session, monkeypatch):
+    test, channel, video, variations = make_running_test(db_session)
+    variations[0].thumbnail_image_url = YT_ORIGINAL
+    db_session.commit()
+
+    monkeypatch.setattr(scheduler_module, "snapshot_original_thumbnail", lambda video_id: _async_return(None))
+    calls = []
+    _stub_youtube(monkeypatch, calls)
+
+    run(engine._do_swap(test, db_session))
+
+    # 원본을 잃지 않도록 B를 걸지 않고, 다음 주기에 다시 시도한다
+    assert calls == []
+    assert test.current_variation_id is None
+    assert test.swap_failed is True
+    assert variations[0].thumbnail_image_url == YT_ORIGINAL
+
+
+def test_later_swaps_do_not_fetch_the_original_again(engine, db_session, monkeypatch):
+    test, channel, video, variations = make_running_test(db_session, num_variations=3)  # B 다음은 C (네트워크 없음)
+    variations[0].thumbnail_image_url = YT_ORIGINAL  # (보관 이전 데이터라도) 이미 교체가 시작된 테스트
+    test.current_variation_id = variations[1].id
+    test.swap_count = 1
+    db_session.commit()
+
+    async def must_not_run(video_id):
+        raise AssertionError("첫 교체 이후에는 원본을 다시 받으면 안 된다 (이미 바뀐 썸네일이 받아짐)")
+
+    monkeypatch.setattr(scheduler_module, "snapshot_original_thumbnail", must_not_run)
+    calls = []
+    _stub_youtube(monkeypatch, calls)
+
+    run(engine._do_swap(test, db_session))
+    assert test.current_variation_id == variations[2].id
+
+
 async def _async_return(value):
     return value

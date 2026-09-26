@@ -13,6 +13,7 @@ from youtube_api import (
     ThumbnailPermissionError,
 )
 from metrics_utils import compute_variation_vph
+from thumbnail_store import is_youtube_native_url, snapshot_original_thumbnail
 from test_policy import (
     has_enough_cycles,
     has_enough_sample,
@@ -238,6 +239,18 @@ class AVSchedulerEngine:
             logger.error(f"채널에 리프레시 토큰이 없어 조작할 수 없습니다: {channel.id}")
             return
 
+        # 첫 교체(B 적용) 전에 원본(A) 썸네일 이미지를 보관한다. 유튜브 썸네일 주소는 "지금 썸네일"을
+        # 가리켜서 B를 건 뒤에는 원본을 다시 받을 수 없다. 보관에 실패하면 원본을 잃지 않도록 교체를 미루고
+        # 다음 tick에 다시 시도한다.
+        if test.current_variation_id is None:
+            if not await self._keep_original_thumbnail(test, session):
+                test.swap_failed = True
+                return
+            # 보관 결과를 커밋하면서 행 잠금이 풀렸으니 다시 잡고, 그 사이 다른 요청이 먼저 교체했는지 확인한다.
+            test = session.query(ABTest).filter(ABTest.id == original_test_id).with_for_update().first()
+            if not test or test.status != TestStatus.RUNNING or test.current_variation_id is not None:
+                return
+
         # YouTube Data API 쿼터는 프로젝트(앱) 전체 공유 자원이므로, 소진 위험이 있으면
         # 이번 스왑을 건너뛴다 (last_swapped_at을 갱신하지 않으므로 다음 tick에 다시 시도됨).
         # L-5: check_and_reserve_usage로 확인+예약을 원자적으로 처리 (TOCTOU 방지)
@@ -374,6 +387,20 @@ class AVSchedulerEngine:
             test.swap_failed = True
             still_showing = current_var.name if current_var else "초기 상태"
             logger.error(f"⚠️ 영상 [{test.video.youtube_video_id}] 변인 교체 실패 - 다음 스케줄러 주기에 재시도합니다 (현재 유지: {still_showing})")
+
+    async def _keep_original_thumbnail(self, test, session) -> bool:
+        """원본(A)의 썸네일이 아직 유튜브 주소면 이미지를 받아 영구 URL로 바꿔 둔다. 이미 보관됐거나 없으면 True."""
+        control = session.query(Variation).filter(Variation.ab_test_id == test.id, Variation.is_control == True).first()
+        if not control or not is_youtube_native_url(control.thumbnail_image_url):
+            return True
+        kept_url = await snapshot_original_thumbnail(test.video.youtube_video_id)
+        if not kept_url:
+            logger.error(f"⚠️ 테스트 ID [{test.id}] 원본 썸네일을 보관하지 못해 첫 교체를 미룹니다 (다음 주기에 재시도).")
+            return False
+        control.thumbnail_image_url = kept_url
+        session.commit()  # 원본 보관은 이후 교체 성공 여부와 무관하게 남겨야 한다
+        logger.info(f" - [테스트 {test.id}] 원본 썸네일 보관 완료: {kept_url}")
+        return True
 
     def _get_next_variation(self, variations, current_var):
         """B -> C -> A -> B 순환 로직 (최초 실행 시 컨트롤을 건너뛰고 첫 번째 새 썸네일부터 시작)"""

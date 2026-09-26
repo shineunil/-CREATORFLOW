@@ -30,7 +30,7 @@ from models import User, Channel, Video, ABTest, Variation, TestStatus, MetricLo
 from schemas import ABTestCreate, ABTestResponse
 from env_utils import is_dev_environment, allow_test_upgrade
 from metrics_utils import compute_variation_vph
-from storage import is_cloud_storage_configured, upload_thumbnail_to_cloud
+from thumbnail_store import process_image_for_youtube as _process_image_for_youtube, publish_local_image
 from test_policy import BASIC_MIN_SWAP_INTERVAL_MINUTES, MAX_CONCURRENT_TESTS_PER_CHANNEL
 from messages import msg, current_locale, set_request_locale, locale_from_accept_language, SUPPORTED_LOCALES
 
@@ -1072,91 +1072,6 @@ async def generate_thumbnail_endpoint(
     return {"url": public_url, "filename": output_filename, "analysis": analysis}
 
 from ml_scorer import analyze_thumbnail
-
-def _process_image_for_youtube(file_path: str) -> tuple[str, int, int, int, bool]:
-    """
-    YouTube 썸네일 규격에 맞게 이미지를 자동 조정하고, 저장 용량을 줄이기 위해 항상 JPEG로 다시 저장합니다.
-    - 해상도: 비율을 유지한 채 1280×720을 꽉 채우는 크기로 맞춤 (작으면 키우고, 크면 줄임)
-    - 용량: JPEG 품질 85로 저장 (유튜브도 썸네일을 다시 압축하므로 눈으로 보이는 차이는 거의 없음).
-      그래도 2MB를 넘으면 품질을 더 낮춘다.
-    Returns: (final_path, width, height, size_bytes, was_upscaled)
-      was_upscaled는 작은 이미지를 키운 경우에만 True - 화질이 떨어질 수 있어 사용자에게 알려줄 때만 쓴다.
-    """
-    YOUTUBE_W = 1280
-    YOUTUBE_H = 720
-    YOUTUBE_MAX_BYTES = 2 * 1024 * 1024  # 2MB
-    JPEG_QUALITY = 85
-
-    img = Image.open(file_path)
-    try:
-        # RGBA/P 등 → RGB 변환 (JPEG 저장 필수)
-        if img.mode == "RGBA":
-            bg = Image.new("RGB", img.size, (255, 255, 255))
-            bg.paste(img, mask=img.split()[3])
-            img.close()
-            img = bg
-        elif img.mode != "RGB":
-            converted = img.convert("RGB")
-            img.close()
-            img = converted
-
-        orig_w, orig_h = img.size
-
-        # 1280×720을 꽉 채우는 배율 (16:9 이미지는 정확히 1280×720이 됨)
-        scale = max(YOUTUBE_W / orig_w, YOUTUBE_H / orig_h)
-        was_upscaled = scale > 1
-        if scale != 1:
-            resized = img.resize((round(orig_w * scale), round(orig_h * scale)), Image.LANCZOS)
-            img.close()
-            img = resized
-
-        final_w, final_h = img.size
-
-        # JPEG로 다시 저장 (85에서 시작해 2MB를 넘으면 40까지 5씩 낮춤)
-        new_path = os.path.splitext(file_path)[0] + ".jpg"
-        quality = JPEG_QUALITY
-        buf = io.BytesIO()
-        while quality >= 40:
-            buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=quality, optimize=True, progressive=True)
-            if buf.tell() <= YOUTUBE_MAX_BYTES:
-                break
-            quality -= 5
-
-        buf.seek(0)
-        with open(new_path, "wb") as f:
-            f.write(buf.read())
-
-        if new_path != file_path:
-            try:
-                os.remove(file_path)
-            except Exception:
-                pass
-
-        return new_path, final_w, final_h, os.path.getsize(new_path), was_upscaled
-    finally:
-        try:
-            img.close()
-        except Exception:
-            pass
-
-async def publish_local_image(file_path: str, filename: str) -> str:
-    """
-    🌩️ 클라우드 스토리지(Cloudinary)가 설정되어 있으면 영구 URL로 업로드합니다.
-    (로컬 디스크는 Render 재배포 시 초기화되므로, 프로덕션에서는 클라우드 URL을 DB에 저장해야 합니다.
-     로컬 사본은 /api/analyze-thumbnail의 즉시 분석과 스케줄러의 로컬 캐시 용도로 그대로 유지합니다.)
-    """
-    if not is_cloud_storage_configured():
-        return f"{BACKEND_URL}/uploads/{filename}"
-
-    with open(file_path, "rb") as f:
-        file_bytes = f.read()
-    cloud_url = await upload_thumbnail_to_cloud(file_bytes, filename)
-    if cloud_url:
-        return cloud_url
-
-    logger.error("Cloudinary 업로드 실패 - 로컬 URL로 폴백합니다 (재배포 시 유실될 수 있음)")
-    return f"{BACKEND_URL}/uploads/{filename}"
 
 @app.post("/api/analyze-thumbnail")
 async def api_analyze_thumbnail(request: Request, channel: Channel = Depends(get_current_channel)):
