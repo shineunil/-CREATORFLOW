@@ -1075,14 +1075,17 @@ from ml_scorer import analyze_thumbnail
 
 def _process_image_for_youtube(file_path: str) -> tuple[str, int, int, int, bool]:
     """
-    YouTube 썸네일 규격에 맞게 이미지를 자동 조정합니다.
-    - 최소 해상도 미달(1280×720) → 업스케일
-    - 파일 크기 초과(2MB) → JPEG 품질 낮춰 압축
-    Returns: (final_path, width, height, size_bytes, was_processed)
+    YouTube 썸네일 규격에 맞게 이미지를 자동 조정하고, 저장 용량을 줄이기 위해 항상 JPEG로 다시 저장합니다.
+    - 해상도: 비율을 유지한 채 1280×720을 꽉 채우는 크기로 맞춤 (작으면 키우고, 크면 줄임)
+    - 용량: JPEG 품질 85로 저장 (유튜브도 썸네일을 다시 압축하므로 눈으로 보이는 차이는 거의 없음).
+      그래도 2MB를 넘으면 품질을 더 낮춘다.
+    Returns: (final_path, width, height, size_bytes, was_upscaled)
+      was_upscaled는 작은 이미지를 키운 경우에만 True - 화질이 떨어질 수 있어 사용자에게 알려줄 때만 쓴다.
     """
-    YOUTUBE_MIN_W = 1280
-    YOUTUBE_MIN_H = 720
+    YOUTUBE_W = 1280
+    YOUTUBE_H = 720
     YOUTUBE_MAX_BYTES = 2 * 1024 * 1024  # 2MB
+    JPEG_QUALITY = 85
 
     img = Image.open(file_path)
     try:
@@ -1098,28 +1101,24 @@ def _process_image_for_youtube(file_path: str) -> tuple[str, int, int, int, bool
             img = converted
 
         orig_w, orig_h = img.size
-        current_size = os.path.getsize(file_path)
 
-        # 최소 해상도 미달 → 업스케일
-        if orig_w < YOUTUBE_MIN_W or orig_h < YOUTUBE_MIN_H:
-            scale = max(YOUTUBE_MIN_W / orig_w, YOUTUBE_MIN_H / orig_h)
-            resized = img.resize((int(orig_w * scale), int(orig_h * scale)), Image.LANCZOS)
+        # 1280×720을 꽉 채우는 배율 (16:9 이미지는 정확히 1280×720이 됨)
+        scale = max(YOUTUBE_W / orig_w, YOUTUBE_H / orig_h)
+        was_upscaled = scale > 1
+        if scale != 1:
+            resized = img.resize((round(orig_w * scale), round(orig_h * scale)), Image.LANCZOS)
             img.close()
             img = resized
 
         final_w, final_h = img.size
-        needs_processing = (final_w != orig_w or final_h != orig_h or current_size > YOUTUBE_MAX_BYTES)
 
-        if not needs_processing:
-            return file_path, final_w, final_h, current_size, False
-
-        # JPEG 압축 (quality 95→40까지 5씩 낮춰 2MB 이하 달성)
+        # JPEG로 다시 저장 (85에서 시작해 2MB를 넘으면 40까지 5씩 낮춤)
         new_path = os.path.splitext(file_path)[0] + ".jpg"
-        quality = 95
+        quality = JPEG_QUALITY
         buf = io.BytesIO()
         while quality >= 40:
             buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=quality, optimize=True)
+            img.save(buf, format="JPEG", quality=quality, optimize=True, progressive=True)
             if buf.tell() <= YOUTUBE_MAX_BYTES:
                 break
             quality -= 5
@@ -1134,7 +1133,7 @@ def _process_image_for_youtube(file_path: str) -> tuple[str, int, int, int, bool
             except Exception:
                 pass
 
-        return new_path, final_w, final_h, os.path.getsize(new_path), True
+        return new_path, final_w, final_h, os.path.getsize(new_path), was_upscaled
     finally:
         try:
             img.close()
