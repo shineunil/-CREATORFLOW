@@ -1,11 +1,12 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useState } from "react";
 import Link from "next/link";
-import { FlaskConical, ArrowLeft, AlertTriangle } from "lucide-react";
+import { FlaskConical, ArrowLeft, AlertTriangle, Megaphone, Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { API_BASE_URL } from "@/lib/config";
+import { LAUNCH_AT, SERVICE_UNAVAILABLE_ERROR, startGoogleLogin } from "@/lib/auth";
 import { useI18n } from "@/i18n/I18nProvider";
+import RichText from "@/i18n/RichText";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 function LoginContent() {
@@ -13,9 +14,18 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const errorCode = searchParams.get("error");
   const errorMessage = errorCode ? t.login.errors[errorCode] : null;
+  // 서버가 꺼져 있어 로그인을 시작하지 못한 경우 (다른 화면에서 넘어왔거나, 이 화면에서 방금 확인됨)
+  const [isUnavailable, setIsUnavailable] = useState(errorCode === SERVICE_UNAVAILABLE_ERROR);
+  const [isChecking, setIsChecking] = useState(false);
 
-  const handleGoogleLogin = () => {
-    window.location.href = `${API_BASE_URL}/api/auth/login?locale=${locale}`;
+  const handleGoogleLogin = async () => {
+    if (isChecking) return;
+    setIsChecking(true);
+    const started = await startGoogleLogin(locale);
+    if (!started) {
+      setIsUnavailable(true);
+      setIsChecking(false);
+    }
   };
 
   return (
@@ -43,7 +53,9 @@ function LoginContent() {
           </p>
         </div>
 
-        {errorMessage && (
+        {isUnavailable ? (
+          <ServiceNotice />
+        ) : errorMessage && (
           <div role="alert" className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 text-amber-200 text-sm">
             <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
             <span>{errorMessage}</span>
@@ -54,8 +66,17 @@ function LoginContent() {
         <div className="glass-panel p-8 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 backdrop-blur-xl shadow-2xl">
           <button
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-white hover:bg-zinc-200 text-black rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_20px_rgba(255,255,255,0.1)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+            disabled={isChecking}
+            aria-busy={isChecking}
+            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-white hover:bg-zinc-200 text-black rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-wait shadow-[0_0_20px_rgba(255,255,255,0.1)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
           >
+            {isChecking ? (
+              <>
+                <Loader2 size={20} className="animate-spin" aria-hidden="true" />
+                {t.login.checking}
+              </>
+            ) : (
+            <>
             {/* Google G Logo SVG */}
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -64,12 +85,35 @@ function LoginContent() {
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
             {t.login.google}
+            </>
+            )}
           </button>
 
           <p className="mt-8 text-center text-xs text-zinc-400 leading-relaxed break-keep">
             {t.login.agreeBefore}<Link href={lp("/terms")} className="text-cyan-400 underline underline-offset-2 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded">{t.login.agreeTerms}</Link>{t.login.agreeMiddle}<Link href={lp("/privacy")} className="text-cyan-400 underline underline-offset-2 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded">{t.login.agreePrivacy}</Link>{t.login.agreeAfter}
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** 서버가 꺼져 있을 때의 안내. 오픈 전에는 랜딩 공지와 같은 "오픈 예정" 문구, 오픈 후에는 "점검 중" 문구. */
+function ServiceNotice() {
+  const { t } = useI18n();
+  const beforeLaunch = Date.now() < LAUNCH_AT.getTime();
+  return (
+    <div role="status" className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/30 text-sm">
+      <Megaphone size={18} className="text-cyan-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+      <div>
+        <p className="font-bold text-white mb-1">{beforeLaunch ? t.landing.popup.title : t.login.maintenanceTitle}</p>
+        <p className="text-zinc-300 leading-relaxed break-keep">
+          {beforeLaunch ? (
+            <RichText value={t.landing.popup.body} strongClassName="text-white font-semibold" />
+          ) : (
+            t.login.maintenanceBody
+          )}
+        </p>
       </div>
     </div>
   );
