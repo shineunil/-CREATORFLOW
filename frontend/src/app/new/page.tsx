@@ -498,12 +498,12 @@ function NewTestContent() {
 
                       {v.thumbnail_image_url ? (
                         <>
-                        <label className="block relative rounded-xl overflow-hidden group/img cursor-pointer">
+                        <label className="block relative rounded-xl overflow-hidden group/img cursor-pointer focus-within:ring-2 focus-within:ring-cyan-400">
                           <input
                             type="file"
                             onChange={(e) => handleImageUpload(e, v.id)}
                             accept="image/png, image/jpeg, image/webp, image/jpg"
-                            className="hidden"
+                            className="sr-only"
                           />
                           <img src={v.thumbnail_image_url} alt={N.thumbAlt(v.id)} className={`w-full aspect-video object-cover ${v.analyzing ? 'opacity-50 blur-sm' : ''}`} />
                           {!v.analyzing && (
@@ -531,12 +531,12 @@ function NewTestContent() {
                             maxLength={60}
                             className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
                           />
-                          <label className="cursor-pointer w-full">
+                          <label className="cursor-pointer w-full rounded-lg focus-within:ring-2 focus-within:ring-cyan-400">
                             <input
                               type="file"
                               onChange={(e) => handleGenerateThumbnail(e, v.id)}
                               accept="image/png, image/jpeg, image/webp"
-                              className="hidden"
+                              className="sr-only"
                             />
                             <div className="flex items-center justify-center gap-2 w-full py-2.5 bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 rounded-lg text-sm font-bold text-violet-200 transition-colors">
                               <UploadCloud size={16} aria-hidden="true" /> {N.selectBase}
@@ -547,12 +547,12 @@ function NewTestContent() {
                           </button>
                         </div>
                       ) : (
-                        <label className="block w-full aspect-video rounded-xl border-2 border-dashed border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800/80 hover:border-cyan-500/50 flex flex-col items-center justify-center cursor-pointer transition-all group/upload relative">
+                        <label className="block w-full aspect-video rounded-xl border-2 border-dashed border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800/80 hover:border-cyan-500/50 flex flex-col items-center justify-center cursor-pointer transition-all group/upload relative focus-within:ring-2 focus-within:ring-cyan-400">
                           <input
                             type="file"
                             onChange={(e) => handleImageUpload(e, v.id)}
                             accept="image/png, image/jpeg, image/webp, image/jpg"
-                            className="hidden"
+                            className="sr-only"
                           />
                           <UploadCloud size={48} className="text-zinc-400 group-hover/upload:text-cyan-400 mb-4 transition-colors" aria-hidden="true" />
                           <span className="text-lg font-bold text-zinc-300 group-hover/upload:text-white">{N.clickUpload}</span>

@@ -6,6 +6,7 @@ import { ArrowRight, Crown, TrendingUp, Upload, RefreshCw, Award, Check, Minus, 
 import { useEffect, useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import RichText from "@/i18n/RichText";
+import { useDialogFocus } from "@/lib/useDialogFocus";
 
 const LAUNCH_POPUP_KEY = "launch_popup_hidden";
 const STEP_ICONS = [<Upload key="upload" size={16} />, <Clock key="clock" size={16} />, <RefreshCw key="rotate" size={16} />, <TrendingUp key="track" size={16} />, <Award key="award" size={16} />];
@@ -34,6 +35,7 @@ export default function LandingPage() {
     }
     setPopupVisible(false);
   };
+  const popupRef = useDialogFocus<HTMLDivElement>(popupVisible, dismissPopup);
 
   // VPH(시간당 조회수) 올라가는 애니메이션 효과
   useEffect(() => {
@@ -353,10 +355,12 @@ export default function LandingPage() {
       {/* Launch Announcement Popup */}
       {popupVisible && (
         <div
+          ref={popupRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-labelledby="launch-popup-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm focus:outline-none"
         >
           <div className="bg-zinc-950 border border-cyan-500/40 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-[0_0_50px_rgba(6,182,212,0.2)] relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-500" aria-hidden="true" />

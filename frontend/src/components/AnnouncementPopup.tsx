@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { X, Megaphone } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useDialogFocus } from "@/lib/useDialogFocus";
 
 type Announcement = {
   id: number;
@@ -48,14 +49,18 @@ export default function AnnouncementPopup() {
     setVisible(false);
   };
 
+  const dialogRef = useDialogFocus<HTMLDivElement>(visible && !!announcement, dismiss);
+
   if (!visible || !announcement) return null;
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="ann-popup-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in focus:outline-none"
     >
       <div className="bg-zinc-950 border border-cyan-500/40 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-[0_0_50px_rgba(6,182,212,0.2)] relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-500" aria-hidden="true" />

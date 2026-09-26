@@ -3,6 +3,7 @@
 import React from "react";
 import { AlertCircle, CheckCircle2, Info, AlertTriangle, X, Loader2 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useDialogFocus } from "@/lib/useDialogFocus";
 
 export interface ModalProps {
   isOpen: boolean;
@@ -37,16 +38,7 @@ export default function Modal({
     }
   };
 
-  React.useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        handleClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, type, onConfirm, onCancel]);
+  const dialogRef = useDialogFocus<HTMLDivElement>(isOpen, handleClose);
 
   if (!isOpen) return null;
 
@@ -94,11 +86,13 @@ export default function Modal({
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
       aria-describedby="modal-description"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200 focus:outline-none"
     >
       <div className={`relative w-full max-w-md bg-[#0f0f12]/90 border rounded-2xl p-6 text-zinc-100 backdrop-blur-xl transition-all scale-100 ${getBorderGlow()}`}>
         {type !== "loading" && (
