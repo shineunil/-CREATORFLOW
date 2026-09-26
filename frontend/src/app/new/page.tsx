@@ -55,7 +55,7 @@ function NewTestContent() {
   
   // Variations state
   const [variations, setVariations] = useState<any[]>([
-    { id: "B", title_text: "", thumbnail_image_url: null, analyzing: false, ml_score: null, ml_feedback: null, showGenerator: false, generateHeadline: "" },
+    { id: "B", title_text: "", thumbnail_image_url: null, analyzing: false, showGenerator: false, generateHeadline: "" },
   ]);
   
   const [swapInterval, setSwapInterval] = useState("240");
@@ -169,27 +169,10 @@ function NewTestContent() {
       if (response.ok) {
         const data = await response.json();
 
-        // Call ML analysis
-        const analyzeRes = await apiFetch("/api/analyze-thumbnail", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: data.filename })
-        });
-
-        let score = null;
-        let feedback = null;
-        if (analyzeRes.ok) {
-          const analyzeData = await analyzeRes.json();
-          score = analyzeData.score;
-          feedback = analyzeData.feedback;
-        }
-
         if (isStale()) return;
         setVariations(prev => prev.map(v => v.id === targetVarId ? {
           ...v,
           thumbnail_image_url: data.url,
-          ml_score: score,
-          ml_feedback: feedback,
           analyzing: false
         } : v));
 
@@ -220,7 +203,7 @@ function NewTestContent() {
     setVariations(prev => prev.map(v => v.id === targetVarId ? { ...v, generateHeadline: text } : v));
   };
 
-  // AI Thumbnail Assist: 베이스 이미지 + 문구로 유튜브 규격 썸네일을 자동 생성 (PIL 기반, 외부 API 비용 없음)
+  // 문구 넣어 썸네일 만들기: 베이스 이미지 + 문구로 유튜브 규격 썸네일을 자동 생성 (PIL 이미지 편집, AI 아님, 외부 API 비용 없음)
   const handleGenerateThumbnail = async (e: React.ChangeEvent<HTMLInputElement>, targetVarId: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -255,8 +238,6 @@ function NewTestContent() {
         setVariations(prev => prev.map(v => v.id === targetVarId ? {
           ...v,
           thumbnail_image_url: data.url,
-          ml_score: data.analysis?.score ?? null,
-          ml_feedback: data.analysis?.feedback ?? null,
           analyzing: false,
           showGenerator: false,
         } : v));
@@ -581,16 +562,6 @@ function NewTestContent() {
                           className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
                         />
                       </div>
-                      
-                      {v.ml_score != null && (
-                        <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Sparkles size={16} className="text-emerald-400" aria-hidden="true" />
-                            <span className="font-bold text-emerald-400 text-sm">{N.analysisDone(String(v.ml_score))}</span>
-                          </div>
-                          <p className="text-xs text-emerald-200/70">{v.ml_feedback}</p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
