@@ -191,6 +191,7 @@ export const ko: Dictionary = {
       youtube_permission_denied:
         "구글 로그인 화면에서 유튜브 권한이 허용되지 않은 것 같습니다. 다시 로그인하고 요청된 권한을 모두 허용해 주세요.",
       no_youtube_channel: "이 구글 계정에서 유튜브 채널을 찾지 못했습니다. 채널이 있는 계정으로 다시 시도해 주세요.",
+      session_expired: "로그인 시간이 지났거나 다른 창에서 시작된 로그인입니다. 이 화면에서 다시 로그인해 주세요.",
     },
   },
 

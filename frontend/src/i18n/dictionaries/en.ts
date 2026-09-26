@@ -194,6 +194,8 @@ export const en = {
         "It looks like YouTube permissions were not granted on the Google sign-in screen. Please sign in again and allow all requested permissions.",
       no_youtube_channel:
         "No YouTube channel was found for this Google account. Please try again with an account that has a channel.",
+      session_expired:
+        "Your sign-in timed out or was started in a different window. Please sign in again from this page.",
     } as Record<string, string>,
   },
 

@@ -67,7 +67,7 @@ security = HTTPBearer()
 # 대신 user_id + 랜덤값을 HMAC으로 서명한 단기 nonce를 사용한다.
 def _make_state_nonce(user_id: int) -> str:
     import secrets as _sec
-    rand = _sec.token_urlsafe(12)
+    rand = _sec.token_urlsafe(24)
     payload = f"{user_id}:{rand}"
     sig = _hmac_lib.new(JWT_SECRET.encode(), payload.encode(), _hashlib.sha256).hexdigest()[:16]
     return f"{payload}:{sig}"
@@ -119,14 +119,16 @@ def _decode_token(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def _set_auth_cookie(response: JSONResponse, token: str):
-    """HttpOnly 쿠키에 JWT를 설정한다. cross-origin(Vercel+Render)은 SameSite=None; Secure 필요."""
+    """HttpOnly 쿠키에 JWT를 설정한다.
+    프론트(trythumbnailflow.com)와 API(api.trythumbnailflow.com)는 같은 사이트라 Lax로 충분하다.
+    Lax면 다른 사이트에서 보낸 POST/DELETE 요청에는 쿠키가 붙지 않아 CSRF가 막힌다."""
     dev = is_dev_environment()
     response.set_cookie(
         key="auth_token",
         value=token,
         httponly=True,
         secure=not dev,
-        samesite="lax" if dev else "none",
+        samesite="lax",
         max_age=60 * 60 * 24 * JWT_EXPIRE_DAYS,
         path="/",
         domain=None if dev else ".trythumbnailflow.com",
@@ -138,7 +140,7 @@ def _clear_auth_cookie(response: JSONResponse):
         key="auth_token",
         path="/",
         secure=not dev,
-        samesite="lax" if dev else "none",
+        samesite="lax",
         httponly=True,
         domain=None if dev else ".trythumbnailflow.com",
     )
@@ -253,6 +255,27 @@ def get_system_status():
 
 # --- Google OAuth 로직 ---
 OAUTH_LOCALE_COOKIE = "oauth_locale"
+# 로그인을 시작한 브라우저에만 심어 두는 값. 콜백의 state와 같아야 통과한다 -
+# 남이 만든 구글 로그인 주소를 열어도(채널을 남의 계정에 연결시키는 공격) 이 쿠키가 없어 거부된다.
+OAUTH_STATE_COOKIE = "oauth_state"
+# 콜백이 발급한 auth_code를 같은 브라우저에서만 교환할 수 있게 묶어 두는 쿠키.
+OAUTH_CODE_COOKIE = "oauth_pending_code"
+OAUTH_COOKIE_PATH = "/api/auth"
+
+
+def _set_oauth_cookie(response, key: str, value: str, max_age: int):
+    response.set_cookie(
+        key, value, max_age=max_age, path=OAUTH_COOKIE_PATH,
+        httponly=True, samesite="lax", secure=not is_dev_environment(),
+    )
+
+
+def _oauth_redirect(url: str) -> RedirectResponse:
+    """콜백을 끝내는 리다이렉트. 한 번 쓴 state/언어 쿠키는 지운다."""
+    response = RedirectResponse(url)
+    response.delete_cookie(OAUTH_STATE_COOKIE, path=OAUTH_COOKIE_PATH)
+    response.delete_cookie(OAUTH_LOCALE_COOKIE, path=OAUTH_COOKIE_PATH)
+    return response
 
 
 def _login_locale(request: Request) -> str:
@@ -262,12 +285,12 @@ def _login_locale(request: Request) -> str:
 
 
 @app.get("/api/auth/login")
-def login_via_google(request: Request, state: str | None = None, locale: str | None = None):
+def login_via_google(request: Request, locale: str | None = None):
     """
     구글 로그인 페이지로 리다이렉트합니다.
     이미 로그인된 상태에서 "채널 추가"로 들어온 경우, HttpOnly 쿠키에서 현재 유저를 읽는다.
-    쿠키가 없으면 구 버전 호환을 위해 state 파라미터에서 JWT를 파싱한다.
     """
+    import secrets as _secrets
     scope = "openid email profile https://www.googleapis.com/auth/youtube.force-ssl"
     auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
@@ -287,44 +310,33 @@ def login_via_google(request: Request, state: str | None = None, locale: str | N
             linking_user_id = int(p["sub"])
         except Exception:
             pass
-    # 구 버전 호환: 프론트가 state로 JWT를 보낸 경우
-    if not linking_user_id and state:
-        try:
-            p = jwt.decode(state, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            linking_user_id = int(p["sub"])
-        except Exception:
-            pass
-    if linking_user_id:
-        auth_url += f"&state={urllib.parse.quote(_make_state_nonce(linking_user_id))}"
+    # 채널 추가면 유저 ID를 서명해 담고, 일반 로그인이면 무작위 값만 담는다.
+    # 어느 쪽이든 같은 값을 이 브라우저 쿠키에도 심어 두고 콜백에서 대조한다.
+    state = _make_state_nonce(linking_user_id) if linking_user_id else _secrets.token_urlsafe(24)
+    auth_url += f"&state={urllib.parse.quote(state)}"
     response = RedirectResponse(auth_url)
+    _set_oauth_cookie(response, OAUTH_STATE_COOKIE, state, max_age=600)
     # 구글을 다녀오는 동안 로그인을 시작한 화면 언어를 기억해 두었다가, 콜백에서 계정 언어로 저장한다.
     if locale in SUPPORTED_LOCALES:
-        response.set_cookie(
-            OAUTH_LOCALE_COOKIE, locale, max_age=600, path="/api/auth",
-            httponly=True, samesite="lax", secure=not is_dev_environment(),
-        )
+        _set_oauth_cookie(response, OAUTH_LOCALE_COOKIE, locale, max_age=600)
     return response
 
 @app.get("/api/auth/callback")
 async def google_auth_callback(request: Request, code: str | None = None, error: str | None = None, state: str | None = None, db: Session = Depends(get_db)):
-    if error or not code:
-        return RedirectResponse(f"{FRONTEND_URL}/login?error=cancelled")
-
     """구글 로그인 성공 시 되돌아오는 콜백 엔드포인트"""
+    if error or not code:
+        return _oauth_redirect(f"{FRONTEND_URL}/login?error=cancelled")
 
-    # "채널 추가" 흐름이면 state에 기존 로그인 유저의 JWT가 실려있다. 유효하면 이 흐름 전체에서
+    # 이 브라우저에서 시작한 로그인인지 확인한다 (10분 안에, 같은 브라우저에서 돌아왔을 때만 통과).
+    expected_state = request.cookies.get(OAUTH_STATE_COOKIE)
+    if not state or not expected_state or not _hmac_lib.compare_digest(state, expected_state):
+        logger.warning("OAuth state 불일치 - 이 브라우저에서 시작하지 않은 로그인이라 거부합니다.")
+        return _oauth_redirect(f"{FRONTEND_URL}/login?error=session_expired")
+
+    # "채널 추가" 흐름이면 state에 기존 로그인 유저 ID가 서명되어 있다. 유효하면 이 흐름 전체에서
     # 그 유저를 채널 소유자로 쓴다 (아래 4번 DB 저장 로직에서 google_user_id 기준 조회/생성을 건너뜀).
-    linking_user_id: int | None = None
-    if state:
-        # H-1: HMAC-signed nonce로 검증 (신규), 실패하면 레거시 JWT 폴백
-        linking_user_id = _verify_state_nonce(state)
-        if linking_user_id is None:
-            try:
-                state_payload = jwt.decode(state, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-                linking_user_id = int(state_payload["sub"])
-            except (jwt.PyJWTError, KeyError, ValueError):
-                logger.warning("채널 추가 시 전달된 state 토큰이 유효하지 않습니다. 신규 로그인으로 처리합니다.")
-    
+    linking_user_id = _verify_state_nonce(state)
+
     # 1. code를 이용해 access_token과 refresh_token 발급
     token_url = "https://oauth2.googleapis.com/token"
     token_data = {
@@ -377,11 +389,11 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
             # 스코프 동의 화면에서 YouTube 권한이 빠지면(브랜드 계정 로그인 시 간소화된 동의 화면이
             # 뜨는 경우 등) 여기서 403이 난다. "채널이 없다"는 것과는 다른 원인이라 별도 에러로 구분한다.
             logger.error(f"YouTube API 403: {yt_res.text}")
-            return RedirectResponse(f"{FRONTEND_URL}/login?error=youtube_permission_denied")
+            return _oauth_redirect(f"{FRONTEND_URL}/login?error=youtube_permission_denied")
         yt_data = yt_res.json()
 
         if not yt_data.get("items"):
-            return RedirectResponse(f"{FRONTEND_URL}/?error=no_youtube_channel")
+            return _oauth_redirect(f"{FRONTEND_URL}/?error=no_youtube_channel")
 
         channel_id = yt_data["items"][0]["id"]
         channel_title = yt_data["items"][0]["snippet"]["title"]
@@ -389,7 +401,7 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
     # 4. DB 저장 로직 (유저 및 채널)
     user = db.query(User).filter(User.id == linking_user_id).first() if linking_user_id else None
     if not user:
-        # "채널 추가"로 들어온 게 아니거나 state가 무효했던 경우의 일반 로그인 흐름.
+        # "채널 추가"로 들어온 게 아닌 일반 로그인 흐름.
         user = db.query(User).filter(User.google_user_id == google_user_id).first()
         if not user:
             # 레거시 브릿지: google_user_id 도입 이전에 이메일만으로 저장된 유저가 있으면 그쪽에
@@ -411,7 +423,7 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
         existing_count = db.query(Channel).filter(Channel.user_id == user.id).count()
         if existing_count >= max_channels_for_plan(plan_value):
             logger.info(f"채널 연동 한도 초과: {email} (plan={plan_value}, 기존 {existing_count}개)")
-            return RedirectResponse(f"{FRONTEND_URL}/dashboard?error=channel_limit_reached")
+            return _oauth_redirect(f"{FRONTEND_URL}/dashboard?error=channel_limit_reached")
         channel = Channel(user_id=user.id, youtube_channel_id=channel_id, channel_title=channel_title)
 
     if refresh_token:
@@ -445,8 +457,10 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
             account.locale = login_locale
     db.commit()
     channel_title_encoded = urllib.parse.quote(channel_title)
-    response = RedirectResponse(f"{FRONTEND_URL}/dashboard?auth_code={auth_code}&connected_channel={channel_title_encoded}")
-    response.delete_cookie(OAUTH_LOCALE_COOKIE, path="/api/auth")
+    response = _oauth_redirect(f"{FRONTEND_URL}/dashboard?auth_code={auth_code}&connected_channel={channel_title_encoded}")
+    # 이 auth_code는 이 브라우저에서만 교환되게 묶는다 - 남의 auth_code 주소를 열어
+    # 공격자 계정으로 로그인되는 것(로그인 CSRF)을 막는다.
+    _set_oauth_cookie(response, OAUTH_CODE_COOKIE, auth_code, max_age=300)
     return response
 
 @app.post("/api/auth/logout")
@@ -457,8 +471,11 @@ def logout_user():
     return response
 
 @app.get("/api/auth/exchange")
-def exchange_auth_code(code: str, db: Session = Depends(get_db)):
-    """OAuth 콜백 후 단기 auth_code를 실제 JWT로 교환합니다. 코드는 5분 내 1회만 유효합니다."""
+def exchange_auth_code(request: Request, code: str, db: Session = Depends(get_db)):
+    """OAuth 콜백 후 단기 auth_code를 실제 JWT로 교환합니다. 코드는 5분 내 1회, 콜백을 받은 브라우저에서만 유효합니다."""
+    pending_code = request.cookies.get(OAUTH_CODE_COOKIE)
+    if not pending_code or not _hmac_lib.compare_digest(pending_code, code):
+        raise HTTPException(status_code=400, detail=msg("invalid_auth_code"))
     now = datetime.now(timezone.utc)
     entry = (
         db.query(OAuthAuthCode)
@@ -473,6 +490,7 @@ def exchange_auth_code(code: str, db: Session = Depends(get_db)):
     # L-3: JWT를 응답 body 대신 HttpOnly 쿠키에 설정한다.
     response = JSONResponse(content={"ok": True})
     _set_auth_cookie(response, token)
+    response.delete_cookie(OAUTH_CODE_COOKIE, path=OAUTH_COOKIE_PATH)
     return response
 
 @app.post("/api/channels/{target_channel_id}/disconnect")
