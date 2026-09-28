@@ -349,15 +349,18 @@ function NewTestContent() {
           swap_interval_minutes: parseInt(swapInterval),
           duration_hours: parseInt(durationHours),
           variations: [
-            { 
-              name: "Variation A", 
-              title_text: selectedVideo.title || "Original Title", 
+            {
+              name: "Variation A",
+              // 제목을 모르면 빈 값 - 서버는 빈 제목이면 유튜브 제목을 건드리지 않는다
+              title_text: selectedVideo.title || "",
               is_control: true,
               thumbnail_image_url: selectedVideo.thumbnail_url || null
             },
             ...variations.map(v => ({
               name: `Variation ${v.id}`,
-              title_text: v.title_text || `Test Title ${v.id}`,
+              // 제목을 비워 두면 원래 영상 제목을 그대로 쓴다 (썸네일만 테스트하는 경우).
+              // 예전엔 "Test Title B" 같은 임시 제목이 실제 유튜브 영상 제목으로 걸렸다.
+              title_text: v.title_text.trim() || selectedVideo.title || "",
               is_control: false,
               thumbnail_image_url: v.thumbnail_image_url || null
             }))
