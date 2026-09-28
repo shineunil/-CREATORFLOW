@@ -331,7 +331,7 @@ export const en = {
   },
 
   channelSelect: {
-    label: "Channel",
+    label: "Select channel",
     disconnectedSuffix: " (disconnected)",
   },
 
@@ -475,6 +475,7 @@ export const en = {
     sub: "Upload multiple thumbnails and titles. We will find the best performing combination.",
     step1: "1. Select Original Video",
     loadingVideos: "Loading recent videos from your connected YouTube channel...",
+    refreshVideos: "Refresh videos",
     testing: "Testing",
     inProgress: "Optimization in progress",
     selectForTest: "Select for Test",

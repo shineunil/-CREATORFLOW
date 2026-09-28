@@ -139,6 +139,21 @@ function NewTestContent() {
     return () => window.removeEventListener(CHANNEL_SWITCHED_EVENT, handleChannelSwitched);
   }, []);
 
+  // 영상 목록은 서버가 잠시 기억해 두므로, 방금 올린 영상이 안 보일 때만 새로 불러온다.
+  const [isRefreshingVideos, setIsRefreshingVideos] = useState(false);
+  const refreshVideos = async () => {
+    setIsRefreshingVideos(true);
+    try {
+      const res = await apiFetch("/api/videos?refresh=true");
+      const data = await res.json();
+      if (data.videos) setVideos(data.videos);
+    } catch (err) {
+      console.error("Failed to refresh video list:", err);
+    } finally {
+      setIsRefreshingVideos(false);
+    }
+  };
+
   const handleTitleChange = (id: string, newTitle: string) => {
     setVariations(prev => prev.map(v => v.id === id ? { ...v, title_text: newTitle } : v));
   };
@@ -344,12 +359,9 @@ function NewTestContent() {
 
   return (
     <div className="w-full p-8 animate-fade-in-up">
-      <div className="mb-4">
-        <ChannelSelect />
-      </div>
-      <Link href="/dashboard" className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors mb-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-        <ArrowLeft size={20} aria-hidden="true" />
-        <span className="font-semibold">{N.backToDashboard}</span>
+      <Link href="/dashboard" className="inline-flex items-center gap-2 px-4 py-2 mb-8 rounded-xl border border-zinc-600 bg-zinc-800 text-sm font-bold text-white shadow-sm hover:bg-zinc-700 hover:border-zinc-400 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+        <ArrowLeft size={16} className="text-cyan-400" aria-hidden="true" />
+        {N.backToDashboard}
       </Link>
 
       <div className="mb-10">
@@ -361,11 +373,29 @@ function NewTestContent() {
 
       {step === 1 && (
         <div className="space-y-6">
-          <h2 className="text-xl font-bold border-b border-zinc-800 pb-4">{N.step1}</h2>
+          {/* 채널을 바꾸면 바로 아래 영상 목록이 바뀌므로, 채널 선택을 영상 선택 단계 안에 둔다 */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-4">
+            <h2 className="text-xl font-bold">{N.step1}</h2>
+            <div className="flex flex-wrap items-center gap-3">
+            <ChannelSelect />
+            {videos.length > 0 && (
+              <button
+                type="button"
+                onClick={refreshVideos}
+                disabled={isRefreshingVideos}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-zinc-600 bg-zinc-800 text-sm font-bold text-white shadow-sm cursor-pointer hover:bg-zinc-700 hover:border-zinc-400 active:scale-95 disabled:opacity-60 disabled:cursor-wait transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              >
+                <RefreshCcw size={16} className={`text-cyan-400 ${isRefreshingVideos ? "animate-spin" : ""}`} aria-hidden="true" />
+                {N.refreshVideos}
+              </button>
+            )}
+            </div>
+          </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {videos.length === 0 ? (
-              <div className="col-span-full text-center p-12 text-zinc-400 glass-panel rounded-2xl border border-zinc-800/50" role="status">
-                {N.loadingVideos}
+              <div className="col-span-full flex flex-col items-center gap-5 p-12 glass-panel rounded-2xl border border-zinc-800/50" role="status">
+                <p className="text-base md:text-lg font-semibold text-zinc-100 text-center break-keep">{N.loadingVideos}</p>
+                <div className="loading-bar w-full max-w-sm" aria-hidden="true" />
               </div>
             ) : (
               videos.map((v) => {

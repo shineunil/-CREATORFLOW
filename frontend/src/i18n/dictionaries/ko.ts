@@ -326,7 +326,7 @@ export const ko: Dictionary = {
   },
 
   channelSelect: {
-    label: "채널",
+    label: "채널 선택",
     disconnectedSuffix: " (연동 해제됨)",
   },
 
@@ -470,6 +470,7 @@ export const ko: Dictionary = {
     sub: "썸네일과 제목을 여러 개 올려 주세요. 성과가 가장 좋은 조합을 찾아 드립니다.",
     step1: "1. 원본 영상 선택",
     loadingVideos: "연동된 유튜브 채널에서 최근 영상을 불러오는 중...",
+    refreshVideos: "영상 목록 새로고침",
     testing: "테스트 중",
     inProgress: "최적화 진행 중",
     selectForTest: "이 영상으로 테스트",

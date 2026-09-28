@@ -62,18 +62,15 @@ export default function VideosPage() {
 
   return (
     <div className="w-full p-8 animate-fade-in-up">
-      <div className="mb-4">
-        <ChannelSelect />
-      </div>
-      <div className="mb-10 flex items-center justify-between">
+      <div className="mb-10 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
             <MonitorPlay className="text-red-500" size={32} aria-hidden="true" /> {V.title}
           </h1>
           <p className="text-zinc-400">{V.sub}</p>
         </div>
-
-        </div>
+        <ChannelSelect />
+      </div>
 
       {isLoading ? (
         <div className="text-center py-20 text-zinc-400 animate-pulse" role="status">{V.loading}</div>

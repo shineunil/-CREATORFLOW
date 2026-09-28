@@ -49,12 +49,12 @@ export default function AnalyticsPage() {
 
   return (
     <div className="w-full p-8 animate-fade-in-up">
-      <div className="mb-4">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">{A.title}</h1>
+          <p className="text-zinc-400">{A.sub}</p>
+        </div>
         <ChannelSelect />
-      </div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">{A.title}</h1>
-        <p className="text-zinc-400">{A.sub}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

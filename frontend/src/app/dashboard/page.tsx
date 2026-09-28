@@ -277,16 +277,14 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="px-8 pt-8 pb-4">
-        <div className="mb-4">
-          <ChannelSelect />
-        </div>
+      <div className="px-8 pt-8 pb-4 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-white tracking-tight">{D.title}</h1>
           <p className="text-sm text-zinc-400 mt-2">
             <RichText value={D.runningCount(testData.filter(test => test.status === "RUNNING").length)} strongClassName="text-cyan-400 font-semibold" />
           </p>
         </div>
+        <ChannelSelect />
       </div>
 
       {userProfile.needs_reconnect && (

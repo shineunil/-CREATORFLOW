@@ -54,8 +54,8 @@ export default function ChannelSelect() {
   const activeId = channels.find((c) => c.is_active)?.id ?? channels[0].id;
 
   return (
-    <div className="inline-flex items-center gap-2">
-      <label htmlFor="channel-select" className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+    <div className="inline-flex items-center gap-3">
+      <label htmlFor="channel-select" className="text-base font-bold text-zinc-100">
         {t.channelSelect.label}
       </label>
       <select
@@ -63,7 +63,7 @@ export default function ChannelSelect() {
         value={activeId}
         onChange={handleChange}
         disabled={isSwitching}
-        className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-white focus:outline-none focus:border-cyan-500 disabled:opacity-60 cursor-pointer"
+        className="bg-zinc-800 border border-zinc-600 hover:border-zinc-400 rounded-xl px-4 py-2 text-base font-bold text-white focus:outline-none focus:border-cyan-500 disabled:opacity-60 disabled:cursor-wait cursor-pointer transition-colors"
       >
         {channels.map((c) => (
           <option key={c.id} value={c.id}>
