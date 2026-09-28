@@ -149,14 +149,20 @@ async def update_youtube_title(youtube_video_id: str, new_title: str, refresh_to
         logger.error(f"YouTube API Error (update_youtube_title): {e}")
         return False
 
-async def get_recent_videos(refresh_token: str, max_results: int = 200) -> list:
+async def get_recent_videos(refresh_token: str, max_results: int = 200) -> tuple[list, int]:
+    """
+    채널의 최근 업로드 영상 목록. (videos, 사용한 쿼터 유닛)을 돌려준다.
+    channels.list·playlistItems.list는 호출마다 1유닛이라, 실패한 호출까지 시도한 횟수를 그대로 센다.
+    """
+    units = 0
     try:
         youtube = get_youtube_client(refresh_token)
         channel_req = youtube.channels().list(part="contentDetails", mine=True)
+        units += 1
         channel_res = await asyncio.to_thread(channel_req.execute)
 
         if not channel_res.get('items'):
-            return []
+            return [], units
 
         uploads_playlist_id = channel_res['items'][0]['contentDetails']['relatedPlaylists']['uploads']
 
@@ -170,6 +176,7 @@ async def get_recent_videos(refresh_token: str, max_results: int = 200) -> list:
                 kwargs["pageToken"] = next_page_token
 
             playlist_req = youtube.playlistItems().list(**kwargs)
+            units += 1
             playlist_res = await asyncio.to_thread(playlist_req.execute)
 
             for item in playlist_res.get('items', []):
@@ -184,10 +191,10 @@ async def get_recent_videos(refresh_token: str, max_results: int = 200) -> list:
             if not next_page_token:
                 break
 
-        return videos
+        return videos, units
 
     except RefreshError as e:
         raise TokenRevokedError(str(e))
     except Exception as e:
         logger.error(f"YouTube API Error (get_recent_videos): {e}")
-        return []
+        return [], units

@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 import uuid
 import shutil
 import asyncio
@@ -1094,21 +1095,39 @@ async def api_analyze_thumbnail(request: Request, channel: Channel = Depends(get
     return result
 
 from youtube_api import get_recent_videos, TokenRevokedError
+from quota_guard import record_usage
+
+# 영상 목록은 자주 바뀌지 않으므로 채널별로 잠시 기억해 두고, 그 사이에는 유튜브를 다시 부르지 않는다
+# (새 테스트 화면에 들어갈 때마다 쿼터 2~5유닛을 쓰던 것을 줄임). 새 영상을 바로 보고 싶으면 refresh=true.
+VIDEO_LIST_CACHE_SECONDS = int(os.getenv("VIDEO_LIST_CACHE_SECONDS", str(15 * 60)))
+_video_list_cache: dict[int, tuple[float, list]] = {}
+
 
 @app.get("/api/videos")
 @limiter.limit("30/minute")
-async def get_channel_videos(request: Request, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+async def get_channel_videos(request: Request, refresh: bool = False, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """현재 연동된 채널의 최근 유튜브 영상 목록을 가져옵니다."""
     if not channel or not channel.oauth_refresh_token:
         raise HTTPException(status_code=400, detail=msg("no_channel_token"))
 
+    cached = _video_list_cache.get(channel.id)
+    if cached and not refresh and time.monotonic() - cached[0] < VIDEO_LIST_CACHE_SECONDS:
+        return {"videos": cached[1]}
+
     try:
-        videos = await get_recent_videos(channel.oauth_refresh_token)
+        videos, units = await get_recent_videos(channel.oauth_refresh_token)
     except TokenRevokedError:
         channel.needs_reconnect = True
         db.commit()
         raise HTTPException(status_code=409, detail=msg("youtube_relogin_required"))
 
+    # 관리자 화면의 "오늘 쿼터 사용량"에 잡히도록 실제 호출 횟수를 기록한다
+    if units:
+        record_usage(db, units)
+        db.commit()
+    # 빈 목록은 조회 실패일 수도 있어 기억하지 않는다 (다음 요청에서 다시 시도)
+    if videos:
+        _video_list_cache[channel.id] = (time.monotonic(), videos)
     return {"videos": videos}
 
 from sqlalchemy import func
