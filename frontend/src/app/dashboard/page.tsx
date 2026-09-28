@@ -24,14 +24,14 @@ import { apiFetch } from "@/lib/api";
 import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 import { useI18n } from "@/i18n/I18nProvider";
 import RichText from "@/i18n/RichText";
-import { formatDate } from "@/i18n/format";
+import { formatDate, parseServerDate } from "@/i18n/format";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
 
 const formatLocalDateTime = (iso: string | null | undefined): string => {
   if (!iso) return "-";
   try {
-    const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
+    const d = parseServerDate(iso);
     if (isNaN(d.getTime())) return iso;
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const dd = String(d.getDate()).padStart(2, "0");
@@ -45,12 +45,12 @@ const formatLocalDateTime = (iso: string | null | undefined): string => {
 
 const formatTestDuration = (startIso: string | null | undefined, endIso: string | null | undefined, status: string, t: Dictionary, locale: Locale) => {
   if (!startIso) return t.dashboard.notStarted;
-  if (startIso && !startIso.endsWith('Z')) startIso += 'Z';
-  const start = new Date(startIso);
-  if (status === "STOPPED") {
+  const start = parseServerDate(startIso);
+  // 사용자가 끝낸 테스트(STOPPED)와 기간이 끝나 승자가 정해진 테스트(COMPLETED)는 남은 시간 대신 종료로 표시
+  if (status === "STOPPED" || status === "COMPLETED") {
     return t.dashboard.finishedStarted(formatDate(start, locale));
   }
-  let end = endIso ? new Date(endIso.endsWith('Z') ? endIso : endIso + 'Z') : new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const end = endIso ? parseServerDate(endIso) : new Date(start.getTime() + 24 * 60 * 60 * 1000);
   const now = new Date();
   const diffHours = Math.max(0, Math.floor((end.getTime() - now.getTime()) / (1000 * 60 * 60)));
   return t.dashboard.runningEnds(diffHours);
