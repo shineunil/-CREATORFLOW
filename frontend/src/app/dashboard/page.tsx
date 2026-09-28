@@ -21,6 +21,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
 import ChannelSelect from "@/components/layout/ChannelSelect";
 import { apiFetch } from "@/lib/api";
+import { SERVICE_UNAVAILABLE_ERROR, startGoogleLogin } from "@/lib/auth";
 import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 import { useI18n } from "@/i18n/I18nProvider";
 import RichText from "@/i18n/RichText";
@@ -58,8 +59,25 @@ const formatTestDuration = (startIso: string | null | undefined, endIso: string 
 
 export default function Dashboard() {
   const router = useRouter();
-  const { t, locale } = useI18n();
+  const { t, lp, locale } = useI18n();
   const D = t.dashboard;
+
+  // 해제·만료된 "이 채널"을 다시 연동한다. 구글 화면은 모든 채널을 보여주므로 어떤 채널을 골라야 하는지 먼저 알려준다.
+  const handleConnectChannel = () => {
+    setModalConfig({
+      isOpen: true,
+      type: "confirm",
+      variant: "info",
+      title: D.reconnectGuideTitle,
+      message: D.reconnectGuideMsg(userProfile.channel_title || ""),
+      confirmText: D.reconnectGuideConfirm,
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
+        if (!(await startGoogleLogin(locale, userProfile.channel_id))) router.push(`${lp("/login")}?error=${SERVICE_UNAVAILABLE_ERROR}`);
+      },
+      onCancel: () => setModalConfig(prev => ({ ...prev, isOpen: false })),
+    });
+  };
   const searchParams = useSearchParams();
   const [testData, setTestData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -105,7 +123,26 @@ export default function Dashboard() {
     const upgradedFromUrl = searchParams.get("upgraded");
 
     if (errorFromUrl === "channel_limit_reached") {
-      showAlert(D.channelLimitTitle, D.channelLimitMsg, "warning");
+      // 막기만 하지 않고 PRO 요금제로 바로 갈 수 있게 한다
+      setModalConfig({
+        isOpen: true,
+        type: "confirm",
+        variant: "warning",
+        title: D.channelLimitTitle,
+        message: D.channelLimitMsg,
+        confirmText: D.viewPlans,
+        cancelText: t.common.close,
+        onConfirm: () => {
+          setModalConfig(prev => ({ ...prev, isOpen: false }));
+          router.push("/pricing");
+        },
+        onCancel: () => setModalConfig(prev => ({ ...prev, isOpen: false })),
+      });
+      router.replace("/dashboard");
+    }
+
+    if (errorFromUrl === "reconnect_wrong_channel") {
+      showAlert(D.wrongChannelTitle, D.wrongChannelMsg(searchParams.get("expected") || ""), "warning");
       router.replace("/dashboard");
     }
 
@@ -287,6 +324,22 @@ export default function Dashboard() {
         <ChannelSelect />
       </div>
 
+      {userProfile.is_connected === false && !userProfile.needs_reconnect && (
+        <div className="mx-8 mb-2 flex flex-wrap items-center gap-3 justify-between px-5 py-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-100">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={20} className="text-cyan-400 flex-shrink-0" aria-hidden="true" />
+            <p className="text-sm break-keep">{D.disconnectedBanner}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleConnectChannel}
+            className="px-4 py-2 bg-white text-black text-sm font-bold rounded-lg cursor-pointer hover:bg-zinc-200 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+          >
+            {D.connectChannelBtn}
+          </button>
+        </div>
+      )}
+
       {userProfile.needs_reconnect && (
         <div className="mx-8 mb-2 flex flex-wrap items-center gap-3 justify-between px-5 py-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200">
           <div className="flex items-center gap-3">
@@ -295,9 +348,13 @@ export default function Dashboard() {
               {D.reconnectMsg}
             </p>
           </div>
-          <Link href="/login" className="px-4 py-2 bg-amber-500 text-black text-sm font-bold rounded-lg hover:bg-amber-400 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+          <button
+            type="button"
+            onClick={handleConnectChannel}
+            className="px-4 py-2 bg-amber-500 text-black text-sm font-bold rounded-lg cursor-pointer hover:bg-amber-400 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+          >
             {D.reconnectBtn}
-          </Link>
+          </button>
         </div>
       )}
 

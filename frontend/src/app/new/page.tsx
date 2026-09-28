@@ -10,10 +10,31 @@ import Modal from "@/components/Modal";
 import ChannelSelect from "@/components/layout/ChannelSelect";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatDate, formatNumber } from "@/i18n/format";
+import { SERVICE_UNAVAILABLE_ERROR, startGoogleLogin } from "@/lib/auth";
+
+type VideosState = "loading" | "ready" | "empty" | "no_channel" | "error";
+
+/**
+ * 영상 목록을 불러오고 화면 상태까지 정한다. 목록이 비었다고 무조건 "불러오는 중"으로 두면
+ * 채널 연동을 해제했거나(400) 만료됐을 때(409) 로딩이 끝나지 않으므로, 이유별로 나눈다.
+ */
+async function fetchVideoList(refresh = false): Promise<{ state: VideosState; videos: any[] }> {
+  try {
+    const res = await apiFetch(`/api/videos${refresh ? "?refresh=true" : ""}`);
+    if (res.status === 400 || res.status === 409) return { state: "no_channel", videos: [] };
+    if (!res.ok) return { state: "error", videos: [] };
+    const data = await res.json();
+    const videos = data.videos || [];
+    return { state: videos.length ? "ready" : "empty", videos };
+  } catch (err) {
+    console.error("Failed to fetch video list:", err);
+    return { state: "error", videos: [] };
+  }
+}
 
 function NewTestContent() {
   const router = useRouter();
-  const { t, locale } = useI18n();
+  const { t, lp, locale } = useI18n();
   const N = t.newTest;
   const searchParams = useSearchParams();
   const videoIdFromUrl = searchParams.get("videoId");
@@ -62,6 +83,7 @@ function NewTestContent() {
   const [durationHours, setDurationHours] = useState("24");
   
   const [videos, setVideos] = useState<any[]>([]);
+  const [videosState, setVideosState] = useState<VideosState>("loading");
   const [activeTestVideoIds, setActiveTestVideoIds] = useState<Set<string>>(new Set());
   const [userProfile, setUserProfile] = useState<any>({});
 
@@ -89,22 +111,18 @@ function NewTestContent() {
       })
       .catch(err => console.error("Failed to fetch active tests:", err));
 
-    apiFetch("/api/videos")
-      .then(res => res.json())
-      .then(data => {
-        if (data.videos) {
-          setVideos(data.videos);
-          // 만약 URL에 videoId가 있다면 해당 영상을 찾아서 즉시 2단계로 넘어갑니다.
-          if (videoIdFromUrl) {
-            const target = data.videos.find((v: any) => v.id === videoIdFromUrl);
-            if (target) {
-              setSelectedVideo(target);
-              setStep(2);
-            }
-          }
+    fetchVideoList().then(({ state, videos: list }) => {
+      setVideos(list);
+      setVideosState(state);
+      // 만약 URL에 videoId가 있다면 해당 영상을 찾아서 즉시 2단계로 넘어갑니다.
+      if (videoIdFromUrl) {
+        const target = list.find((v: any) => v.id === videoIdFromUrl);
+        if (target) {
+          setSelectedVideo(target);
+          setStep(2);
         }
-      })
-      .catch(err => console.error("Failed to fetch video list:", err));
+      }
+    });
   }, [videoIdFromUrl]);
 
   // 좌측 상단 select box(또는 우측 상단 헤더)에서 다른 채널로 전환하면, 그 채널 기준
@@ -130,10 +148,11 @@ function NewTestContent() {
         })
         .catch(err => console.error("Failed to fetch active tests:", err));
 
-      apiFetch("/api/videos")
-        .then(res => res.json())
-        .then(data => setVideos(data.videos || []))
-        .catch(err => console.error("Failed to fetch video list:", err));
+      setVideosState("loading");
+      fetchVideoList().then(({ state, videos: list }) => {
+        setVideos(list);
+        setVideosState(state);
+      });
     };
     window.addEventListener(CHANNEL_SWITCHED_EVENT, handleChannelSwitched);
     return () => window.removeEventListener(CHANNEL_SWITCHED_EVENT, handleChannelSwitched);
@@ -143,15 +162,27 @@ function NewTestContent() {
   const [isRefreshingVideos, setIsRefreshingVideos] = useState(false);
   const refreshVideos = async () => {
     setIsRefreshingVideos(true);
-    try {
-      const res = await apiFetch("/api/videos?refresh=true");
-      const data = await res.json();
-      if (data.videos) setVideos(data.videos);
-    } catch (err) {
-      console.error("Failed to refresh video list:", err);
-    } finally {
-      setIsRefreshingVideos(false);
-    }
+    const { state, videos: list } = await fetchVideoList(true);
+    setVideos(list);
+    setVideosState(state);
+    setIsRefreshingVideos(false);
+  };
+
+  // 해제·만료된 "이 채널"을 다시 연동한다. 구글 화면은 모든 채널을 보여주므로 어떤 채널을 골라야 하는지 먼저 알려준다.
+  const handleConnectChannel = () => {
+    setModalConfig({
+      isOpen: true,
+      type: "confirm",
+      variant: "info",
+      title: t.dashboard.reconnectGuideTitle,
+      message: t.dashboard.reconnectGuideMsg(userProfile.channel_title || ""),
+      confirmText: t.dashboard.reconnectGuideConfirm,
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
+        if (!(await startGoogleLogin(locale, userProfile.channel_id))) router.push(`${lp("/login")}?error=${SERVICE_UNAVAILABLE_ERROR}`);
+      },
+      onCancel: () => setModalConfig(prev => ({ ...prev, isOpen: false })),
+    });
   };
 
   const handleTitleChange = (id: string, newTitle: string) => {
@@ -378,7 +409,7 @@ function NewTestContent() {
             <h2 className="text-xl font-bold">{N.step1}</h2>
             <div className="flex flex-wrap items-center gap-3">
             <ChannelSelect />
-            {videos.length > 0 && (
+            {(videosState === "ready" || videosState === "empty") && (
               <button
                 type="button"
                 onClick={refreshVideos}
@@ -392,10 +423,39 @@ function NewTestContent() {
             </div>
           </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {videos.length === 0 ? (
+            {videosState === "loading" ? (
               <div className="col-span-full flex flex-col items-center gap-5 p-12 glass-panel rounded-2xl border border-zinc-800/50" role="status">
                 <p className="text-base md:text-lg font-semibold text-zinc-100 text-center break-keep">{N.loadingVideos}</p>
                 <div className="loading-bar w-full max-w-sm" aria-hidden="true" />
+              </div>
+            ) : videosState !== "ready" ? (
+              <div className="col-span-full flex flex-col items-center gap-3 p-12 glass-panel rounded-2xl border border-zinc-800/50 text-center" role="status">
+                <p className="text-base md:text-lg font-bold text-zinc-100 break-keep">
+                  {videosState === "no_channel" ? N.noChannelTitle : videosState === "empty" ? N.noVideosTitle : N.videosErrorTitle}
+                </p>
+                <p className="text-sm text-zinc-300 break-keep max-w-md">
+                  {videosState === "no_channel" ? N.noChannelMsg : videosState === "empty" ? N.noVideosMsg : N.videosErrorMsg}
+                </p>
+                {videosState === "no_channel" && (
+                  <button
+                    type="button"
+                    onClick={handleConnectChannel}
+                    className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-black text-sm font-bold cursor-pointer hover:bg-zinc-200 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                  >
+                    {N.connectChannel}
+                  </button>
+                )}
+                {videosState === "error" && (
+                  <button
+                    type="button"
+                    onClick={refreshVideos}
+                    disabled={isRefreshingVideos}
+                    className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-zinc-600 bg-zinc-800 text-sm font-bold text-white cursor-pointer hover:bg-zinc-700 hover:border-zinc-400 active:scale-95 disabled:opacity-60 disabled:cursor-wait transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                  >
+                    <RefreshCcw size={16} className={`text-cyan-400 ${isRefreshingVideos ? "animate-spin" : ""}`} aria-hidden="true" />
+                    {N.retry}
+                  </button>
+                )}
               </div>
             ) : (
               videos.map((v) => {

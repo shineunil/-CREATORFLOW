@@ -275,6 +275,9 @@ OAUTH_LOCALE_COOKIE = "oauth_locale"
 OAUTH_STATE_COOKIE = "oauth_state"
 # 콜백이 발급한 auth_code를 같은 브라우저에서만 교환할 수 있게 묶어 두는 쿠키.
 OAUTH_CODE_COOKIE = "oauth_pending_code"
+# "다시 연동" 버튼으로 시작한 로그인이면, 다시 연결할 채널의 ID. 구글 화면은 모든 채널을 보여주므로
+# 콜백에서 사용자가 고른 채널이 이 채널인지 확인하고, 다르면 아무것도 바꾸지 않는다.
+OAUTH_RECONNECT_COOKIE = "oauth_reconnect"
 OAUTH_COOKIE_PATH = "/api/auth"
 
 
@@ -290,6 +293,7 @@ def _oauth_redirect(url: str) -> RedirectResponse:
     response = RedirectResponse(url)
     response.delete_cookie(OAUTH_STATE_COOKIE, path=OAUTH_COOKIE_PATH)
     response.delete_cookie(OAUTH_LOCALE_COOKIE, path=OAUTH_COOKIE_PATH)
+    response.delete_cookie(OAUTH_RECONNECT_COOKIE, path=OAUTH_COOKIE_PATH)
     return response
 
 
@@ -300,10 +304,11 @@ def _login_locale(request: Request) -> str:
 
 
 @app.get("/api/auth/login")
-def login_via_google(request: Request, locale: str | None = None):
+def login_via_google(request: Request, locale: str | None = None, reconnect: int | None = None):
     """
     구글 로그인 페이지로 리다이렉트합니다.
     이미 로그인된 상태에서 "채널 추가"로 들어온 경우, HttpOnly 쿠키에서 현재 유저를 읽는다.
+    reconnect=채널ID면 "그 채널 다시 연동" 모드 - 콜백에서 같은 채널을 골랐을 때만 연동한다.
     """
     import secrets as _secrets
     scope = "openid email profile https://www.googleapis.com/auth/youtube.force-ssl"
@@ -334,6 +339,9 @@ def login_via_google(request: Request, locale: str | None = None):
     # 구글을 다녀오는 동안 로그인을 시작한 화면 언어를 기억해 두었다가, 콜백에서 계정 언어로 저장한다.
     if locale in SUPPORTED_LOCALES:
         _set_oauth_cookie(response, OAUTH_LOCALE_COOKIE, locale, max_age=600)
+    # 다시 연동은 로그인한 사람이 자기 채널에 대해서만 쓴다 (채널 소유 확인은 콜백에서).
+    if reconnect and linking_user_id:
+        _set_oauth_cookie(response, OAUTH_RECONNECT_COOKIE, str(reconnect), max_age=600)
     return response
 
 @app.get("/api/auth/callback")
@@ -412,6 +420,20 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
 
         channel_id = yt_data["items"][0]["id"]
         channel_title = yt_data["items"][0]["snippet"]["title"]
+
+    # "다시 연동" 모드: 사용자가 고른 채널이 다시 연결하려던 그 채널인지 확인한다.
+    # 다르면 아무것도 바꾸지 않고, 방금 받은 권한도 돌려준 뒤 올바른 채널을 고르라고 안내한다.
+    reconnect_cookie = request.cookies.get(OAUTH_RECONNECT_COOKIE)
+    if reconnect_cookie and linking_user_id:
+        try:
+            expected = db.query(Channel).filter(Channel.id == int(reconnect_cookie)).first()
+        except ValueError:
+            expected = None
+        if expected and expected.user_id == linking_user_id and expected.youtube_channel_id != channel_id:
+            logger.info(f"다시 연동 채널 불일치: 기대 {expected.youtube_channel_id}, 선택 {channel_id} - 변경 없음")
+            await _revoke_google_token(refresh_token or access_token)
+            expected_title = urllib.parse.quote(expected.channel_title or "")
+            return _oauth_redirect(f"{FRONTEND_URL}/dashboard?error=reconnect_wrong_channel&expected={expected_title}")
 
     # 4. DB 저장 로직 (유저 및 채널)
     user = db.query(User).filter(User.id == linking_user_id).first() if linking_user_id else None
@@ -515,22 +537,51 @@ def exchange_auth_code(request: Request, code: str, db: Session = Depends(get_db
     response.delete_cookie(OAUTH_CODE_COOKIE, path=OAUTH_COOKIE_PATH)
     return response
 
+async def _revoke_google_token(refresh_token: str):
+    """구글 쪽 앱 권한도 회수한다 (사용자의 구글 계정 '연결된 앱'에서 사라짐). 실패해도 연동 해제는 계속한다."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            res = await client.post("https://oauth2.googleapis.com/revoke", data={"token": refresh_token})
+        if res.status_code != 200:
+            logger.warning(f"구글 권한 회수 실패 (상태 코드 {res.status_code}) - 토큰은 DB에서 삭제합니다.")
+    except Exception as e:
+        logger.warning(f"구글 권한 회수 중 오류: {e} - 토큰은 DB에서 삭제합니다.")
+
+
 @app.post("/api/channels/{target_channel_id}/disconnect")
-def disconnect_channel(target_channel_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+async def disconnect_channel(target_channel_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
     """
-    지정한 채널의 YouTube 연동을 해제합니다 (OAuth 리프레시 토큰만 삭제).
+    지정한 채널의 YouTube 연동을 해제합니다.
     switch_channel과 동일하게 같은 계정 소유 채널이면 지금 활성 채널이 아니어도 해제할 수 있다.
     채널 row/테스트 기록 자체는 지우지 않는다 - 재연동하면 다시 쓸 수 있어야 하고, cascade 삭제로
     과거 A/B 테스트 데이터까지 날아가면 안 되기 때문.
+
+    권한이 사라지면 테스트 썸네일이 유튜브에 그대로 방치되므로, 아직 권한이 있는 지금
+    진행 중인 테스트를 멈추고 썸네일·제목을 원본으로 되돌린 뒤 권한을 회수한다.
     """
     target = db.query(Channel).filter(Channel.id == target_channel_id).first()
     if not target or target.user_id != channel.user_id:
         raise HTTPException(status_code=404, detail=msg("channel_not_owned"))
 
+    refresh_token = target.oauth_refresh_token
+    running_tests = (
+        db.query(ABTest).join(Video)
+        .filter(Video.channel_id == target.id, ABTest.status == TestStatus.RUNNING, ABTest.is_deleted == False)
+        .all()
+    )
+    for test in running_tests:
+        await _restore_original(test, db, refresh_token)
+        test.status = TestStatus.STOPPED
+        test.end_time = datetime.now(timezone.utc)
+
+    if refresh_token:
+        await _revoke_google_token(refresh_token)
+
     target.oauth_refresh_token = None
     target.needs_reconnect = False  # 완전히 연동 해제된 상태이므로 "재연동 필요" 배너와는 구분
     db.commit()
-    return {"message": msg("channel_disconnected_ok")}
+    _video_list_cache.pop(target.id, None)
+    return {"message": msg("channel_disconnected_ok"), "stopped_tests": len(running_tests)}
 
 @app.get("/api/channels")
 def list_channels(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
@@ -881,9 +932,21 @@ async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: C
     if test.is_deleted:
         return {"message": msg("test_cancelled")}
 
-    # 원본(Candidate A) 찾기
+    await _restore_original(test, db, channel.oauth_refresh_token)
+
+    # 논리적 삭제 (Soft Delete) - 쿼터 유지를 위해 DB에 남김
+    test.is_deleted = True
+    test.status = TestStatus.STOPPED
+    db.commit()
+    return {"message": msg("test_cancelled")}
+
+
+async def _restore_original(test: ABTest, db: Session, refresh_token: str | None):
+    """유튜브 썸네일과 제목을 원본(Candidate A)으로 되돌린다. 테스트 삭제와 채널 연동 해제에서 함께 쓴다."""
+    if not refresh_token:
+        return
     original_var = db.query(Variation).filter(Variation.ab_test_id == test.id, Variation.is_control == True).first()
-    
+
     if original_var:
         from youtube_api import update_youtube_thumbnail, update_youtube_title
         
@@ -908,7 +971,7 @@ async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: C
                             if resp.status_code == 200:
                                 with open(file_path, "wb") as f:
                                     f.write(resp.content)
-                                await update_youtube_thumbnail(test.video.youtube_video_id, file_path, channel.oauth_refresh_token)
+                                await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token)
                             else:
                                 logger.error(f"원본 썸네일 복구 실패 (상태 코드: {resp.status_code})")
                     except Exception as e:
@@ -918,22 +981,16 @@ async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: C
                     file_name = original_var.thumbnail_image_url.split('/')[-1]
                     file_path = os.path.join("uploads", file_name)
                     if os.path.exists(file_path):
-                        await update_youtube_thumbnail(test.video.youtube_video_id, file_path, channel.oauth_refresh_token)
+                        await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token)
                 except Exception as e:
                     logger.error(f"원본 썸네일 로컬 복구 실패: {e}")
-                    
+
         # 제목 복구
         if original_var.title_text:
             try:
-                await update_youtube_title(test.video.youtube_video_id, original_var.title_text, channel.oauth_refresh_token)
+                await update_youtube_title(test.video.youtube_video_id, original_var.title_text, refresh_token)
             except Exception as e:
                 logger.error(f"원본 제목 복구 실패: {e}")
-
-    # 논리적 삭제 (Soft Delete) - 쿼터 유지를 위해 DB에 남김
-    test.is_deleted = True
-    test.status = TestStatus.STOPPED
-    db.commit()
-    return {"message": msg("test_cancelled")}
 
 @app.post("/api/upload")
 @limiter.limit("10/minute")
@@ -1298,7 +1355,7 @@ def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
     """현재 연동된 채널 소유 유저 정보 및 구독 요금제를 반환합니다."""
     user = channel.user
     if not user:
-        return {"email": None, "plan": "BASIC", "is_pro": False, "channel_title": None, "needs_reconnect": channel.needs_reconnect, "is_admin": False}
+        return {"email": None, "plan": "BASIC", "is_pro": False, "channel_title": None, "needs_reconnect": channel.needs_reconnect, "is_connected": bool(channel.oauth_refresh_token), "is_admin": False}
 
     admin_emails = {e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()}
     is_admin = bool(user.email) and user.email.lower() in admin_emails
@@ -1309,6 +1366,8 @@ def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
         "is_pro": user.plan == PlanType.PRO or user.plan == PlanType.AGENCY,
         "channel_title": channel.channel_title,
         "needs_reconnect": channel.needs_reconnect,
+        "is_connected": bool(channel.oauth_refresh_token),
+        "channel_id": channel.id,
         "is_admin": is_admin,
         "notification_email": user.notification_email,
         "notification_email_verified": user.notification_email_verified,

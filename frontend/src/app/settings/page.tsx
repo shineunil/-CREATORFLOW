@@ -47,7 +47,7 @@ export default function SettingsPage() {
   const isSwitchingRef = useRef(false);
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
-    type?: "alert" | "confirm";
+    type?: "alert" | "confirm" | "loading";
     variant?: "info" | "success" | "warning" | "error";
     title: string;
     message: string;
@@ -209,6 +209,8 @@ export default function SettingsPage() {
       S.disconnectConfirmTitle,
       S.disconnectConfirmMsg(channelTitle || S.thisChannel),
       async () => {
+        // 진행 중인 테스트의 썸네일·제목을 원본으로 되돌리느라 몇 초 걸릴 수 있어, 그동안 기다림 창을 띄운다
+        setModalConfig({ isOpen: true, type: "loading", variant: "info", title: S.disconnectingTitle, message: S.disconnectingMsg, onConfirm: () => {} });
         try {
           const res = await apiFetch(`/api/channels/${channelId}/disconnect`, { method: "POST" });
           if (!res.ok) throw new Error("disconnect failed");

@@ -190,6 +190,58 @@ def _log_in(client):
     assert client.get(f"/api/auth/exchange?code={auth_code}").status_code == 200
 
 
+# --- "다시 연동" 모드 ---
+
+def _channel_id(SessionLocal, youtube_channel_id):
+    db = SessionLocal()
+    try:
+        return db.query(Channel).filter(Channel.youtube_channel_id == youtube_channel_id).one().id
+    finally:
+        db.close()
+
+
+def test_reconnect_rejects_a_different_channel_and_changes_nothing(session_factory, monkeypatch):
+    revoked = []
+
+    async def fake_revoke(token):
+        revoked.append(token)
+
+    monkeypatch.setattr(main, "_revoke_google_token", fake_revoke)
+    client = TestClient(main.app)
+    _log_in(client)  # CHANNEL_ID 채널로 가입
+
+    # 같은 계정에 연동 해제된 다른 채널이 있고, 그 채널을 다시 연동하려는 상황
+    db = session_factory()
+    user = db.query(User).filter(User.google_user_id == GOOGLE_ID).one()
+    db.add(Channel(user_id=user.id, youtube_channel_id="UC-disconnected", channel_title="Old Channel"))
+    db.commit()
+    db.close()
+    target = _channel_id(session_factory, "UC-disconnected")
+
+    state = _start_login(client, f"?reconnect={target}")
+    res = _callback(client, state)  # 구글 화면에서 다른 채널(CHANNEL_ID)을 고름
+    location = res.headers["location"]
+    assert "error=reconnect_wrong_channel" in location and "expected=Old%20Channel" in location
+    assert "auth_code=" not in location
+    assert revoked == ["refresh"]  # 잘못 받은 권한은 돌려준다
+
+    db = session_factory()
+    try:
+        assert db.get(Channel, target).oauth_refresh_token is None  # 아무것도 바뀌지 않음
+    finally:
+        db.close()
+
+
+def test_reconnect_succeeds_when_the_same_channel_is_chosen(session_factory):
+    client = TestClient(main.app)
+    _log_in(client)
+    target = _channel_id(session_factory, CHANNEL_ID)
+
+    state = _start_login(client, f"?reconnect={target}")
+    res = _callback(client, state)
+    assert "auth_code=" in res.headers["location"]
+
+
 def test_owner_session_passes_the_billing_owner_check(session_factory):
     client = TestClient(main.app)
     _log_in(client)
