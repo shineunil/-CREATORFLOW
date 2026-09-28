@@ -19,6 +19,9 @@ frontend/.env*
 frontend/.env.local
 frontend/.vercel/
 
+# Logs (로컬 실행 로그 - 이메일·토큰 같은 값이 찍힐 수 있어 올리지 않는다)
+*.log
+
 # OS / Misc
 .DS_Store
 Thumbs.db
