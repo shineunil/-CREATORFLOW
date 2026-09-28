@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from models import User, Channel, Video, ABTest, Variation, TestStatus, PlanType
+from models import User, Channel, Video, ABTest, Variation, TestStatus, PlanType, MetricLog
 from scheduler import AVSchedulerEngine
 from youtube_api import TokenRevokedError
 import scheduler as scheduler_module
@@ -237,6 +237,55 @@ def test_later_swaps_do_not_fetch_the_original_again(engine, db_session, monkeyp
 
     run(engine._do_swap(test, db_session))
     assert test.current_variation_id == variations[2].id
+
+
+# --- 제목이 같으면 제목 교체를 건너뛴다 (쿼터 절약) ---
+
+def test_thumbnail_only_swap_skips_the_title_update_and_its_quota(engine, db_session, monkeypatch):
+    from quota_guard import get_today_usage
+
+    test, channel, video, variations = make_running_test(db_session)
+    for v in variations:
+        v.title_text = "원래 영상 제목"  # 제목 칸을 비워 두면 모든 후보가 원래 제목을 갖는다
+    variations[1].thumbnail_image_url = None  # 썸네일 다운로드(네트워크) 없이 확인
+    db_session.commit()
+    calls = []
+    _stub_youtube(monkeypatch, calls)
+
+    run(engine._do_swap(test, db_session))
+
+    assert calls == []  # 제목이 같으니 유튜브 제목 수정 요청을 보내지 않음
+    assert test.current_variation_id == variations[1].id  # 교체 자체는 성공 처리
+    assert get_today_usage(db_session) == 1  # 조회수 확인 1만 예약 (이전엔 101)
+
+
+def test_a_different_title_is_still_applied(engine, db_session, monkeypatch):
+    test, channel, video, variations = make_running_test(db_session)  # "Title 0" -> "Title 1"
+    calls = []
+    _stub_youtube(monkeypatch, calls)
+
+    run(engine._do_swap(test, db_session))
+    assert calls == ["title"]
+
+
+def test_winner_that_is_already_live_is_not_uploaded_again(engine, db_session, monkeypatch):
+    test, channel, video, variations = make_running_test(db_session)
+    for v in variations:
+        v.thumbnail_image_url = KEPT_ORIGINAL
+    test.current_variation_id = variations[1].id  # B가 지금 걸려 있음
+    test.end_time = datetime.now(timezone.utc) - timedelta(minutes=1)
+    test.extension_count = 99  # 표본 부족으로 자동 연장되지 않게
+    db_session.commit()
+    db_session.add(MetricLog(variation_id=variations[1].id, views_gained=500, hours_exposed=1))
+    db_session.commit()
+    calls = []
+    _stub_youtube(monkeypatch, calls)
+
+    run(engine._process_single_test(test, db_session))
+
+    assert test.status == TestStatus.COMPLETED
+    assert variations[1].is_winner is True
+    assert calls == []  # 승자 B가 이미 걸려 있으니 썸네일·제목을 다시 올리지 않음
 
 
 async def _async_return(value):

@@ -27,6 +27,19 @@ from quota_guard import has_quota_for, record_usage, check_and_reserve_usage, CO
 # 로그 형식·단계는 main.py에서 한 번에 정한다 (LOG_LEVEL 환경 변수).
 logger = logging.getLogger(__name__)
 
+
+def _live_title(all_vars, current_var) -> str:
+    """지금 유튜브에 걸려 있는 제목. 교체한 적이 없으면 원본(A)의 제목 = 테스트 시작 때의 영상 제목."""
+    if current_var is not None:
+        return current_var.title_text or ""
+    control = next((v for v in all_vars if v.is_control), None)
+    return (control.title_text or "") if control else ""
+
+
+def _title_differs(new_title, live_title) -> bool:
+    """새 제목이 있고 지금 제목과 다를 때만 제목 교체(쿼터 51)가 필요하다."""
+    return bool(new_title) and new_title.strip() != (live_title or "").strip()
+
 class AVSchedulerEngine:
     def __init__(self, db_session_maker):
         self.scheduler = AsyncIOScheduler()
@@ -118,16 +131,27 @@ class AVSchedulerEngine:
                     # 호출하면 Google이 403 quotaExceeded를 반환해도 update_youtube_thumbnail이
                     # 조용히 False를 반환할 뿐이라, DB엔 "승자 확정됨"이라 남지만 실제 YouTube
                     # 썸네일은 예전 것 그대로 남는 상황이 아무 로그 없이 발생할 수 있었다.
+                    # 이미 유튜브에 걸려 있는 것은 다시 올리지 않는다 (승자가 지금 적용 중이면 썸네일 생략,
+                    # 제목이 지금과 같으면 제목 생략). 직전 교체가 실패했으면 유튜브 상태를 확신할 수 없어 둘 다 적용한다.
+                    live_var = next((v for v in all_vars if v.id == test.current_variation_id), None)
+                    state_known = not test.swap_failed
+                    winner_is_live = state_known and live_var is not None and live_var.id == winner_var.id
+                    apply_thumbnail = bool(winner_var.thumbnail_image_url) and not winner_is_live
+                    apply_title = bool(winner_var.title_text) and (
+                        not state_known or _title_differs(winner_var.title_text, _live_title(all_vars, live_var))
+                    )
                     # L-5: check_and_reserve_usage로 확인+예약을 원자적으로 처리 (TOCTOU 방지)
-                    worst_case_cost = COST_THUMBNAILS_SET + COST_VIDEOS_UPDATE
-                    if not check_and_reserve_usage(session, worst_case_cost):
+                    apply_cost = (COST_THUMBNAILS_SET if apply_thumbnail else 0) + (COST_VIDEOS_UPDATE if apply_title else 0)
+                    if apply_cost == 0:
+                        logger.info(f" - [테스트 {test.id}] 승자 [{winner_var.name}]가 이미 유튜브에 적용되어 있어 추가 교체 없음")
+                    elif not check_and_reserve_usage(session, apply_cost):
                         logger.warning(
                             f"⚠️ YouTube API 일일 쿼터 소진 임박 - 테스트 ID [{test.id}] 승자 썸네일/제목 적용을 건너뜁니다 "
                             f"(DB상 승자 확정은 유지되나, YouTube에는 반영되지 않았습니다)"
                         )
                     else:
                         try:
-                            if winner_var.thumbnail_image_url:
+                            if apply_thumbnail:
                                 import os, re as _re2
                                 _YT_NATIVE = ("https://i.ytimg.com/", "https://img.youtube.com/")
                                 win_url = winner_var.thumbnail_image_url
@@ -148,7 +172,7 @@ class AVSchedulerEngine:
                                     thumb_ok = await update_youtube_thumbnail(test.video.youtube_video_id, win_file, refresh_token)
                                     if not thumb_ok:
                                         logger.error(f"⚠️ 테스트 ID [{test.id}] 승자 썸네일 YouTube 반영 실패 (API가 실패를 반환함)")
-                            if winner_var.title_text:
+                            if apply_title:
                                 title_ok = await update_youtube_title(test.video.youtube_video_id, winner_var.title_text, refresh_token)
                                 if not title_ok:
                                     logger.error(f"⚠️ 테스트 ID [{test.id}] 승자 제목 YouTube 반영 실패 (API가 실패를 반환함)")
@@ -254,17 +278,25 @@ class AVSchedulerEngine:
             if not test or test.status != TestStatus.RUNNING or test.current_variation_id is not None:
                 return
 
-        # YouTube Data API 쿼터는 프로젝트(앱) 전체 공유 자원이므로, 소진 위험이 있으면
-        # 이번 스왑을 건너뛴다 (last_swapped_at을 갱신하지 않으므로 다음 tick에 다시 시도됨).
-        # L-5: check_and_reserve_usage로 확인+예약을 원자적으로 처리 (TOCTOU 방지)
-        worst_case_cost = COST_VIDEOS_LIST + COST_THUMBNAILS_SET + COST_VIDEOS_UPDATE
-        if not check_and_reserve_usage(session, worst_case_cost):
-            logger.warning(f"⚠️ YouTube API 일일 쿼터 소진 임박 - 테스트 ID [{test.id}] 스왑을 건너뜁니다 (쿼터 리셋 후 자동 재개)")
-            return
-
-        # 현재 적용된 변인 가져오기 (처음 실행되는 경우엔 None일 수 있음)
+        # 현재 적용된 변인과 다음 변인 (DB만 본다. 처음 실행되는 경우 current_var는 None)
         all_vars = session.query(Variation).filter(Variation.ab_test_id == test.id).order_by(Variation.id).all()
         current_var = session.query(Variation).filter(Variation.id == test.current_variation_id).first() if test.current_variation_id else None
+        next_var = self._get_next_variation(all_vars, current_var)
+        if not next_var:
+            logger.error(f"[스케줄러] 테스트 [{test.id}] 다음 변인을 찾을 수 없습니다. 스왑 건너뜀.")
+            return
+
+        # 제목이 지금 유튜브에 걸린 제목과 같으면 제목 교체를 건너뛴다 (썸네일만 테스트하는 경우 쿼터가 절반).
+        needs_title = _title_differs(next_var.title_text, _live_title(all_vars, current_var))
+        needs_thumbnail = bool(next_var.thumbnail_image_url)
+
+        # YouTube Data API 쿼터는 프로젝트(앱) 전체 공유 자원이므로, 소진 위험이 있으면
+        # 이번 스왑을 건너뛴다 (last_swapped_at을 갱신하지 않으므로 다음 tick에 다시 시도됨).
+        # L-5: check_and_reserve_usage로 확인+예약을 원자적으로 처리 (TOCTOU 방지). 실제로 할 작업만큼만 예약한다.
+        swap_cost = COST_VIDEOS_LIST + (COST_THUMBNAILS_SET if needs_thumbnail else 0) + (COST_VIDEOS_UPDATE if needs_title else 0)
+        if not check_and_reserve_usage(session, swap_cost):
+            logger.warning(f"⚠️ YouTube API 일일 쿼터 소진 임박 - 테스트 ID [{test.id}] 스왑을 건너뜁니다 (쿼터 리셋 후 자동 재개)")
+            return
 
         now = datetime.now(timezone.utc)
 
@@ -297,13 +329,7 @@ class AVSchedulerEngine:
         # last_views_snapshot은 스왑 성공 후에만 갱신 (실패 시 기준선 오염 방지)
         test.last_swapped_at = now
 
-        # 4. 다음 순서의 Variation 결정 (A -> B -> C -> A)
-        next_var = self._get_next_variation(all_vars, current_var)
-        if not next_var:
-            logger.error(f"[스케줄러] 테스트 [{test.id}] 다음 변인을 찾을 수 없습니다. 스왑 건너뜀.")
-            return
-
-        # 5. YouTube API를 호출하여 실제 썸네일과 제목 교체
+        # 5. YouTube API를 호출하여 실제 썸네일과 제목 교체 (다음 변인은 위에서 이미 정함: A -> B -> C -> A)
         try:
             thumbnail_ok = True
             if next_var.thumbnail_image_url:
@@ -360,8 +386,10 @@ class AVSchedulerEngine:
                         thumbnail_ok = False
 
             title_ok = True
-            if next_var.title_text:
+            if needs_title:
                 title_ok = await update_youtube_title(test.video.youtube_video_id, next_var.title_text, refresh_token)
+            else:
+                logger.debug(f" - [테스트 {test.id}] 제목이 지금과 같아 제목 교체 건너뜀")
         except ThumbnailPermissionError:
             test.swap_failed = True
             channel.thumbnail_permission = "denied"
