@@ -24,7 +24,7 @@ from test_policy import (
 )
 from quota_guard import has_quota_for, record_usage, check_and_reserve_usage, COST_VIDEOS_LIST, COST_VIDEOS_UPDATE, COST_THUMBNAILS_SET
 
-logging.basicConfig(level=logging.INFO)
+# 로그 형식·단계는 main.py에서 한 번에 정한다 (LOG_LEVEL 환경 변수).
 logger = logging.getLogger(__name__)
 
 class AVSchedulerEngine:
@@ -187,6 +187,7 @@ class AVSchedulerEngine:
 
         # 재연동이 필요한 채널은 정상화 전까지 API 호출을 반복하지 않고 건너뜀
         if channel.needs_reconnect:
+            logger.debug(f" - [테스트 {test.id}] 채널 {channel.id} 재연동 필요 - 건너뜀")
             return
 
         # 0-1. 워밍업 구간(스왑 직후 SWAP_WARMUP_MINUTES) 종료 시점에 조회수 기준선을 다시 캡처한다.
@@ -213,6 +214,8 @@ class AVSchedulerEngine:
         time_since_last_swap = datetime.now(timezone.utc) - test.last_swapped_at
         interval_elapsed = time_since_last_swap >= timedelta(minutes=test.swap_interval_minutes)
         if not interval_elapsed and not test.swap_failed:
+            remaining = timedelta(minutes=test.swap_interval_minutes) - time_since_last_swap
+            logger.debug(f" - [테스트 {test.id}] 다음 교체까지 {remaining.total_seconds() / 60:.0f}분 남음 - 대기")
             return # 아직 교체 주기가 안 됨
 
         await self._do_swap(test, session)

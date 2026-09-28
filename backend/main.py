@@ -37,7 +37,18 @@ from messages import msg, current_locale, set_request_locale, locale_from_accept
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
+# 로그 단계는 LOG_LEVEL 환경 변수로 정한다 (기본 INFO, 로컬에서 자세히 보려면 backend/.env에 LOG_LEVEL=DEBUG).
+# force=True: 먼저 import된 모듈이 로그 설정을 해 두었더라도 여기 설정이 이긴다.
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+    force=True,
+)
+# DEBUG에서도 네트워크 라이브러리의 패킷 단위 기록까지 쏟아지지 않게 우리 코드 위주로 보이게 한다.
+for _noisy in ("httpcore", "httpx", "urllib3", "hpack", "PIL", "multipart", "googleapiclient.discovery_cache", "python_multipart"):
+    logging.getLogger(_noisy).setLevel(logging.INFO if LOG_LEVEL == "DEBUG" else logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # 에러 모니터링(Sentry): SENTRY_DSN이 설정된 경우에만 활성화된다. 미설정 시(로컬 개발 등)에는
@@ -253,7 +264,14 @@ app.add_middleware(
 async def apply_request_locale(request: Request, call_next):
     """프론트가 보낸 Accept-Language로 이 요청의 응답 메시지 언어를 정한다 (messages.msg가 읽음)."""
     set_request_locale(locale_from_accept_language(request.headers.get("accept-language")))
-    return await call_next(request)
+    started = time.perf_counter()
+    response = await call_next(request)
+    # DEBUG에서만: 요청마다 처리 시간까지 남겨 느린 API를 찾을 수 있게 한다
+    logger.debug(
+        f"{request.method} {request.url.path} -> {response.status_code} "
+        f"({(time.perf_counter() - started) * 1000:.0f}ms, lang={current_locale()})"
+    )
+    return response
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
@@ -1169,7 +1187,9 @@ async def get_channel_videos(request: Request, refresh: bool = False, db: Sessio
 
     cached = _video_list_cache.get(channel.id)
     if cached and not refresh and time.monotonic() - cached[0] < VIDEO_LIST_CACHE_SECONDS:
+        logger.debug(f"[videos] 채널 {channel.id}: 기억해 둔 목록 사용 ({len(cached[1])}개, {time.monotonic() - cached[0]:.0f}초 전)")
         return {"videos": cached[1]}
+    logger.debug(f"[videos] 채널 {channel.id}: 유튜브에서 새로 불러옴 (refresh={refresh})")
 
     try:
         videos, units = await get_recent_videos(channel.oauth_refresh_token)
