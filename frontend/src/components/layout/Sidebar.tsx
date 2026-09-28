@@ -74,11 +74,12 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
         />
       )}
       <aside
-        className={`fixed md:static inset-y-0 left-0 w-64 flex-shrink-0 border-r border-zinc-800/50 bg-[#000000] h-screen p-6 flex flex-col z-[60] md:z-50 transition-transform duration-300 ease-in-out ${
+        className={`fixed md:static inset-y-0 left-0 w-64 flex-shrink-0 border-r border-zinc-800 bg-[#111114] p-6 flex flex-col z-[60] md:z-auto transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0`}
       >
-        <div className="flex items-center justify-between mb-10">
+        {/* PC에서는 로고가 화면 전체 폭 헤더에 있으므로, 로고·닫기 버튼은 휴대폰 서랍 메뉴에서만 보인다 */}
+        <div className="flex items-center justify-between mb-10 md:hidden">
           <Link href="/" className="flex items-center gap-2 px-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
             <div className="w-8 h-8 rounded bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(6,182,212,0.5)]" aria-hidden="true">
               TF
@@ -104,16 +105,16 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
                 href={menu.href}
                 onClick={onClose}
                 aria-current={isActive ? "page" : undefined}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl text-base font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
                   isActive
-                    ? "bg-zinc-900 text-white shadow-sm"
-                    : "text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200"
+                    ? "bg-zinc-800 text-white shadow-sm"
+                    : "text-zinc-200 hover:bg-zinc-800/60 hover:text-white"
                 }`}
               >
                 <menu.icon
-                  size={18}
+                  size={20}
                   aria-hidden="true"
-                  className={isActive ? "text-cyan-400" : "text-zinc-400"}
+                  className={isActive ? "text-cyan-400" : "text-zinc-300"}
                 />
                 {t.sidebar.menu[menu.key]}
               </Link>

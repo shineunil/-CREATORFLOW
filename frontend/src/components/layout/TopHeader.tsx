@@ -128,7 +128,9 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
   const atChannelLimit = channels.length >= maxChannels;
 
   return (
-    <header className={`shrink-0 h-16 md:h-20 border-b border-zinc-800/50 bg-black/50 backdrop-blur-md flex items-center justify-between px-3 md:px-8 gap-2 ${showLogo ? "fixed top-0 left-0 right-0" : "sticky top-0"} z-50`}>
+    // 랜딩(showLogo)은 배경 위에 떠 있는 반투명 헤더, 로그인 후 화면은 화면 전체 폭을 덮는 "틀"로
+    // 왼쪽 메뉴와 같은 색을 쓰고, 메뉴는 이 헤더 아래에서 시작한다 (로고도 메뉴 대신 헤더에 둔다).
+    <header className={`shrink-0 h-16 md:h-20 border-b flex items-center justify-between gap-2 z-50 ${showLogo ? "px-3 md:px-8 border-zinc-800/50 bg-black/50 backdrop-blur-md fixed top-0 left-0 right-0" : "relative px-3 md:px-6 border-zinc-800 bg-[#111114]"}`}>
       <div className="flex items-center min-w-0">
         {!showLogo && onMenuClick && (
           <button
@@ -139,7 +141,7 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
             <Menu size={22} aria-hidden="true" />
           </button>
         )}
-        {showLogo && (
+        {showLogo ? (
           <Link href={lp("/")} className="flex items-center gap-2 md:gap-3 group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(6,182,212,0.5)] group-hover:shadow-[0_0_20px_rgba(6,182,212,0.8)] transition-all flex-shrink-0" aria-hidden="true">
               TF
@@ -147,6 +149,13 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
             <span className="text-[15px] sm:text-lg md:text-2xl font-black tracking-tight text-white transition-colors">
               THUMBNAILFLOW
             </span>
+          </Link>
+        ) : (
+          <Link href={lp("/")} className="flex items-center gap-2 px-1 md:px-2 rounded-lg min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            <div className="w-8 h-8 rounded bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(6,182,212,0.5)] flex-shrink-0" aria-hidden="true">
+              TF
+            </div>
+            <span className="text-[15px] md:text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400 truncate">THUMBNAILFLOW</span>
           </Link>
         )}
       </div>

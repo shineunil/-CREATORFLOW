@@ -95,12 +95,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     );
   }
 
+  // 헤더가 화면 전체 폭을 덮고, 그 아래에 왼쪽 메뉴와 본문이 나란히 온다. 스크롤은 본문 영역만 된다.
   return (
-    <div className="flex h-screen w-full bg-[#09090b] text-zinc-100 overflow-hidden font-sans">
-      <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
-      <div className="flex-1 flex flex-col relative overflow-y-auto min-w-0">
-        <TopHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
-        <main>{children}</main>
+    <div className="flex flex-col h-screen w-full bg-[#09090b] text-zinc-100 overflow-hidden font-sans">
+      <TopHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
+      <div className="flex flex-1 min-h-0">
+        <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+        <div className="flex-1 flex flex-col relative overflow-y-auto min-w-0">
+          <main>{children}</main>
+        </div>
       </div>
       <AnnouncementPopup />
     </div>
