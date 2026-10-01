@@ -96,6 +96,13 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isMenuOpen]);
 
+  // 메뉴를 열 때마다 채널 목록과 한도를 새로 불러온다. 페이지를 연 뒤 결제로 PRO가 되면
+  // 한도(1 → 3)가 바뀌는데, 처음 불러온 값만 쓰면 "다른 채널 연동하기"가 계속 숨겨졌다.
+  const toggleMenu = () => {
+    if (!isMenuOpen) loadAccountInfo();
+    setIsMenuOpen(!isMenuOpen);
+  };
+
   const handleLogout = () => {
     // L-3: 서버에서 HttpOnly 쿠키를 삭제하고 로컬 힌트 플래그도 제거
     apiFetch("/api/auth/logout", { method: "POST" }).catch(() => {});
@@ -166,7 +173,7 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
             <div className="relative min-w-0" ref={menuRef}>
               <button
                 ref={menuButtonRef}
-                onClick={() => setIsMenuOpen((v) => !v)}
+                onClick={toggleMenu}
                 aria-haspopup="menu"
                 aria-expanded={isMenuOpen}
                 aria-controls="channel-switcher-menu"
@@ -219,7 +226,7 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
                       </button>
                     ))}
                   </div>
-                  {!atChannelLimit && (
+                  {!atChannelLimit ? (
                     <button
                       role="menuitem"
                       onClick={handleConnectAnother}
@@ -228,6 +235,21 @@ export default function TopHeader({ showLogo = false, onMenuClick }: { showLogo?
                       <Plus size={16} className="text-cyan-400" aria-hidden="true" />
                       {t.header.connectAnother}
                     </button>
+                  ) : (
+                    // 한도에 닿아도 버튼 자리를 비우지 않고 이유와 다음 행동을 알려준다
+                    <div className="px-4 py-3 border-t border-zinc-800 text-xs text-zinc-300 flex flex-col gap-2">
+                      <span>{userProfile?.is_pro ? t.header.channelLimitPro(maxChannels) : t.header.channelLimitFree}</span>
+                      {!userProfile?.is_pro && (
+                        <Link
+                          href="/pricing"
+                          role="menuitem"
+                          onClick={() => setIsMenuOpen(false)}
+                          className="self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500 text-black font-bold hover:bg-cyan-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                        >
+                          {t.header.viewProForChannels}
+                        </Link>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

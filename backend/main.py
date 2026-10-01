@@ -474,6 +474,15 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
             db.refresh(user)
 
     channel = db.query(Channel).filter(Channel.youtube_channel_id == channel_id).first()
+
+    # "채널 추가"인데 고른 채널이 이미 다른 계정에 연결돼 있으면, 그 계정으로 로그인을 바꾸지 않고 거부한다.
+    # (예전엔 채널 주인 계정으로 세션이 넘어가서, 추가한 채널이 내 목록에 안 보이고 남의 계정에 들어가졌다)
+    if linking_user_id and channel and channel.user_id != linking_user_id:
+        logger.info(f"채널 추가 거부: {channel_id}는 다른 계정({channel.user_id}) 소속 - 변경 없음")
+        await _revoke_google_token(refresh_token or access_token)
+        title = urllib.parse.quote(channel.channel_title or channel_title or "")
+        return _oauth_redirect(f"{FRONTEND_URL}/dashboard?error=channel_owned_elsewhere&channel={title}")
+
     if not channel:
         # 신규 채널 연동 - 요금제별 채널 개수 상한 확인 (멀티채널 관리는 PRO/AGENCY 차별화 포인트)
         from test_policy import max_channels_for_plan

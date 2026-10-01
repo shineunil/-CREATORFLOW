@@ -239,6 +239,42 @@ def test_reconnect_rejects_a_different_channel_and_changes_nothing(session_facto
         db.close()
 
 
+def test_adding_a_channel_owned_by_another_account_is_refused(session_factory, monkeypatch):
+    revoked = []
+
+    async def fake_revoke(token):
+        revoked.append(token)
+
+    monkeypatch.setattr(main, "_revoke_google_token", fake_revoke)
+
+    # 구글이 돌려줄 채널(CHANNEL_ID)은 다른 계정(other) 소속, 지금 로그인한 사람은 mine
+    db = session_factory()
+    other = User(google_user_id="other-google", email="other@example.com")
+    mine = User(google_user_id="mine-google", email="mine@example.com")
+    db.add_all([other, mine])
+    db.commit()
+    db.add(Channel(user_id=other.id, youtube_channel_id=CHANNEL_ID, channel_title="Other Channel", oauth_refresh_token="theirs"))
+    my_channel = Channel(user_id=mine.id, youtube_channel_id="UC-mine", channel_title="Mine")
+    db.add(my_channel)
+    db.commit()
+    token = main.create_access_token(mine.id, my_channel.id, True)
+    db.close()
+
+    client = TestClient(main.app)
+    client.cookies.set("auth_token", token)
+    state = _start_login(client)  # 로그인 상태에서 시작 = 채널 추가
+    location = _callback(client, state).headers["location"]
+
+    assert "error=channel_owned_elsewhere" in location and "auth_code=" not in location  # 다른 계정으로 넘어가지 않음
+    assert revoked == ["refresh"]
+    db = session_factory()
+    try:
+        owned = db.query(Channel).filter(Channel.youtube_channel_id == CHANNEL_ID).one()
+        assert owned.oauth_refresh_token == "theirs"  # 남의 채널 권한을 덮어쓰지 않음
+    finally:
+        db.close()
+
+
 def test_reconnect_succeeds_when_the_same_channel_is_chosen(session_factory):
     client = TestClient(main.app)
     _log_in(client)

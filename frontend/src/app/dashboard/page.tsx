@@ -145,6 +145,11 @@ export default function Dashboard() {
       router.replace("/dashboard");
     }
 
+    if (errorFromUrl === "channel_owned_elsewhere") {
+      showAlert(D.channelOwnedTitle, D.channelOwnedMsg(searchParams.get("channel") || ""), "warning");
+      router.replace("/dashboard");
+    }
+
     if (errorFromUrl === "reconnect_wrong_channel") {
       showAlert(D.wrongChannelTitle, D.wrongChannelMsg(searchParams.get("expected") || ""), "warning");
       router.replace("/dashboard");

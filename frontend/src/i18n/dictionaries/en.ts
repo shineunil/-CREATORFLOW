@@ -40,6 +40,9 @@ export const en = {
     needsReconnect: "Reconnect required",
     active: "Active",
     connectAnother: "Connect another channel",
+    channelLimitFree: "The free plan connects 1 channel. A disconnected channel still counts as that 1.",
+    channelLimitPro: (max: number) => `You've connected the maximum of ${max} channels.`,
+    viewProForChannels: "See PRO (up to 3 channels)",
     user: "User",
   },
 
@@ -416,6 +419,9 @@ export const en = {
     reconnectGuideMsg: (name: string) =>
       `On the Google screen, choose the "${name}" channel.\nPicking a different channel won't connect it. To add a new channel, use "Connect another channel" in the channel menu at the top right.`,
     reconnectGuideConfirm: "Continue to Google",
+    channelOwnedTitle: "Channel Already Connected Elsewhere",
+    channelOwnedMsg: (name: string) =>
+      `"${name}" is already connected to another ThumbnailFlow account, so it wasn't added. Disconnect it from that account and try again. Nothing changed on this account.`,
     wrongChannelTitle: "A Different Channel Was Chosen",
     wrongChannelMsg: (name: string) =>
       `To reconnect, choose the "${name}" channel on the Google screen. Nothing was changed.`,

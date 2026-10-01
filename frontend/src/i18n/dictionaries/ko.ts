@@ -39,6 +39,9 @@ export const ko: Dictionary = {
     needsReconnect: "재연동 필요",
     active: "사용 중",
     connectAnother: "다른 채널 연동하기",
+    channelLimitFree: "무료 요금제는 채널을 1개까지 연결할 수 있어요. 연동을 해제한 채널도 1개로 계산됩니다.",
+    channelLimitPro: (max: number) => `채널을 최대 ${max}개까지 모두 연결했어요.`,
+    viewProForChannels: "PRO 보기 (채널 3개까지)",
     user: "사용자",
   },
 
@@ -411,6 +414,9 @@ export const ko: Dictionary = {
     reconnectGuideMsg: (name: string) =>
       `구글 화면에서 "${name}" 채널을 선택해 주세요.\n다른 채널을 고르면 연동되지 않습니다. 새 채널을 추가하려면 오른쪽 위 채널 메뉴의 "다른 채널 연동하기"를 이용해 주세요.`,
     reconnectGuideConfirm: "구글로 계속",
+    channelOwnedTitle: "이미 다른 계정에 연결된 채널입니다",
+    channelOwnedMsg: (name: string) =>
+      `"${name}" 채널은 다른 ThumbnailFlow 계정에 이미 연결되어 있어 추가하지 않았습니다. 그 계정에서 연동을 해제한 뒤 다시 시도해 주세요. 지금 계정에는 아무것도 바뀌지 않았습니다.`,
     wrongChannelTitle: "다른 채널을 선택하셨습니다",
     wrongChannelMsg: (name: string) =>
       `다시 연동하려면 구글 화면에서 "${name}" 채널을 선택해 주세요. 아무것도 변경되지 않았습니다.`,
