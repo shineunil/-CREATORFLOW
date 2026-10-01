@@ -337,7 +337,10 @@ def login_via_google(request: Request, locale: str | None = None, reconnect: int
         f"response_type=code&"
         f"scope={scope}&"
         f"access_type=offline&"
-        f"prompt=consent"
+        # consent: 매번 refresh_token을 받기 위해 동의 화면을 띄운다.
+        # select_account: 브라우저에 로그인된 계정을 자동으로 고르지 않고 항상 계정·채널 선택 화면을 보여준다
+        # (채널 추가·다시 연동 때 다른 계정이나 브랜드 채널을 고를 수 있어야 한다).
+        f"prompt=consent%20select_account"
     )
     # L-3: 쿠키에서 현재 로그인 유저 ID를 읽는다 — JWT를 URL에 노출하지 않아도 됨
     linking_user_id = None

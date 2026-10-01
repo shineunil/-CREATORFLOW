@@ -90,6 +90,13 @@ def _callback(client, state, **headers):
     return client.get(f"/api/auth/callback?code=abc&state={urllib.parse.quote(state)}", headers=headers, follow_redirects=False)
 
 
+def test_login_always_shows_the_google_account_chooser():
+    res = TestClient(main.app).get("/api/auth/login", follow_redirects=False)
+    query = urllib.parse.parse_qs(urllib.parse.urlparse(res.headers["location"]).query)
+    # 채널 추가 때 브라우저의 현재 계정이 자동 선택되지 않고, 다른 계정·브랜드 채널을 고를 수 있어야 한다
+    assert query["prompt"] == ["consent select_account"]
+
+
 def test_login_link_remembers_only_supported_locales():
     client = TestClient(main.app)
     res = client.get("/api/auth/login?locale=ko", follow_redirects=False)
