@@ -2,40 +2,16 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Crown, TrendingUp, Upload, RefreshCw, Award, Check, Minus, Clock, X, Megaphone } from "lucide-react";
+import { ArrowRight, Crown, TrendingUp, Upload, RefreshCw, Award, Check, Minus, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import RichText from "@/i18n/RichText";
-import { useDialogFocus } from "@/lib/useDialogFocus";
-
-const LAUNCH_POPUP_KEY = "launch_popup_hidden";
 const STEP_ICONS = [<Upload key="upload" size={16} />, <Clock key="clock" size={16} />, <RefreshCw key="rotate" size={16} />, <TrendingUp key="track" size={16} />, <Award key="award" size={16} />];
 
 export default function LandingPage() {
   const { t, lp, locale } = useI18n();
   const L = t.landing;
   const [vph, setVph] = useState(42);
-  const [popupVisible, setPopupVisible] = useState(false);
-  const [hideToday, setHideToday] = useState(false);
-
-  useEffect(() => {
-    try {
-      const hidden = localStorage.getItem(LAUNCH_POPUP_KEY);
-      const today = new Date().toISOString().slice(0, 10);
-      if (hidden === today) return;
-    } catch {}
-    setPopupVisible(true);
-  }, []);
-
-  const dismissPopup = () => {
-    if (hideToday) {
-      try {
-        localStorage.setItem(LAUNCH_POPUP_KEY, new Date().toISOString().slice(0, 10));
-      } catch {}
-    }
-    setPopupVisible(false);
-  };
-  const popupRef = useDialogFocus<HTMLDivElement>(popupVisible, dismissPopup);
 
   // VPH(시간당 조회수) 올라가는 애니메이션 효과
   useEffect(() => {
@@ -351,64 +327,6 @@ export default function LandingPage() {
           </Link>
         </motion.div>
       </section>
-
-      {/* Launch Announcement Popup */}
-      {popupVisible && (
-        <div
-          ref={popupRef}
-          tabIndex={-1}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="launch-popup-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm focus:outline-none"
-        >
-          <div className="bg-zinc-950 border border-cyan-500/40 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-[0_0_50px_rgba(6,182,212,0.2)] relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-500" aria-hidden="true" />
-
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-2">
-                <Megaphone size={20} className="text-cyan-400" aria-hidden="true" />
-                <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">{L.popup.notice}</span>
-              </div>
-              <button
-                onClick={dismissPopup}
-                aria-label={L.popup.close}
-                className="text-zinc-400 hover:text-white p-1 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-              >
-                <X size={18} aria-hidden="true" />
-              </button>
-            </div>
-
-            <h2 id="launch-popup-title" className="text-xl font-extrabold text-white mb-3">
-              {L.popup.title}
-            </h2>
-            <p className="text-zinc-300 text-sm leading-relaxed mb-6 break-keep">
-              <RichText value={L.popup.body} strongClassName="text-white font-semibold" />
-            </p>
-
-            <label className="flex items-center gap-2 mb-4 cursor-pointer select-none group">
-              <input
-                type="checkbox"
-                checked={hideToday}
-                onChange={e => setHideToday(e.target.checked)}
-                className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 accent-cyan-500 cursor-pointer"
-              />
-              <span className="text-xs text-zinc-400 group-hover:text-zinc-300 transition-colors">
-                {L.popup.hideToday}
-              </span>
-            </label>
-
-            <div className="flex gap-3">
-              <button
-                onClick={dismissPopup}
-                className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-              >
-                {L.popup.closeButton}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Footer */}
       <footer className="py-10 text-center border-t border-zinc-900 bg-zinc-950 relative z-10">

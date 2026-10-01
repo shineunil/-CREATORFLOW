@@ -154,18 +154,6 @@ export const ko: Dictionary = {
     finalTitle: "감으로 고르던 썸네일,\n이제 데이터로 고르세요.",
     finalSub: "모든 테스트는 백그라운드에서 진행됩니다. 승자가 정해지면 확인만 하세요.",
     finalCta: "무료로 테스트 시작하기",
-    popup: {
-      notice: "공지",
-      close: "공지 닫기",
-      title: "🎉 곧 만나요 — 10월 3일 정식 오픈",
-      body: {
-        before: "감으로 고르던 썸네일, 이제 데이터로 고르세요. ",
-        strong: "10월 3일",
-        after: "부터 무료로 유튜브 썸네일 A/B 테스트를 시작할 수 있습니다.",
-      },
-      hideToday: "오늘 하루 보지 않기",
-      closeButton: "닫기",
-    },
     footer: {
       support: "고객 지원: admin@trythumbnailflow.com",
       privacy: "개인정보처리방침",
@@ -185,6 +173,12 @@ export const ko: Dictionary = {
     sub: "로그인하고 유튜브 채널을 연결하면 바로 썸네일 최적화를 시작할 수 있습니다.",
     google: "Google로 계속하기",
     checking: "연결 확인 중...",
+    launchSoonTitle: "🎉 곧 만나요 — 10월 3일 정식 오픈",
+    launchSoonBody: {
+      before: "감으로 고르던 썸네일, 이제 데이터로 고르세요. ",
+      strong: "10월 3일",
+      after: "부터 무료로 유튜브 썸네일 A/B 테스트를 시작할 수 있습니다.",
+    },
     maintenanceTitle: "잠시 점검 중입니다",
     maintenanceBody: "서비스를 잠시 점검하고 있습니다. 몇 분 뒤에 다시 시도해 주세요.",
     agreeBefore: "로그인하면 ",

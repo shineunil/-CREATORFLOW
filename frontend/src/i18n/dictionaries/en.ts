@@ -156,18 +156,6 @@ export const en = {
     finalTitle: "Stop guessing which thumbnail wins.",
     finalSub: "Every test runs in the background. Come back when there's a winner.",
     finalCta: "Start testing — free",
-    popup: {
-      notice: "Notice",
-      close: "Close notice",
-      title: "🎉 See You Soon — Launching October 3",
-      body: {
-        before: "Stop guessing which thumbnail wins — let the data decide. Starting ",
-        strong: "October 3",
-        after: ", you can A/B test your YouTube thumbnails for free.",
-      } as Rich,
-      hideToday: "Don't show again today",
-      closeButton: "Close",
-    },
     footer: {
       support: "Support: admin@trythumbnailflow.com",
       privacy: "Privacy Policy",
@@ -187,6 +175,12 @@ export const en = {
     sub: "Sign in and connect your YouTube channel to start optimizing your thumbnails.",
     google: "Continue with Google",
     checking: "Checking connection...",
+    launchSoonTitle: "🎉 See You Soon — Launching October 3",
+    launchSoonBody: {
+      before: "Stop guessing which thumbnail wins — let the data decide. Starting ",
+      strong: "October 3",
+      after: ", you can A/B test your YouTube thumbnails for free.",
+    } as Rich,
     maintenanceTitle: "Under Maintenance",
     maintenanceBody: "We're doing some quick maintenance. Please try again in a few minutes.",
     agreeBefore: "By signing in, you agree to our ",

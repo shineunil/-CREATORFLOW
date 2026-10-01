@@ -98,7 +98,7 @@ function LoginContent() {
   );
 }
 
-/** 서버가 꺼져 있을 때의 안내. 오픈 전에는 랜딩 공지와 같은 "오픈 예정" 문구, 오픈 후에는 "점검 중" 문구. */
+/** 서버가 꺼져 있을 때의 안내. 오픈 전에는 "오픈 예정" 문구, 오픈 후에는 "점검 중" 문구. */
 function ServiceNotice() {
   const { t } = useI18n();
   const beforeLaunch = Date.now() < LAUNCH_AT.getTime();
@@ -106,10 +106,10 @@ function ServiceNotice() {
     <div role="status" className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/30 text-sm">
       <Megaphone size={18} className="text-cyan-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
       <div>
-        <p className="font-bold text-white mb-1">{beforeLaunch ? t.landing.popup.title : t.login.maintenanceTitle}</p>
+        <p className="font-bold text-white mb-1">{beforeLaunch ? t.login.launchSoonTitle : t.login.maintenanceTitle}</p>
         <p className="text-zinc-300 leading-relaxed break-keep">
           {beforeLaunch ? (
-            <RichText value={t.landing.popup.body} strongClassName="text-white font-semibold" />
+            <RichText value={t.login.launchSoonBody} strongClassName="text-white font-semibold" />
           ) : (
             t.login.maintenanceBody
           )}
