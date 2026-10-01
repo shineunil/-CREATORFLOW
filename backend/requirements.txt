@@ -1,16 +1,20 @@
-﻿fastapi>=0.100.0
-uvicorn>=0.23.0
-sqlalchemy>=2.0.0
-apscheduler>=3.10.0
-google-api-python-client>=2.100.0
-google-auth-oauthlib>=1.0.0
-python-dotenv>=1.0.0
-psycopg2-binary>=2.9.9
-pydantic>=2.0.0
-python-multipart>=0.0.6
-PyJWT>=2.13.0
-httpx>=0.25.0
-Pillow>=10.0.0
-sentry-sdk[fastapi]>=2.0.0
-slowapi>=0.1.9
-stripe>=8.0.0
+# 로컬에서 테스트를 통과한 버전으로 고정한다 (Python 3.12).
+# ">=" 로 두면 배포할 때마다 새 버전이 깔린다 - SQLAlchemy 2.1이 기본 Postgres 드라이버를
+# psycopg2 → psycopg(3)로 바꾸면서 2026-10-01 배포가 시작 직후 실패한 적이 있다.
+# 올릴 때는 로컬에서 버전을 바꾸고 테스트(pytest)를 통과시킨 뒤 이 파일을 함께 고친다.
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.52.4
+sqlalchemy==2.0.52
+apscheduler==3.11.3
+google-api-python-client==2.200.0
+google-auth-oauthlib==1.4.1
+python-dotenv==1.2.3
+psycopg2-binary==2.9.12
+pydantic==2.13.5
+python-multipart==0.0.32
+PyJWT==2.13.0
+httpx==0.28.1
+Pillow==12.3.0
+sentry-sdk[fastapi]==2.68.1
+slowapi==0.1.10

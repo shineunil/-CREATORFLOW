@@ -12,6 +12,13 @@ load_dotenv()
 # 환경 변수에서 DATABASE_URL을 가져오거나, 없으면 기본 SQLite 사용 (Supabase 연동 준비)
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./youtube_ab_test.db")
 
+# 설치된 드라이버(psycopg2)를 주소에 명시한다. "postgresql://"만 쓰면 SQLAlchemy 버전에 따라
+# 다른 드라이버(psycopg 3)를 찾다가 서버가 시작하지 못한다.
+for _prefix in ("postgresql://", "postgres://"):
+    if SQLALCHEMY_DATABASE_URL.startswith(_prefix):
+        SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://" + SQLALCHEMY_DATABASE_URL[len(_prefix):]
+        break
+
 # PostgreSQL일 경우 check_same_thread 옵션 제거
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
     engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
