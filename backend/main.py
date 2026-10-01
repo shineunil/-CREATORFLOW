@@ -337,6 +337,9 @@ def login_via_google(request: Request, locale: str | None = None, reconnect: int
         f"response_type=code&"
         f"scope={scope}&"
         f"access_type=offline&"
+        # 예전에 승인한 권한도 이번 토큰에 담는다. 권한별 체크박스가 생긴 뒤로 다시 로그인할 때 YouTube 항목을
+        # 놓치면 계정에는 권한이 있는데 이번 토큰에만 빠져 403이 났다.
+        f"include_granted_scopes=true&"
         # consent: 매번 refresh_token을 받기 위해 동의 화면을 띄운다.
         # select_account: 브라우저에 로그인된 계정을 자동으로 고르지 않고 항상 계정·채널 선택 화면을 보여준다
         # (채널 추가·다시 연동 때 다른 계정이나 브랜드 채널을 고를 수 있어야 한다).
@@ -432,7 +435,8 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
         if yt_res.status_code == 403:
             # 스코프 동의 화면에서 YouTube 권한이 빠지면(브랜드 계정 로그인 시 간소화된 동의 화면이
             # 뜨는 경우 등) 여기서 403이 난다. "채널이 없다"는 것과는 다른 원인이라 별도 에러로 구분한다.
-            logger.error(f"YouTube API 403: {yt_res.text}")
+            # 토큰에 실제로 담긴 권한도 남긴다 - 동의 화면 문제인지, 토큰 문제인지 로그만 보고 가릴 수 있게
+            logger.error(f"YouTube API 403 (granted scope: {token_json.get('scope')}): {yt_res.text}")
             return _oauth_redirect(f"{FRONTEND_URL}/login?error=youtube_permission_denied")
         yt_data = yt_res.json()
 

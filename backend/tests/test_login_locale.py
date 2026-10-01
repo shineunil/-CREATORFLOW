@@ -95,6 +95,8 @@ def test_login_always_shows_the_google_account_chooser():
     query = urllib.parse.parse_qs(urllib.parse.urlparse(res.headers["location"]).query)
     # 채널 추가 때 브라우저의 현재 계정이 자동 선택되지 않고, 다른 계정·브랜드 채널을 고를 수 있어야 한다
     assert query["prompt"] == ["consent select_account"]
+    # 다시 로그인하며 YouTube 체크를 놓쳐도, 예전에 승인한 권한이 토큰에 함께 담겨야 한다
+    assert query["include_granted_scopes"] == ["true"]
 
 
 def test_login_link_remembers_only_supported_locales():
