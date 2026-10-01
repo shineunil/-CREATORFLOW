@@ -8,7 +8,8 @@ import {
   Settings2,
   Trash2,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  PauseCircle
 } from "lucide-react";
 import {
   BarChart,
@@ -47,9 +48,12 @@ const formatLocalDateTime = (iso: string | null | undefined): string => {
 const formatTestDuration = (startIso: string | null | undefined, endIso: string | null | undefined, status: string, t: Dictionary, locale: Locale) => {
   if (!startIso) return t.dashboard.notStarted;
   const start = parseServerDate(startIso);
-  // 사용자가 끝낸 테스트(STOPPED)와 기간이 끝나 승자가 정해진 테스트(COMPLETED)는 남은 시간 대신 종료로 표시
-  if (status === "STOPPED" || status === "COMPLETED") {
+  // 승자가 정해진 테스트(COMPLETED: 기간 종료·조기 종료)와, 승자 없이 멈춘 테스트(STOPPED: 채널 연동 해제 등)를 구분한다
+  if (status === "COMPLETED") {
     return t.dashboard.finishedStarted(formatDate(start, locale));
+  }
+  if (status === "STOPPED") {
+    return t.dashboard.stoppedStarted(formatDate(start, locale));
   }
   const end = endIso ? parseServerDate(endIso) : new Date(start.getTime() + 24 * 60 * 60 * 1000);
   const now = new Date();
@@ -270,7 +274,8 @@ export default function Dashboard() {
           const res = await apiFetch(`/api/tests/${testId}/stop`, { method: "POST" });
           if (res.ok) {
             showAlert(D.successTitle, D.stoppedMsg, "success");
-            setTestData(prevData => prevData.map(test => test.test_id === testId ? { ...test, status: "STOPPED" } : test));
+            // 조기 종료는 승자를 확정하므로 서버 상태와 같은 COMPLETED로 둔다
+            setTestData(prevData => prevData.map(test => test.test_id === testId ? { ...test, status: "COMPLETED" } : test));
           } else {
             showAlert(t.common.error, D.stopError, "error");
           }
@@ -395,6 +400,10 @@ export default function Dashboard() {
                     {test.status === "RUNNING" ? (
                       <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold border border-cyan-500/20">
                         <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" aria-hidden="true" /> {D.running}
+                      </span>
+                    ) : test.status === "STOPPED" ? (
+                      <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-700/40 text-zinc-200 text-xs font-bold border border-zinc-600">
+                        <PauseCircle size={12} aria-hidden="true" /> {D.stoppedBadge}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20">
