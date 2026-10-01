@@ -250,6 +250,44 @@ def test_owner_session_passes_the_billing_owner_check(session_factory):
     assert res.status_code == 404
 
 
+def test_billing_portal_uses_a_paddle_portal_session(session_factory, monkeypatch):
+    client = TestClient(main.app)
+    _log_in(client)
+    db = session_factory()
+    user = db.query(User).filter(User.google_user_id == GOOGLE_ID).one()
+    user.stripe_customer_id = "ctm_test"
+    user.stripe_subscription_id = "sub_test"
+    db.commit()
+    db.close()
+
+    sent = {}
+
+    class FakePaddle:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, headers=None, json=None):
+            sent["url"], sent["json"] = url, json
+            return main._httpx.Response(
+                201,
+                json={"data": {"urls": {"general": {"overview": "https://customer-portal.paddle.com/cpl_abc"}}}},
+                request=main._httpx.Request("POST", url),
+            )
+
+    monkeypatch.setattr(main._httpx, "AsyncClient", FakePaddle)
+    res = client.get("/api/billing/portal")
+    assert res.status_code == 200
+    assert res.json() == {"url": "https://customer-portal.paddle.com/cpl_abc"}
+    assert sent["url"].endswith("/customers/ctm_test/portal-sessions")
+    assert sent["json"] == {"subscription_ids": ["sub_test"]}
+
+
 def test_channel_manager_session_cannot_open_billing(session_factory):
     # 채널 주인은 다른 구글 계정으로 가입해 두었고, 관리자가 같은 채널을 골라 로그인한 상황
     db = session_factory()

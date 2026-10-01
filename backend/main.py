@@ -1472,8 +1472,9 @@ def upgrade_user_plan_test(db: Session = Depends(get_db), channel: Channel = Dep
 @app.get("/api/billing/portal")
 async def get_billing_portal(request: Request, channel: Channel = Depends(get_current_channel)):
     """
-    Paddle Customer Portal URL 발급. Paddle 고객 ID로 인증 토큰을 발급받아
-    구독 관리 페이지로 리다이렉트한다.
+    Paddle 고객 포털(결제 정보·영수증·구독 해지) 주소를 발급한다.
+    공식 방법인 portal-sessions로 로그인된 링크를 만들고, 응답의 urls.general.overview로 보낸다.
+    (예전에 쓰던 auth-token은 Paddle.js용이라 포털이 로그인 화면으로 열렸다.)
     결제 정보 조회·구독 취소가 가능한 페이지라, 채널 관리자로 들어온 세션에는 열어주지 않는다.
     """
     if not _session_is_owner(request, channel.user_id):
@@ -1482,15 +1483,20 @@ async def get_billing_portal(request: Request, channel: Channel = Depends(get_cu
     if not user or not user.stripe_customer_id:
         raise HTTPException(status_code=404, detail=msg("no_billing_history"))
 
+    # 구독 ID를 같이 넘기면 포털에 그 구독의 해지·결제수단 변경 바로가기도 만들어진다
+    body = {"subscription_ids": [user.stripe_subscription_id]} if user.stripe_subscription_id else {}
     try:
         async with _httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
-                f"{PADDLE_API_BASE}/customers/{user.stripe_customer_id}/auth-token",
-                headers={"Authorization": f"Bearer {PADDLE_API_KEY}"},
+                f"{PADDLE_API_BASE}/customers/{user.stripe_customer_id}/portal-sessions",
+                headers={"Authorization": f"Bearer {PADDLE_API_KEY}", "Content-Type": "application/json"},
+                json=body,
             )
             resp.raise_for_status()
-            token = resp.json()["data"]["customer_auth_token"]
-        portal_url = f"https://customer.paddle.com?customerAuthToken={token}"
+            portal_url = resp.json()["data"]["urls"]["general"]["overview"]
+    except _httpx.HTTPStatusError as e:
+        logger.error(f"[Paddle Portal] 포털 세션 생성 실패: {e.response.status_code} {e.response.text}")
+        raise HTTPException(status_code=502, detail=msg("billing_portal_failed"))
     except Exception as e:
         logger.error(f"[Paddle Portal] 포털 URL 발급 실패: {e}")
         raise HTTPException(status_code=502, detail=msg("billing_portal_failed"))
