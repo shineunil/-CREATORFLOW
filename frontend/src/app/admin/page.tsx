@@ -6,10 +6,18 @@ import { apiFetch } from "@/lib/api";
 
 type Stats = {
   users: { total: number; pro: number; basic: number };
-  channels: { total: number; needs_reconnect: number };
+  channels: { total: number; connected: number; disconnected: number; needs_reconnect: number };
   tests: { active: number; completed: number; total: number };
   quota_today: { used: number; limit: number };
 };
+
+/** 연결된 채널 카드의 보조 문구: 재연동이 필요한 채널과 연동 해제한 채널 수를 함께 보여준다. */
+function channelStatus(channels: Stats["channels"]): string {
+  const parts = [];
+  if (channels.needs_reconnect > 0) parts.push(`${channels.needs_reconnect} need reconnect`);
+  if (channels.disconnected > 0) parts.push(`${channels.disconnected} disconnected`);
+  return parts.length ? parts.join(" · ") : "All normal";
+}
 
 type AdminUser = {
   id: number;
@@ -17,6 +25,7 @@ type AdminUser = {
   plan: string;
   created_at: string | null;
   channel_count: number;
+  disconnected_channel_count: number;
   has_paddle_customer: boolean;
 };
 
@@ -180,7 +189,7 @@ export default function AdminPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
         <StatCard icon={<Users size={18} aria-hidden="true" />} label="Total Users" value={`${stats.users.total}`} sub={`PRO ${stats.users.pro} / BASIC ${stats.users.basic}`} />
-        <StatCard icon={<PlaySquare size={18} aria-hidden="true" />} label="Connected Channels" value={`${stats.channels.total}`} sub={stats.channels.needs_reconnect > 0 ? `${stats.channels.needs_reconnect} need reconnect` : "All normal"} warn={stats.channels.needs_reconnect > 0} />
+        <StatCard icon={<PlaySquare size={18} aria-hidden="true" />} label="Connected Channels" value={`${stats.channels.connected}`} sub={channelStatus(stats.channels)} warn={stats.channels.needs_reconnect > 0} />
         <StatCard icon={<FlaskConical size={18} aria-hidden="true" />} label="Active Tests" value={`${stats.tests.active}`} sub={`${stats.tests.total} total (${stats.tests.completed} completed)`} />
         <StatCard icon={<Gauge size={18} aria-hidden="true" />} label="Today's API Quota" value={`${quotaPct}%`} sub={`${stats.quota_today.used.toLocaleString()} / ${stats.quota_today.limit.toLocaleString()}`} warn={quotaPct >= 80} />
       </div>
@@ -336,7 +345,12 @@ export default function AdminPage() {
                       {u.plan}
                     </span>
                   </td>
-                  <td className="py-2 pr-4">{u.channel_count}</td>
+                  <td className="py-2 pr-4 tabular-nums">
+                    {u.channel_count}
+                    {u.disconnected_channel_count > 0 && (
+                      <span className="ml-1.5 text-xs text-zinc-400">(+{u.disconnected_channel_count} disconnected)</span>
+                    )}
+                  </td>
                   <td className="py-2 pr-4">{u.has_paddle_customer ? "Yes" : "-"}</td>
                   <td className="py-2 pr-4 text-zinc-400 text-xs">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "-"}</td>
                 </tr>

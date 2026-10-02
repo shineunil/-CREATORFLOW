@@ -1543,8 +1543,11 @@ def get_admin_stats(db: Session = Depends(get_db), admin: User = Depends(get_cur
     pro_users = db.query(User).filter(User.plan == PlanType.PRO).count()
     basic_users = db.query(User).filter(User.plan == PlanType.BASIC).count()
 
+    # 연동 해제는 권한만 지우고 채널 기록은 남기므로, 권한(refresh_token)이 있는 채널만 "연결됨"으로 센다
     total_channels = db.query(Channel).count()
-    channels_needing_reconnect = db.query(Channel).filter(Channel.needs_reconnect == True).count()
+    connected = db.query(Channel).filter(Channel.oauth_refresh_token.isnot(None))
+    connected_channels = connected.count()
+    channels_needing_reconnect = connected.filter(Channel.needs_reconnect == True).count()
 
     active_tests = db.query(ABTest).filter(ABTest.status == TestStatus.RUNNING, ABTest.is_deleted == False).count()
     completed_tests = db.query(ABTest).filter(ABTest.status == TestStatus.COMPLETED).count()
@@ -1552,7 +1555,12 @@ def get_admin_stats(db: Session = Depends(get_db), admin: User = Depends(get_cur
 
     return {
         "users": {"total": total_users, "pro": pro_users, "basic": basic_users},
-        "channels": {"total": total_channels, "needs_reconnect": channels_needing_reconnect},
+        "channels": {
+            "total": total_channels,
+            "connected": connected_channels,
+            "disconnected": total_channels - connected_channels,
+            "needs_reconnect": channels_needing_reconnect,
+        },
         "tests": {"active": active_tests, "completed": completed_tests, "total": total_tests},
         "quota_today": {"used": get_today_usage(db), "limit": DAILY_QUOTA_LIMIT},
     }
@@ -1568,8 +1576,10 @@ def get_admin_users(db: Session = Depends(get_db), admin: User = Depends(get_cur
                 "email": u.email,
                 "plan": u.plan.name,
                 "created_at": u.created_at.isoformat() if u.created_at else None,
-                "channel_count": len(u.channels),
-                "has_stripe_customer": bool(u.stripe_customer_id),
+                # 연동 해제한 채널은 기록만 남아 있으므로 연결된 채널과 따로 센다
+                "channel_count": sum(1 for c in u.channels if c.oauth_refresh_token),
+                "disconnected_channel_count": sum(1 for c in u.channels if not c.oauth_refresh_token),
+                "has_paddle_customer": bool(u.stripe_customer_id),  # Paddle 고객 ID는 stripe_customer_id 컬럼을 재사용
             }
             for u in users
         ]
