@@ -302,7 +302,7 @@ export const ko: Dictionary = {
   meta: {
     siteTitle: "ThumbnailFlow — 유튜브 썸네일 A/B 테스트",
     siteDescription:
-      "썸네일과 제목 후보를 올리면 ThumbnailFlow가 공개 중인 영상에 번갈아 적용하고, 시간당 조회수가 가장 높은 것을 남깁니다. 무료로 시작하세요.",
+      "유튜브 썸네일, 감 대신 조회수로 고르세요. 후보를 번갈아 적용해 가장 잘 되는 썸네일을 자동으로 남깁니다. 무료로 시작하세요.",
     ogDescription: "공개 중인 유튜브 영상에 썸네일 후보를 자동으로 번갈아 적용하고, 시간당 조회수가 가장 높은 썸네일을 남깁니다.",
     ogImageAlt: "ThumbnailFlow — 유튜브 썸네일 A/B 테스트",
     keywords: [
