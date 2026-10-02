@@ -26,5 +26,14 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     throw new Error("Unauthorized");
   }
 
+  // 로그인은 했지만 아직 YouTube 채널을 연결하지 않은 계정 - 채널이 필요한 화면 대신 연결 화면으로 보낸다
+  if (response.status === 409 && typeof window !== "undefined") {
+    const body = await response.clone().json().catch(() => null);
+    if (body?.detail === "no_channel") {
+      window.location.href = "/connect";
+      throw new Error("No channel");
+    }
+  }
+
   return response;
 }

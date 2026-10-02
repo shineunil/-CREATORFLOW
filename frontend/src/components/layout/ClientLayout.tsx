@@ -95,6 +95,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     );
   }
 
+  // 채널 연결 화면은 아직 채널이 없는 계정이 보는 곳이라, 채널 메뉴가 있는 헤더·왼쪽 메뉴 없이 그린다.
+  if (path === "/connect") {
+    return <main className="min-h-screen bg-[#09090b] text-zinc-100 font-sans">{children}</main>;
+  }
+
   // 헤더가 화면 전체 폭을 덮고, 그 아래에 왼쪽 메뉴와 본문이 나란히 온다. 스크롤은 본문 영역만 된다.
   return (
     <div className="flex flex-col h-screen w-full bg-[#09090b] text-zinc-100 overflow-hidden font-sans">

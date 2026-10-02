@@ -29,7 +29,7 @@ def setup(monkeypatch):
     channel = Channel(user_id=user.id, youtube_channel_id="UC1", channel_title="Test", oauth_refresh_token="refresh")
     db.add(channel)
     db.commit()
-    token = main.create_access_token(user.id, channel.id, True)
+    token = main.create_access_token(user.id, channel.id)
     db.close()
 
     def override_get_db():

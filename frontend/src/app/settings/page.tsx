@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
 import { apiFetch } from "@/lib/api";
-import { SERVICE_UNAVAILABLE_ERROR, startGoogleLogin } from "@/lib/auth";
+import { SERVICE_UNAVAILABLE_ERROR, startChannelConnect } from "@/lib/auth";
 import { switchChannel, CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 import { useI18n } from "@/i18n/I18nProvider";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -140,7 +140,7 @@ export default function SettingsPage() {
   const handleConnectAnotherChannel = async () => {
     // L-3: JWT를 URL에 노출할 필요 없음 — 백엔드가 HttpOnly 쿠키에서 현재 유저를 직접 읽음
     // 서버가 꺼져 있으면 오류 화면 대신 로그인 화면의 안내(오픈 예정 / 점검 중)로 보낸다.
-    if (!(await startGoogleLogin(locale, { addChannel: true }))) router.push(`${lp("/login")}?error=${SERVICE_UNAVAILABLE_ERROR}`);
+    if (!(await startChannelConnect(locale))) router.push(`${lp("/login")}?error=${SERVICE_UNAVAILABLE_ERROR}`);
   };
 
   const handleOpenBillingPortal = async () => {

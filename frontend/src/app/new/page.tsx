@@ -10,7 +10,7 @@ import Modal from "@/components/Modal";
 import ChannelSelect from "@/components/layout/ChannelSelect";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatDate, formatNumber } from "@/i18n/format";
-import { SERVICE_UNAVAILABLE_ERROR, startGoogleLogin } from "@/lib/auth";
+import { SERVICE_UNAVAILABLE_ERROR, startChannelConnect } from "@/lib/auth";
 
 type VideosState = "loading" | "ready" | "empty" | "no_channel" | "error";
 
@@ -179,7 +179,7 @@ function NewTestContent() {
       confirmText: t.dashboard.reconnectGuideConfirm,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }));
-        if (!(await startGoogleLogin(locale, { reconnectChannelId: userProfile.channel_id }))) router.push(`${lp("/login")}?error=${SERVICE_UNAVAILABLE_ERROR}`);
+        if (!(await startChannelConnect(locale, userProfile.channel_id))) router.push(`${lp("/login")}?error=${SERVICE_UNAVAILABLE_ERROR}`);
       },
       onCancel: () => setModalConfig(prev => ({ ...prev, isOpen: false })),
     });

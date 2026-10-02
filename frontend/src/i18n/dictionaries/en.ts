@@ -172,7 +172,7 @@ export const en = {
 
   login: {
     title: "Welcome Back",
-    sub: "Sign in and connect your YouTube channel to start optimizing your thumbnails.",
+    sub: "Sign in with your personal Google account. You'll connect your YouTube channel in the next step.",
     google: "Continue with Google",
     checking: "Checking connection...",
     launchSoonTitle: "🎉 See You Soon — Launching October 3",
@@ -196,6 +196,28 @@ export const en = {
         "No YouTube channel was found for this Google account. Please try again with an account that has a channel.",
       session_expired:
         "Your sign-in timed out or was started in a different window. Please sign in again from this page.",
+    } as Record<string, string>,
+  },
+
+  connect: {
+    title: "Connect Your YouTube Channel",
+    sub: "Connect the channel whose thumbnails you want to test, and you're ready to go.",
+    signedInAs: (email: string) => `It will be connected to ${email}`,
+    steps: [
+      "Click the button below and choose the Google account that has your channel.",
+      "For a Brand Account channel, pick that channel on the channel chooser.",
+      "On the permissions screen, check every item including YouTube, then click Continue.",
+    ],
+    button: "Connect YouTube Channel",
+    otherAccount: "Sign in with a different account",
+    failedTitle: "Channel Not Connected",
+    errors: {
+      cancelled: "Channel connection was cancelled. Please try again.",
+      youtube_permission_denied:
+        "YouTube permissions weren't granted. Connect again and check every item on the permissions screen, including YouTube.",
+      no_youtube_channel:
+        "The Google account you chose has no YouTube channel. Pick an account or Brand Account that has a channel.",
+      channel_limit_reached: "You've used all the channels your current plan allows.",
     } as Record<string, string>,
   },
 
@@ -264,19 +286,19 @@ export const en = {
         items: [
           {
             q: "How do I connect my YouTube channel?",
-            a: "Just sign in with your Google account — your YouTube channel is connected automatically. No separate configuration is required.",
+            a: "Sign in with your personal Google account, then click Connect YouTube Channel and pick your channel. On the permissions screen, check every item including YouTube.",
           },
           {
             q: "Can I manage multiple YouTube channels?",
-            a: "Yes. Sign in with your main account, use Connect Another Channel in the channel menu at the top right to add more channels, and switch between them directly from the dashboard. Channels from another Google account or a Brand Account can be picked on the channel chooser too. If you already signed in with that channel and it became a separate account, disconnect the channel there first, then add it again from your main account.",
+            a: "Yes. Use Connect Another Channel in the channel menu at the top right to add more channels, and switch between them directly from the dashboard. Channels from another Google account or a Brand Account can be picked on the channel chooser too, and they're added to the account you're signed in to. If you previously signed in with that channel and it became a separate account, connecting it from your current account moves it over automatically.",
           },
           {
             q: "Does ThumbnailFlow work with YouTube Brand Accounts?",
-            a: "Yes. When you sign in, Google may show a channel-selection screen if your Google account manages a Brand Account. In some cases YouTube also requires phone verification to grant API access for Brand Accounts.",
+            a: "Yes. When you connect a channel, Google shows a channel-selection screen if your Google account manages a Brand Account. In some cases YouTube also requires phone verification to grant API access for Brand Accounts.",
           },
           {
             q: "I use a Brand Account — where will email alerts go?",
-            a: "Brand Account addresses are often unmonitored. To receive test-completion and billing notifications, register a personal email address in Settings → Notification Email.",
+            a: "Alerts go to the email of the personal Google account you sign in with. To use a different address, register it in Settings → Notification Email.",
           },
         ],
       },
@@ -415,7 +437,7 @@ export const en = {
     reconnectGuideConfirm: "Continue to Google",
     channelOwnedTitle: "Channel Already Connected Elsewhere",
     channelOwnedMsg: (name: string) =>
-      `"${name}" is already connected to another ThumbnailFlow account, so it wasn't added. Sign in with that channel, click Disconnect in Settings, then use Connect Another Channel on this account again. Its past test history moves over too. Nothing changed on this account.`,
+      `"${name}" is already connected to another ThumbnailFlow account, so it wasn't added. Sign in to that account, click Disconnect for this channel in Settings, then connect it again from this account. Its past test history moves over too. Nothing changed on this account.`,
     wrongChannelTitle: "A Different Channel Was Chosen",
     wrongChannelMsg: (name: string) =>
       `To reconnect, choose the "${name}" channel on the Google screen. Nothing was changed.`,

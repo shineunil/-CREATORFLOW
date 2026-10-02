@@ -39,7 +39,7 @@ def setup(monkeypatch):
     db.add(Variation(ab_test_id=running.id, name="Variation A", title_text="Original", is_control=True))
     db.commit()
     ids = {"channel": channel.id, "running": running.id, "finished": finished.id}
-    token = main.create_access_token(user.id, channel.id, True)
+    token = main.create_access_token(user.id, channel.id)
     db.close()
 
     def override_get_db():

@@ -22,7 +22,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
 import ChannelSelect from "@/components/layout/ChannelSelect";
 import { apiFetch } from "@/lib/api";
-import { SERVICE_UNAVAILABLE_ERROR, startGoogleLogin } from "@/lib/auth";
+import { SERVICE_UNAVAILABLE_ERROR, startChannelConnect } from "@/lib/auth";
 import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 import { useI18n } from "@/i18n/I18nProvider";
 import RichText from "@/i18n/RichText";
@@ -77,7 +77,7 @@ export default function Dashboard() {
       confirmText: D.reconnectGuideConfirm,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }));
-        if (!(await startGoogleLogin(locale, { reconnectChannelId: userProfile.channel_id }))) router.push(`${lp("/login")}?error=${SERVICE_UNAVAILABLE_ERROR}`);
+        if (!(await startChannelConnect(locale, userProfile.channel_id))) router.push(`${lp("/login")}?error=${SERVICE_UNAVAILABLE_ERROR}`);
       },
       onCancel: () => setModalConfig(prev => ({ ...prev, isOpen: false })),
     });
@@ -152,6 +152,12 @@ export default function Dashboard() {
 
     if (errorFromUrl === "reconnect_wrong_channel") {
       showAlert(D.wrongChannelTitle, D.wrongChannelMsg(searchParams.get("expected") || ""), "warning");
+      router.replace("/dashboard");
+    }
+
+    // 다른 채널을 연결하다가 취소했거나 YouTube 권한·채널이 없었던 경우 (채널 연결 화면과 같은 안내)
+    if (errorFromUrl && errorFromUrl in t.connect.errors && errorFromUrl !== "channel_limit_reached") {
+      showAlert(t.connect.failedTitle, t.connect.errors[errorFromUrl], "warning");
       router.replace("/dashboard");
     }
 

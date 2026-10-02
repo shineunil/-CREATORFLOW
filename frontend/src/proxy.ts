@@ -52,8 +52,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.next(withLocaleHeader(request, locale, pathname));
   }
 
-  // OAuth 콜백 후 auth_code 교환 중인 경우 — 쿠키 없어도 통과
-  if (pathname === "/dashboard" && request.nextUrl.searchParams.get("auth_code")) {
+  // OAuth 콜백 후 auth_code 교환 중인 경우 — 쿠키 없어도 통과 (채널이 아직 없는 새 계정은 /connect로 온다)
+  if ((pathname === "/dashboard" || pathname === "/connect") && request.nextUrl.searchParams.get("auth_code")) {
     return NextResponse.next(withLocaleHeader(request, locale, pathname));
   }
 

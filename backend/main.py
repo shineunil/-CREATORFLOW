@@ -98,20 +98,17 @@ def _verify_state_nonce(state: str) -> int | None:
     except Exception:
         return None
 
-def create_access_token(user_id: int, channel_id: int, is_owner: bool) -> str:
+def create_access_token(user_id: int, channel_id: int | None) -> str:
     """
-    한 계정(User)이 여러 YouTube 채널을 연동할 수 있으므로, 토큰에는 유저 신원(sub)과
-    "지금 보고 있는 채널"(channel_id)을 함께 담는다. 채널 전환은 /api/channels/{id}/switch로
-    channel_id만 다른 새 토큰을 재발급받는 방식으로 처리한다 (기존 엔드포인트들은 변경 없이
-    Depends(get_current_channel)만으로 계속 동작함).
-    "own"은 계정을 만든 구글 계정 본인으로 로그인했는지 여부다. 채널 관리자(브랜드 계정 공동 관리자)가
-    그 채널을 골라 로그인하면 주인 계정으로 들어오게 되는데, 이때는 False라서 결제 관리를 막는다.
+    로그인은 개인 구글 계정(User)으로 하고, 그 계정에 YouTube 채널을 여러 개 연결한다.
+    토큰에는 유저 신원(sub)과 "지금 보고 있는 채널"(channel_id)을 함께 담는다. 채널 전환은
+    /api/channels/{id}/switch로 channel_id만 다른 새 토큰을 재발급받는다.
+    아직 채널을 연결하지 않은 새 계정이면 channel_id가 없다 (채널 화면은 409 no_channel → 연결 화면).
     """
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
         "channel_id": channel_id,
-        "own": is_owner,
         "iat": now,
         "exp": now + timedelta(days=JWT_EXPIRE_DAYS),
     }
@@ -132,17 +129,6 @@ def _decode_token(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
-
-def _session_is_owner(request: Request, user_id: int) -> bool:
-    """지금 로그인 쿠키가 이 유저 계정의 주인 본인 세션인지 (토큰의 "own" 값). 없거나 무효면 False."""
-    token = request.cookies.get("auth_token")
-    if not token:
-        return False
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    except jwt.PyJWTError:
-        return False
-    return payload.get("sub") == str(user_id) and payload.get("own") is True
 
 def _set_auth_cookie(response: JSONResponse, token: str):
     """HttpOnly 쿠키에 JWT를 설정한다.
@@ -185,8 +171,11 @@ def get_current_channel(request: Request, db: Session = Depends(get_db)) -> Chan
     payload = _decode_token(request)
     user_id = payload.get("sub")
     channel_id = payload.get("channel_id")
-    if not user_id or not channel_id:
+    if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
+    if not channel_id:
+        # 로그인은 했지만 아직 채널을 연결하지 않았다 - 프론트가 이 코드를 보고 채널 연결 화면으로 보낸다
+        raise HTTPException(status_code=409, detail="no_channel")
     channel = db.query(Channel).filter(Channel.id == int(channel_id)).first()
     if not channel:
         raise HTTPException(status_code=401, detail="Channel not found")
@@ -321,163 +310,136 @@ def _login_locale(request: Request) -> str:
     return chosen if chosen in SUPPORTED_LOCALES else locale_from_accept_language(request.headers.get("accept-language"))
 
 
-@app.get("/api/auth/login")
-def login_via_google(request: Request, locale: str | None = None, reconnect: int | None = None, link: bool = False):
-    """
-    구글 로그인 페이지로 리다이렉트합니다.
-    link=true("채널 추가")면 HttpOnly 쿠키에서 현재 유저를 읽어 그 계정에 채널을 붙인다.
-    reconnect=채널ID면 "그 채널 다시 연동" 모드 - 콜백에서 같은 채널을 골랐을 때만 연동한다.
-    둘 다 없으면 쿠키가 남아 있어도 일반 로그인이다 - 예전엔 다른 계정의 쿠키가 남은 브라우저에서
-    로그인 버튼을 누르면 그 계정에 채널 추가로 처리됐다.
-    """
-    import secrets as _secrets
-    scope = "openid email profile https://www.googleapis.com/auth/youtube.force-ssl"
-    auth_url = (
-        f"https://accounts.google.com/o/oauth2/v2/auth?"
-        f"client_id={GOOGLE_CLIENT_ID}&"
-        f"redirect_uri={REDIRECT_URI}&"
-        f"response_type=code&"
-        f"scope={scope}&"
-        f"access_type=offline&"
-        # 예전에 승인한 권한도 이번 토큰에 담는다. 권한별 체크박스가 생긴 뒤로 다시 로그인할 때 YouTube 항목을
-        # 놓치면 계정에는 권한이 있는데 이번 토큰에만 빠져 403이 났다.
-        f"include_granted_scopes=true&"
-        # consent: 매번 refresh_token을 받기 위해 동의 화면을 띄운다.
-        # select_account: 브라우저에 로그인된 계정을 자동으로 고르지 않고 항상 계정·채널 선택 화면을 보여준다
-        # (채널 추가·다시 연동 때 다른 계정이나 브랜드 채널을 고를 수 있어야 한다).
-        f"prompt=consent%20select_account"
-    )
-    # L-3: 쿠키에서 현재 로그인 유저 ID를 읽는다 — JWT를 URL에 노출하지 않아도 됨
-    linking_user_id = None
-    auth_cookie = request.cookies.get("auth_token")
-    if auth_cookie and (link or reconnect):
-        try:
-            p = jwt.decode(auth_cookie, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            linking_user_id = int(p["sub"])
-        except Exception:
-            pass
-    # 채널 추가면 유저 ID를 서명해 담고, 일반 로그인이면 무작위 값만 담는다.
-    # 어느 쪽이든 같은 값을 이 브라우저 쿠키에도 심어 두고 콜백에서 대조한다.
-    state = _make_state_nonce(linking_user_id) if linking_user_id else _secrets.token_urlsafe(24)
-    auth_url += f"&state={urllib.parse.quote(state)}"
-    response = RedirectResponse(auth_url)
+LOGIN_SCOPE = "openid email profile"
+CHANNEL_SCOPE = "openid email profile https://www.googleapis.com/auth/youtube.force-ssl"
+
+
+def _google_auth_redirect(scope: str, prompt: str, state: str, locale: str | None, offline: bool) -> RedirectResponse:
+    """구글 동의 화면으로 보내고, 같은 브라우저에서 돌아왔는지 대조할 state와 화면 언어를 쿠키에 남긴다."""
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": REDIRECT_URI,
+        "response_type": "code",
+        "scope": scope,
+        "prompt": prompt,
+        "state": state,
+    }
+    if offline:
+        # 백그라운드 테스트에 쓸 refresh_token을 받는다. 예전에 승인한 권한도 이번 토큰에 담아,
+        # 다시 연결할 때 YouTube 체크박스를 놓쳐도 계정에 남은 권한으로 동작하게 한다.
+        params["access_type"] = "offline"
+        params["include_granted_scopes"] = "true"
+    response = RedirectResponse("https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params, quote_via=urllib.parse.quote))
     _set_oauth_cookie(response, OAUTH_STATE_COOKIE, state, max_age=600)
-    # 구글을 다녀오는 동안 로그인을 시작한 화면 언어를 기억해 두었다가, 콜백에서 계정 언어로 저장한다.
+    # 구글을 다녀오는 동안 시작한 화면 언어를 기억해 두었다가, 콜백에서 계정 언어로 저장한다.
     if locale in SUPPORTED_LOCALES:
         _set_oauth_cookie(response, OAUTH_LOCALE_COOKIE, locale, max_age=600)
+    return response
+
+
+@app.get("/api/auth/login")
+def login_via_google(locale: str | None = None):
+    """
+    개인 구글 계정으로 로그인한다. 이메일·프로필만 요청하므로 구글은 브랜드 채널이 아닌 구글 계정만 보여준다.
+    YouTube 채널은 로그인한 뒤 /api/auth/connect로 따로 연결한다.
+    브라우저에 다른 계정의 로그인이 남아 있어도 그 계정과는 상관없는 새 로그인이다.
+    """
+    import secrets as _secrets
+    return _google_auth_redirect(LOGIN_SCOPE, "select_account", _secrets.token_urlsafe(24), locale, offline=False)
+
+
+@app.get("/api/auth/connect")
+def connect_youtube_channel(request: Request, locale: str | None = None, reconnect: int | None = None):
+    """
+    로그인한 계정에 YouTube 채널을 연결한다 (첫 연결·채널 추가·다시 연동 모두).
+    구글 화면에서 다른 구글 계정이나 브랜드 채널을 골라도, 채널은 지금 로그인한 계정에 붙는다.
+    reconnect=채널ID면 "그 채널 다시 연동" 모드 - 콜백에서 같은 채널을 골랐을 때만 연동한다.
+    """
+    # L-3: 쿠키에서 현재 로그인 유저 ID를 읽는다 — JWT를 URL에 노출하지 않아도 됨
+    try:
+        user_id = int(_decode_token(request)["sub"])
+    except Exception:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=session_expired")
+    # state에 유저 ID를 서명해 담아 두면, 콜백이 이것을 보고 로그인이 아닌 채널 연결로 처리한다.
+    response = _google_auth_redirect(CHANNEL_SCOPE, "consent select_account", _make_state_nonce(user_id), locale, offline=True)
     # 다시 연동은 로그인한 사람이 자기 채널에 대해서만 쓴다 (채널 소유 확인은 콜백에서).
-    if reconnect and linking_user_id:
+    if reconnect:
         _set_oauth_cookie(response, OAUTH_RECONNECT_COOKIE, str(reconnect), max_age=600)
     return response
 
-@app.get("/api/auth/callback")
-async def google_auth_callback(request: Request, code: str | None = None, error: str | None = None, state: str | None = None, db: Session = Depends(get_db)):
-    """구글 로그인 성공 시 되돌아오는 콜백 엔드포인트"""
-    if error or not code:
-        return _oauth_redirect(f"{FRONTEND_URL}/login?error=cancelled")
+def _issue_auth_code_redirect(db: Session, request: Request, user: User, channel: Channel | None, extra_query: str = "") -> RedirectResponse:
+    """
+    로그인·채널 연결을 마치고 프론트로 보낸다 (C-1: JWT를 URL에 직접 싣지 않음).
+    JWT 전체를 URL에 노출하면 브라우저 히스토리·서버 로그·Referer에 그대로 남는다.
+    대신 단기(5분) 일회용 auth_code를 URL에 실어 보내고, 프론트가 /api/auth/exchange로 교환해 JWT를 받는다.
+    아직 채널이 없는 계정이면 대시보드 대신 채널 연결 화면으로 보낸다.
+    """
+    import secrets as _secrets
+    token = create_access_token(user.id, channel.id if channel else None)
+    auth_code = _secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    # 만료된 코드 정리 (최대 행 수 제어)
+    db.query(OAuthAuthCode).filter(OAuthAuthCode.expires_at < now).delete()
+    db.add(OAuthAuthCode(code=auth_code, token=token, expires_at=now + timedelta(minutes=5)))
+    # 언어를 아직 저장한 적 없는 계정이면 로그인 순간의 언어로 채운다 (알림 메일 언어에 쓰임).
+    if not user.locale:
+        user.locale = _login_locale(request)
+    db.commit()
+    page = "dashboard" if channel else "connect"
+    response = _oauth_redirect(f"{FRONTEND_URL}/{page}?auth_code={auth_code}{extra_query}")
+    # 이 auth_code는 이 브라우저에서만 교환되게 묶는다 - 남의 auth_code 주소를 열어
+    # 공격자 계정으로 로그인되는 것(로그인 CSRF)을 막는다.
+    _set_oauth_cookie(response, OAUTH_CODE_COOKIE, auth_code, max_age=300)
+    return response
 
-    # 이 브라우저에서 시작한 로그인인지 확인한다 (10분 안에, 같은 브라우저에서 돌아왔을 때만 통과).
-    expected_state = request.cookies.get(OAUTH_STATE_COOKIE)
-    if not state or not expected_state or not _hmac_lib.compare_digest(state, expected_state):
-        logger.warning("OAuth state 불일치 - 이 브라우저에서 시작하지 않은 로그인이라 거부합니다.")
+
+def _connect_error_redirect(db: Session, user_id: int, query: str) -> RedirectResponse:
+    """채널을 연결하지 못했을 때: 이미 채널이 있으면 대시보드, 없으면 채널 연결 화면에서 이유를 보여준다."""
+    has_channel = db.query(Channel).filter(Channel.user_id == user_id).first() is not None
+    return _oauth_redirect(f"{FRONTEND_URL}/{'dashboard' if has_channel else 'connect'}?{query}")
+
+
+def _finish_login(request: Request, db: Session, google_user_id: str, email: str) -> RedirectResponse:
+    """개인 구글 계정으로 계정을 찾거나 만든다. 채널이 있으면 첫 채널로, 없으면 채널 연결 화면으로 들어간다."""
+    user = db.query(User).filter(User.google_user_id == google_user_id).first()
+    if not user:
+        # 레거시 브릿지: google_user_id 도입 이전에 이메일만으로 저장된 유저가 있으면 그쪽에 채워 넣는다.
+        user = db.query(User).filter(User.email == email).first()
+        if user and not user.google_user_id:
+            user.google_user_id = google_user_id
+    if not user:
+        user = User(google_user_id=google_user_id, email=email)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    channel = db.query(Channel).filter(Channel.user_id == user.id).order_by(Channel.id).first()
+    logger.info(f"로그인: {email} (채널 {'있음' if channel else '없음'})")
+    return _issue_auth_code_redirect(db, request, user, channel)
+
+
+async def _finish_channel_connect(
+    request: Request, db: Session, user_id: int, google_user_id: str,
+    channel_id: str, channel_title: str, access_token: str, refresh_token: str | None,
+) -> RedirectResponse:
+    """구글 화면에서 고른 YouTube 채널을 로그인한 계정(user_id)에 연결한다."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        await _revoke_google_token(refresh_token or access_token)
         return _oauth_redirect(f"{FRONTEND_URL}/login?error=session_expired")
-
-    # "채널 추가" 흐름이면 state에 기존 로그인 유저 ID가 서명되어 있다. 유효하면 이 흐름 전체에서
-    # 그 유저를 채널 소유자로 쓴다 (아래 4번 DB 저장 로직에서 google_user_id 기준 조회/생성을 건너뜀).
-    linking_user_id = _verify_state_nonce(state)
-
-    # 1. code를 이용해 access_token과 refresh_token 발급
-    token_url = "https://oauth2.googleapis.com/token"
-    token_data = {
-        "code": code,
-        "client_id": GOOGLE_CLIENT_ID,
-        "client_secret": GOOGLE_CLIENT_SECRET,
-        "redirect_uri": REDIRECT_URI,
-        "grant_type": "authorization_code",
-    }
-    
-    # M-1: 문자열 비교 대신 is_dev_environment()로 SSL 검증 여부를 결정한다.
-    ssl_verify = not is_dev_environment()
-    
-    async with httpx.AsyncClient(verify=ssl_verify) as client:
-        token_res = await client.post(token_url, data=token_data)
-        if token_res.status_code != 200:
-            logger.error(f"Token error: {token_res.text}")
-            raise HTTPException(status_code=400, detail=msg("oauth_token_failed"))
-            
-        token_json = token_res.json()
-        access_token = token_json.get("access_token")
-        refresh_token = token_json.get("refresh_token") # 최초 로그인 시에만 발급됨
-        
-        headers = {"Authorization": f"Bearer {access_token}"}
-        
-        # 2. 사용자 정보 가져오기
-        userinfo_res = await client.get("https://www.googleapis.com/oauth2/v2/userinfo", headers=headers)
-        if userinfo_res.status_code != 200:
-            logger.error(f"Userinfo error: {userinfo_res.text}")
-            raise HTTPException(status_code=400, detail=msg("google_userinfo_failed"))
-        userinfo_json = userinfo_res.json()
-        # 🔒 유저 식별은 반드시 이 "id"(OIDC sub와 동일, 계정당 고유·불변) 기준으로 해야 한다.
-        # email은 브랜드 계정(유튜브 채널) 컨텍스트로 로그인하면 실제 이메일 대신
-        # "...@pages.plusgoogle.com" 같은 그 채널 전용 가짜 이메일을 돌려주는 경우가 있어서,
-        # email로 유저를 찾으면 같은 사람인데도 채널 연동할 때마다 별개 계정이 새로 생겨버린다.
-        google_user_id = userinfo_json.get("id")
-        email = userinfo_json.get("email")
-        if not google_user_id:
-            logger.error("구글 userinfo 응답에 id(sub)가 없습니다.")
-            raise HTTPException(status_code=400, detail=msg("google_account_failed"))
-        if not email:
-            # User.email은 nullable=False라서, None인 채로 User를 만들면 여기서 잡지 않으면
-            # DB commit 시점에 처리되지 않은 IntegrityError로 500이 난다.
-            logger.error("구글 userinfo 응답에 email이 없습니다.")
-            raise HTTPException(status_code=400, detail=msg("google_email_missing"))
-
-        # 3. 유튜브 채널 정보 가져오기
-        yt_res = await client.get("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", headers=headers)
-        if yt_res.status_code == 403:
-            # 스코프 동의 화면에서 YouTube 권한이 빠지면(브랜드 계정 로그인 시 간소화된 동의 화면이
-            # 뜨는 경우 등) 여기서 403이 난다. "채널이 없다"는 것과는 다른 원인이라 별도 에러로 구분한다.
-            # 토큰에 실제로 담긴 권한도 남긴다 - 동의 화면 문제인지, 토큰 문제인지 로그만 보고 가릴 수 있게
-            logger.error(f"YouTube API 403 (granted scope: {token_json.get('scope')}): {yt_res.text}")
-            return _oauth_redirect(f"{FRONTEND_URL}/login?error=youtube_permission_denied")
-        yt_data = yt_res.json()
-
-        if not yt_data.get("items"):
-            return _oauth_redirect(f"{FRONTEND_URL}/?error=no_youtube_channel")
-
-        channel_id = yt_data["items"][0]["id"]
-        channel_title = yt_data["items"][0]["snippet"]["title"]
 
     # "다시 연동" 모드: 사용자가 고른 채널이 다시 연결하려던 그 채널인지 확인한다.
     # 다르면 아무것도 바꾸지 않고, 방금 받은 권한도 돌려준 뒤 올바른 채널을 고르라고 안내한다.
     reconnect_cookie = request.cookies.get(OAUTH_RECONNECT_COOKIE)
-    if reconnect_cookie and linking_user_id:
+    if reconnect_cookie:
         try:
             expected = db.query(Channel).filter(Channel.id == int(reconnect_cookie)).first()
         except ValueError:
             expected = None
-        if expected and expected.user_id == linking_user_id and expected.youtube_channel_id != channel_id:
+        if expected and expected.user_id == user.id and expected.youtube_channel_id != channel_id:
             logger.info(f"다시 연동 채널 불일치: 기대 {expected.youtube_channel_id}, 선택 {channel_id} - 변경 없음")
             await _revoke_google_token(refresh_token or access_token)
             expected_title = urllib.parse.quote(expected.channel_title or "")
             return _oauth_redirect(f"{FRONTEND_URL}/dashboard?error=reconnect_wrong_channel&expected={expected_title}")
-
-    # 4. DB 저장 로직 (유저 및 채널)
-    user = db.query(User).filter(User.id == linking_user_id).first() if linking_user_id else None
-    if not user:
-        # "채널 추가"로 들어온 게 아닌 일반 로그인 흐름.
-        user = db.query(User).filter(User.google_user_id == google_user_id).first()
-        if not user:
-            # 레거시 브릿지: google_user_id 도입 이전에 이메일만으로 저장된 유저가 있으면 그쪽에
-            # 채워 넣는다 (단, 이번 로그인의 email이 진짜 자기 이메일일 때만 유효한 매칭이므로 그대로 사용).
-            user = db.query(User).filter(User.email == email).first()
-            if user and not user.google_user_id:
-                user.google_user_id = google_user_id
-        if not user:
-            user = User(google_user_id=google_user_id, email=email)
-            db.add(user)
-            db.commit()
-            db.refresh(user)
 
     channel = db.query(Channel).filter(Channel.youtube_channel_id == channel_id).first()
 
@@ -487,30 +449,33 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
         plan_value = user.plan.value if hasattr(user.plan, "value") else str(user.plan)
         existing_count = db.query(Channel).filter(Channel.user_id == user.id).count()
         if existing_count >= max_channels_for_plan(plan_value):
-            logger.info(f"채널 연동 한도 초과: {email} (plan={plan_value}, 기존 {existing_count}개)")
+            logger.info(f"채널 연동 한도 초과: {user.email} (plan={plan_value}, 기존 {existing_count}개)")
             return True
         return False
 
-    # "채널 추가"인데 고른 채널이 이미 다른 계정에 연결돼 있으면, 그 계정으로 로그인을 바꾸지 않고 거부한다.
-    # (예전엔 채널 주인 계정으로 세션이 넘어가서, 추가한 채널이 내 목록에 안 보이고 남의 계정에 들어가졌다)
-    # 단, 그 계정에서 이미 연동 해제한 채널이면 이 계정으로 옮긴다 - 해제는 그 계정에 로그인해야만 할 수 있으므로
-    # "따로 가입해 버린 채널을 메인 계정으로 합치는" 정상 경로이고, 연결된 채널을 빼앗아 오는 데는 쓸 수 없다.
-    if linking_user_id and channel and channel.user_id != linking_user_id:
-        if channel.oauth_refresh_token:
+    if channel and channel.user_id != user.id:
+        # 다른 계정에 붙어 있는 채널. 그 계정에서 연동을 해제했거나, 그 계정이 지금 구글 화면에서 고른 바로 그
+        # 구글 신원으로 만든 계정이면(2단계 로그인 전에 채널로 로그인해 생긴 계정 등) 이 계정으로 옮긴다.
+        # 둘 다 원래 그 계정에 들어갈 수 있는 사람만 할 수 있는 일이라, 남의 연결된 채널을 빼앗는 데는 쓸 수 없다.
+        previous_owner = channel.user
+        same_identity = previous_owner is not None and previous_owner.google_user_id == google_user_id
+        if channel.oauth_refresh_token and not same_identity:
             logger.info(f"채널 추가 거부: {channel_id}는 다른 계정({channel.user_id}) 소속 - 변경 없음")
             await _revoke_google_token(refresh_token or access_token)
             title = urllib.parse.quote(channel.channel_title or channel_title or "")
-            return _oauth_redirect(f"{FRONTEND_URL}/dashboard?error=channel_owned_elsewhere&channel={title}")
+            return _connect_error_redirect(db, user.id, f"error=channel_owned_elsewhere&channel={title}")
         if _channel_limit_reached():
             await _revoke_google_token(refresh_token or access_token)
-            return _oauth_redirect(f"{FRONTEND_URL}/dashboard?error=channel_limit_reached")
-        logger.info(f"연동 해제된 채널 이전: {channel_id} 계정 {channel.user_id} → {user.id}")
+            return _connect_error_redirect(db, user.id, "error=channel_limit_reached")
+        logger.info(f"채널 이전: {channel_id} 계정 {channel.user_id} → {user.id}")
+        if previous_owner is not None and previous_owner.plan != PlanType.BASIC:
+            logger.warning(f"채널 이전: 이전 계정({previous_owner.id})의 요금제 {previous_owner.plan}는 옮기지 않았습니다 - 확인 필요")
         channel.user = user
         _video_list_cache.pop(channel.id, None)
 
     if not channel:
         if _channel_limit_reached():
-            return _oauth_redirect(f"{FRONTEND_URL}/dashboard?error=channel_limit_reached")
+            return _connect_error_redirect(db, user.id, "error=channel_limit_reached")
         channel = Channel(user_id=user.id, youtube_channel_id=channel_id, channel_title=channel_title)
 
     if refresh_token:
@@ -521,41 +486,85 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
     db.add(channel)
     db.commit()
     db.refresh(channel)
+    logger.info(f"유튜브 채널 연동 성공: {channel_title} ({user.email})")
+    return _issue_auth_code_redirect(db, request, user, channel, f"&connected_channel={urllib.parse.quote(channel_title)}")
 
-    logger.info(f"유튜브 채널 연동 성공: {channel_title} ({email})")
 
-    # 5. 프론트엔드로 리다이렉트 (C-1: JWT를 URL에 직접 싣지 않음)
-    # JWT 전체를 URL에 노출하면 브라우저 히스토리·서버 로그·Referer에 그대로 남는다.
-    # 대신 단기(5분) 일회용 auth_code를 생성해 URL에 실어 보내고,
-    # 프론트엔드가 해당 코드를 /api/auth/exchange로 교환해 JWT를 받도록 한다.
-    import secrets as _secrets
-    if linking_user_id:
-        # 채널 추가는 이미 로그인한 세션에서 시작하므로, 그 세션의 주인 여부를 그대로 이어받는다
-        # (관리자로 들어온 세션이 채널 추가를 거쳐 주인 권한을 얻지 못하게).
-        is_owner = channel.user_id == linking_user_id and _session_is_owner(request, linking_user_id)
-    else:
-        # 이번에 로그인한 구글 계정이 곧 이 채널을 가진 계정일 때만 주인이다.
-        is_owner = channel.user_id == user.id and user.google_user_id == google_user_id
-    token = create_access_token(channel.user_id, channel.id, is_owner)
-    auth_code = _secrets.token_urlsafe(32)
-    now = datetime.now(timezone.utc)
-    # 만료된 코드 정리 (최대 행 수 제어)
-    db.query(OAuthAuthCode).filter(OAuthAuthCode.expires_at < now).delete()
-    db.add(OAuthAuthCode(code=auth_code, token=token, expires_at=now + timedelta(minutes=5)))
+@app.get("/api/auth/callback")
+async def google_auth_callback(request: Request, code: str | None = None, error: str | None = None, state: str | None = None, db: Session = Depends(get_db)):
+    """구글 로그인·채널 연결이 끝나고 돌아오는 콜백. state에 유저 ID가 서명돼 있으면 채널 연결, 아니면 로그인이다."""
+    # 이 브라우저에서 시작한 요청인지 확인한다 (10분 안에, 같은 브라우저에서 돌아왔을 때만 통과).
+    expected_state = request.cookies.get(OAUTH_STATE_COOKIE)
+    state_ok = bool(state and expected_state and _hmac_lib.compare_digest(state, expected_state))
+    connecting_user_id = _verify_state_nonce(state) if state_ok else None
 
-    # 언어를 아직 저장한 적 없는 계정이면 로그인 순간의 언어로 채운다 (알림 메일 언어에 쓰임).
-    # 브랜드 계정처럼 채널 소유자가 로그인한 계정과 다를 수 있어, 세션 주인(channel.user)까지 챙긴다.
-    login_locale = _login_locale(request)
-    for account in (user, channel.user):
-        if account is not None and not account.locale:
-            account.locale = login_locale
-    db.commit()
-    channel_title_encoded = urllib.parse.quote(channel_title)
-    response = _oauth_redirect(f"{FRONTEND_URL}/dashboard?auth_code={auth_code}&connected_channel={channel_title_encoded}")
-    # 이 auth_code는 이 브라우저에서만 교환되게 묶는다 - 남의 auth_code 주소를 열어
-    # 공격자 계정으로 로그인되는 것(로그인 CSRF)을 막는다.
-    _set_oauth_cookie(response, OAUTH_CODE_COOKIE, auth_code, max_age=300)
-    return response
+    if error or not code:
+        if connecting_user_id:
+            return _connect_error_redirect(db, connecting_user_id, "error=cancelled")
+        return _oauth_redirect(f"{FRONTEND_URL}/login?error=cancelled")
+    if not state_ok:
+        logger.warning("OAuth state 불일치 - 이 브라우저에서 시작하지 않은 로그인이라 거부합니다.")
+        return _oauth_redirect(f"{FRONTEND_URL}/login?error=session_expired")
+
+    # 1. code를 이용해 access_token과 refresh_token 발급
+    token_data = {
+        "code": code,
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": REDIRECT_URI,
+        "grant_type": "authorization_code",
+    }
+    # M-1: 문자열 비교 대신 is_dev_environment()로 SSL 검증 여부를 결정한다.
+    ssl_verify = not is_dev_environment()
+
+    async with httpx.AsyncClient(verify=ssl_verify) as client:
+        token_res = await client.post("https://oauth2.googleapis.com/token", data=token_data)
+        if token_res.status_code != 200:
+            logger.error(f"Token error: {token_res.text}")
+            raise HTTPException(status_code=400, detail=msg("oauth_token_failed"))
+
+        token_json = token_res.json()
+        access_token = token_json.get("access_token")
+        refresh_token = token_json.get("refresh_token")  # 채널 연결(offline)에서만 발급됨
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        # 2. 사용자 정보 가져오기
+        userinfo_res = await client.get("https://www.googleapis.com/oauth2/v2/userinfo", headers=headers)
+        if userinfo_res.status_code != 200:
+            logger.error(f"Userinfo error: {userinfo_res.text}")
+            raise HTTPException(status_code=400, detail=msg("google_userinfo_failed"))
+        userinfo_json = userinfo_res.json()
+        # 🔒 유저 식별은 반드시 이 "id"(OIDC sub와 동일, 계정당 고유·불변) 기준으로 해야 한다.
+        # 채널 연결 때 브랜드 채널을 고르면 그 채널 전용 신원과 "...@pages.plusgoogle.com" 같은 이메일이 온다.
+        google_user_id = userinfo_json.get("id")
+        email = userinfo_json.get("email")
+        if not google_user_id:
+            logger.error("구글 userinfo 응답에 id(sub)가 없습니다.")
+            raise HTTPException(status_code=400, detail=msg("google_account_failed"))
+        if not email:
+            # User.email은 nullable=False라서, None인 채로 User를 만들면 DB commit 시점에 500이 난다.
+            logger.error("구글 userinfo 응답에 email이 없습니다.")
+            raise HTTPException(status_code=400, detail=msg("google_email_missing"))
+
+        if not connecting_user_id:
+            return _finish_login(request, db, google_user_id, email)
+
+        # 3. 채널 연결이면 고른 YouTube 채널 정보 가져오기
+        yt_res = await client.get("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", headers=headers)
+        if yt_res.status_code == 403:
+            # 동의 화면에서 YouTube 권한 체크를 빠뜨리면 여기서 403이 난다. "채널이 없다"와는 다른 원인이라 따로 알린다.
+            # 토큰에 실제로 담긴 권한도 남긴다 - 동의 화면 문제인지, 토큰 문제인지 로그만 보고 가릴 수 있게
+            logger.error(f"YouTube API 403 (granted scope: {token_json.get('scope')}): {yt_res.text}")
+            return _connect_error_redirect(db, connecting_user_id, "error=youtube_permission_denied")
+        yt_data = yt_res.json()
+        if not yt_data.get("items"):
+            return _connect_error_redirect(db, connecting_user_id, "error=no_youtube_channel")
+        channel_id = yt_data["items"][0]["id"]
+        channel_title = yt_data["items"][0]["snippet"]["title"]
+
+    return await _finish_channel_connect(
+        request, db, connecting_user_id, google_user_id, channel_id, channel_title, access_token, refresh_token,
+    )
 
 @app.post("/api/auth/logout")
 def logout_user():
@@ -599,7 +608,7 @@ async def _revoke_google_token(refresh_token: str):
 
 
 @app.post("/api/channels/{target_channel_id}/disconnect")
-async def disconnect_channel(target_channel_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+async def disconnect_channel(target_channel_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """
     지정한 채널의 YouTube 연동을 해제합니다.
     switch_channel과 동일하게 같은 계정 소유 채널이면 지금 활성 채널이 아니어도 해제할 수 있다.
@@ -610,7 +619,7 @@ async def disconnect_channel(target_channel_id: int, db: Session = Depends(get_d
     진행 중인 테스트를 멈추고 썸네일·제목을 원본으로 되돌린 뒤 권한을 회수한다.
     """
     target = db.query(Channel).filter(Channel.id == target_channel_id).first()
-    if not target or target.user_id != channel.user_id:
+    if not target or target.user_id != user.id:
         raise HTTPException(status_code=404, detail=msg("channel_not_owned"))
 
     refresh_token = target.oauth_refresh_token
@@ -634,13 +643,13 @@ async def disconnect_channel(target_channel_id: int, db: Session = Depends(get_d
     return {"message": msg("channel_disconnected_ok"), "stopped_tests": len(running_tests)}
 
 @app.get("/api/channels")
-def list_channels(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+def list_channels(request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """현재 계정에 연동된 모든 YouTube 채널 목록 (멀티채널 전환 UI용). '활성' 채널은 지금 토큰이 가리키는 채널."""
     from test_policy import max_channels_for_plan
 
-    channels = db.query(Channel).filter(Channel.user_id == channel.user_id).order_by(Channel.id).all()
-    user = channel.user
-    plan_value = user.plan.value if user and hasattr(user.plan, "value") else "BASIC"
+    active_channel_id = _decode_token(request).get("channel_id")
+    channels = db.query(Channel).filter(Channel.user_id == user.id).order_by(Channel.id).all()
+    plan_value = user.plan.value if hasattr(user.plan, "value") else "BASIC"
 
     return {
         "channels": [
@@ -650,7 +659,7 @@ def list_channels(db: Session = Depends(get_db), channel: Channel = Depends(get_
                 "youtube_channel_id": c.youtube_channel_id,
                 "needs_reconnect": c.needs_reconnect,
                 "is_connected": bool(c.oauth_refresh_token),
-                "is_active": c.id == channel.id,
+                "is_active": c.id == active_channel_id,
                 "thumbnail_permission": c.thumbnail_permission or "unknown",
             }
             for c in channels
@@ -659,14 +668,13 @@ def list_channels(db: Session = Depends(get_db), channel: Channel = Depends(get_
     }
 
 @app.post("/api/channels/{target_channel_id}/switch")
-def switch_channel(request: Request, target_channel_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+def switch_channel(target_channel_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """대시보드에서 다른 연동 채널로 전환 - 같은 계정 소유 채널일 때만 새 토큰을 발급한다."""
     target = db.query(Channel).filter(Channel.id == target_channel_id).first()
-    if not target or target.user_id != channel.user_id:
+    if not target or target.user_id != user.id:
         raise HTTPException(status_code=404, detail=msg("channel_not_owned"))
 
-    # 채널만 바꾸고 주인 여부는 지금 세션 그대로 유지한다.
-    token = create_access_token(target.user_id, target.id, _session_is_owner(request, target.user_id))
+    token = create_access_token(user.id, target.id)
     # L-3: JWT를 응답 body 대신 HttpOnly 쿠키에 설정한다.
     response = JSONResponse(content={"ok": True, "channel_title": target.channel_title})
     _set_auth_cookie(response, token)
@@ -1403,11 +1411,13 @@ PADDLE_ENVIRONMENT  = "sandbox" if os.getenv("PADDLE_ENVIRONMENT", "").strip().l
 PADDLE_API_BASE  = "https://sandbox-api.paddle.com" if PADDLE_ENVIRONMENT == "sandbox" else "https://api.paddle.com"
 
 @app.get("/api/user/me")
-def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
-    """현재 연동된 채널 소유 유저 정보 및 구독 요금제를 반환합니다."""
-    user = channel.user
-    if not user:
-        return {"email": None, "plan": "BASIC", "is_pro": False, "channel_title": None, "needs_reconnect": channel.needs_reconnect, "is_connected": bool(channel.oauth_refresh_token), "is_admin": False}
+def get_current_user_profile(request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """로그인한 계정 정보·요금제와, 지금 보고 있는 채널(아직 연결 전이면 has_channel=False)을 반환합니다."""
+    active_channel_id = _decode_token(request).get("channel_id")
+    channel = (
+        db.query(Channel).filter(Channel.id == int(active_channel_id), Channel.user_id == user.id).first()
+        if active_channel_id else None
+    )
 
     admin_emails = {e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()}
     is_admin = bool(user.email) and user.email.lower() in admin_emails
@@ -1416,10 +1426,11 @@ def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
         "email": user.email,
         "plan": user.plan.value if hasattr(user.plan, "value") else str(user.plan),
         "is_pro": user.plan == PlanType.PRO or user.plan == PlanType.AGENCY,
-        "channel_title": channel.channel_title,
-        "needs_reconnect": channel.needs_reconnect,
-        "is_connected": bool(channel.oauth_refresh_token),
-        "channel_id": channel.id,
+        "has_channel": channel is not None,
+        "channel_title": channel.channel_title if channel else None,
+        "needs_reconnect": channel.needs_reconnect if channel else False,
+        "is_connected": bool(channel and channel.oauth_refresh_token),
+        "channel_id": channel.id if channel else None,
         "is_admin": is_admin,
         "notification_email": user.notification_email,
         "notification_email_verified": user.notification_email_verified,
@@ -1430,13 +1441,10 @@ def get_current_user_profile(channel: Channel = Depends(get_current_channel)):
 @app.patch("/api/user/preferences")
 def update_user_preferences(
     payload: dict,
-    channel: Channel = Depends(get_current_channel),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """M-6: 이메일 알림 수신 여부 등 사용자 환경설정을 업데이트합니다."""
-    user = db.query(User).filter(User.id == channel.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail=msg("user_not_found"))
     if "email_alerts_enabled" in payload:
         user.email_alerts_enabled = bool(payload["email_alerts_enabled"])
     if "locale" in payload:
@@ -1447,17 +1455,16 @@ def update_user_preferences(
     return {"ok": True, "email_alerts_enabled": user.email_alerts_enabled, "locale": user.locale}
 
 @app.post("/api/checkout/create-session")
-async def create_checkout_session(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+async def create_checkout_session(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Paddle 트랜잭션을 생성하고, 프론트가 Paddle.js 오버레이로 결제창을 열 수 있도록 ID와 client token을 반환합니다."""
-    user = channel.user
     if not PADDLE_API_KEY or not PADDLE_PRICE_ID or not PADDLE_CLIENT_TOKEN:
         raise HTTPException(status_code=503, detail=msg("payments_not_configured"))
 
     payload: dict = {
         "items": [{"price_id": PADDLE_PRICE_ID, "quantity": 1}],
-        "custom_data": {"user_id": str(user.id) if user else ""},
+        "custom_data": {"user_id": str(user.id)},
     }
-    if user and user.email:
+    if user.email:
         payload["customer"] = {"email": user.email}
 
     try:
@@ -1484,35 +1491,23 @@ async def create_checkout_session(db: Session = Depends(get_db), channel: Channe
     }
 
 @app.post("/api/checkout/upgrade-test")
-def upgrade_user_plan_test(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+def upgrade_user_plan_test(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """결제 테스트용: 현재 유저의 요금제를 즉시 PRO로 업그레이드합니다. 프로덕션에서는 비활성."""
     if not allow_test_upgrade():
         raise HTTPException(status_code=403, detail=msg("upgrade_test_disabled"))
-    user = channel.user
-    if not user:
-            user = User(email="test@creatorflow.io", plan=PlanType.BASIC)
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-    else:
-        user = channel.user
-        
     user.plan = PlanType.PRO
     db.commit()
     return {"status": "success", "message": msg("upgraded_pro"), "plan": user.plan.value}
 
 @app.get("/api/billing/portal")
-async def get_billing_portal(request: Request, channel: Channel = Depends(get_current_channel)):
+async def get_billing_portal(user: User = Depends(get_current_user)):
     """
     Paddle 고객 포털(결제 정보·영수증·구독 해지) 주소를 발급한다.
     공식 방법인 portal-sessions로 로그인된 링크를 만들고, 응답의 urls.general.overview로 보낸다.
     (예전에 쓰던 auth-token은 Paddle.js용이라 포털이 로그인 화면으로 열렸다.)
-    결제 정보 조회·구독 취소가 가능한 페이지라, 채널 관리자로 들어온 세션에는 열어주지 않는다.
+    로그인은 개인 구글 계정으로만 하므로, 로그인한 사람이 곧 이 계정(과 결제)의 주인이다.
     """
-    if not _session_is_owner(request, channel.user_id):
-        raise HTTPException(status_code=403, detail=msg("billing_owner_only"))
-    user = channel.user
-    if not user or not user.stripe_customer_id:
+    if not user.stripe_customer_id:
         raise HTTPException(status_code=404, detail=msg("no_billing_history"))
 
     # 구독 ID를 같이 넘기면 포털에 그 구독의 해지·결제수단 변경 바로가기도 만들어진다
