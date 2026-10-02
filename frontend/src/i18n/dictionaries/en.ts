@@ -268,7 +268,7 @@ export const en = {
           },
           {
             q: "Can I manage multiple YouTube channels?",
-            a: "Yes. You can add additional channels from Settings and switch between them directly from the dashboard.",
+            a: "Yes. Sign in with your main account, use Connect Another Channel in the channel menu at the top right to add more channels, and switch between them directly from the dashboard. Channels from another Google account or a Brand Account can be picked on the channel chooser too. If you already signed in with that channel and it became a separate account, disconnect the channel there first, then add it again from your main account.",
           },
           {
             q: "Does ThumbnailFlow work with YouTube Brand Accounts?",
@@ -415,7 +415,7 @@ export const en = {
     reconnectGuideConfirm: "Continue to Google",
     channelOwnedTitle: "Channel Already Connected Elsewhere",
     channelOwnedMsg: (name: string) =>
-      `"${name}" is already connected to another ThumbnailFlow account, so it wasn't added. Disconnect it from that account and try again. Nothing changed on this account.`,
+      `"${name}" is already connected to another ThumbnailFlow account, so it wasn't added. Sign in with that channel, click Disconnect in Settings, then use Connect Another Channel on this account again. Its past test history moves over too. Nothing changed on this account.`,
     wrongChannelTitle: "A Different Channel Was Chosen",
     wrongChannelMsg: (name: string) =>
       `To reconnect, choose the "${name}" channel on the Google screen. Nothing was changed.`,

@@ -28,11 +28,16 @@ async function isBackendDown(): Promise<boolean> {
 /**
  * 구글 로그인(또는 채널 추가)을 시작한다. 백엔드가 꺼져 있으면 Render 오류 화면으로 보내지 않고 false를 돌려준다
  * - 호출한 쪽이 우리 안내(오픈 예정 / 점검 중)를 보여준다.
+ * 아무 옵션이 없으면 일반 로그인 - 다른 계정의 로그인이 남아 있어도 그 계정에 채널을 붙이지 않는다.
+ * addChannel이면 지금 로그인한 계정에 채널을 추가한다.
  * reconnectChannelId를 주면 "그 채널 다시 연동" 모드 - 구글에서 다른 채널을 고르면 서버가 연동하지 않는다.
  */
-export async function startGoogleLogin(locale: string, reconnectChannelId?: number): Promise<boolean> {
+export async function startGoogleLogin(
+  locale: string,
+  { addChannel = false, reconnectChannelId }: { addChannel?: boolean; reconnectChannelId?: number } = {},
+): Promise<boolean> {
   if (await isBackendDown()) return false;
-  const reconnect = reconnectChannelId ? `&reconnect=${reconnectChannelId}` : "";
-  window.location.href = `${API_BASE_URL}/api/auth/login?locale=${locale}${reconnect}`;
+  const mode = reconnectChannelId ? `&reconnect=${reconnectChannelId}` : addChannel ? "&link=true" : "";
+  window.location.href = `${API_BASE_URL}/api/auth/login?locale=${locale}${mode}`;
   return true;
 }

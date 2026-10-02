@@ -77,7 +77,7 @@ export default function Dashboard() {
       confirmText: D.reconnectGuideConfirm,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }));
-        if (!(await startGoogleLogin(locale, userProfile.channel_id))) router.push(`${lp("/login")}?error=${SERVICE_UNAVAILABLE_ERROR}`);
+        if (!(await startGoogleLogin(locale, { reconnectChannelId: userProfile.channel_id }))) router.push(`${lp("/login")}?error=${SERVICE_UNAVAILABLE_ERROR}`);
       },
       onCancel: () => setModalConfig(prev => ({ ...prev, isOpen: false })),
     });

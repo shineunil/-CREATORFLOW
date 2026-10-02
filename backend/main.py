@@ -322,11 +322,13 @@ def _login_locale(request: Request) -> str:
 
 
 @app.get("/api/auth/login")
-def login_via_google(request: Request, locale: str | None = None, reconnect: int | None = None):
+def login_via_google(request: Request, locale: str | None = None, reconnect: int | None = None, link: bool = False):
     """
     구글 로그인 페이지로 리다이렉트합니다.
-    이미 로그인된 상태에서 "채널 추가"로 들어온 경우, HttpOnly 쿠키에서 현재 유저를 읽는다.
+    link=true("채널 추가")면 HttpOnly 쿠키에서 현재 유저를 읽어 그 계정에 채널을 붙인다.
     reconnect=채널ID면 "그 채널 다시 연동" 모드 - 콜백에서 같은 채널을 골랐을 때만 연동한다.
+    둘 다 없으면 쿠키가 남아 있어도 일반 로그인이다 - 예전엔 다른 계정의 쿠키가 남은 브라우저에서
+    로그인 버튼을 누르면 그 계정에 채널 추가로 처리됐다.
     """
     import secrets as _secrets
     scope = "openid email profile https://www.googleapis.com/auth/youtube.force-ssl"
@@ -348,7 +350,7 @@ def login_via_google(request: Request, locale: str | None = None, reconnect: int
     # L-3: 쿠키에서 현재 로그인 유저 ID를 읽는다 — JWT를 URL에 노출하지 않아도 됨
     linking_user_id = None
     auth_cookie = request.cookies.get("auth_token")
-    if auth_cookie:
+    if auth_cookie and (link or reconnect):
         try:
             p = jwt.decode(auth_cookie, JWT_SECRET, algorithms=[JWT_ALGORITHM])
             linking_user_id = int(p["sub"])
@@ -479,21 +481,35 @@ async def google_auth_callback(request: Request, code: str | None = None, error:
 
     channel = db.query(Channel).filter(Channel.youtube_channel_id == channel_id).first()
 
-    # "채널 추가"인데 고른 채널이 이미 다른 계정에 연결돼 있으면, 그 계정으로 로그인을 바꾸지 않고 거부한다.
-    # (예전엔 채널 주인 계정으로 세션이 넘어가서, 추가한 채널이 내 목록에 안 보이고 남의 계정에 들어가졌다)
-    if linking_user_id and channel and channel.user_id != linking_user_id:
-        logger.info(f"채널 추가 거부: {channel_id}는 다른 계정({channel.user_id}) 소속 - 변경 없음")
-        await _revoke_google_token(refresh_token or access_token)
-        title = urllib.parse.quote(channel.channel_title or channel_title or "")
-        return _oauth_redirect(f"{FRONTEND_URL}/dashboard?error=channel_owned_elsewhere&channel={title}")
-
-    if not channel:
-        # 신규 채널 연동 - 요금제별 채널 개수 상한 확인 (멀티채널 관리는 PRO/AGENCY 차별화 포인트)
+    def _channel_limit_reached() -> bool:
+        # 요금제별 채널 개수 상한 (멀티채널 관리는 PRO/AGENCY 차별화 포인트)
         from test_policy import max_channels_for_plan
         plan_value = user.plan.value if hasattr(user.plan, "value") else str(user.plan)
         existing_count = db.query(Channel).filter(Channel.user_id == user.id).count()
         if existing_count >= max_channels_for_plan(plan_value):
             logger.info(f"채널 연동 한도 초과: {email} (plan={plan_value}, 기존 {existing_count}개)")
+            return True
+        return False
+
+    # "채널 추가"인데 고른 채널이 이미 다른 계정에 연결돼 있으면, 그 계정으로 로그인을 바꾸지 않고 거부한다.
+    # (예전엔 채널 주인 계정으로 세션이 넘어가서, 추가한 채널이 내 목록에 안 보이고 남의 계정에 들어가졌다)
+    # 단, 그 계정에서 이미 연동 해제한 채널이면 이 계정으로 옮긴다 - 해제는 그 계정에 로그인해야만 할 수 있으므로
+    # "따로 가입해 버린 채널을 메인 계정으로 합치는" 정상 경로이고, 연결된 채널을 빼앗아 오는 데는 쓸 수 없다.
+    if linking_user_id and channel and channel.user_id != linking_user_id:
+        if channel.oauth_refresh_token:
+            logger.info(f"채널 추가 거부: {channel_id}는 다른 계정({channel.user_id}) 소속 - 변경 없음")
+            await _revoke_google_token(refresh_token or access_token)
+            title = urllib.parse.quote(channel.channel_title or channel_title or "")
+            return _oauth_redirect(f"{FRONTEND_URL}/dashboard?error=channel_owned_elsewhere&channel={title}")
+        if _channel_limit_reached():
+            await _revoke_google_token(refresh_token or access_token)
+            return _oauth_redirect(f"{FRONTEND_URL}/dashboard?error=channel_limit_reached")
+        logger.info(f"연동 해제된 채널 이전: {channel_id} 계정 {channel.user_id} → {user.id}")
+        channel.user = user
+        _video_list_cache.pop(channel.id, None)
+
+    if not channel:
+        if _channel_limit_reached():
             return _oauth_redirect(f"{FRONTEND_URL}/dashboard?error=channel_limit_reached")
         channel = Channel(user_id=user.id, youtube_channel_id=channel_id, channel_title=channel_title)
 

@@ -241,40 +241,81 @@ def test_reconnect_rejects_a_different_channel_and_changes_nothing(session_facto
         db.close()
 
 
-def test_adding_a_channel_owned_by_another_account_is_refused(session_factory, monkeypatch):
-    revoked = []
+@pytest.fixture()
+def revoked(monkeypatch):
+    tokens = []
 
     async def fake_revoke(token):
-        revoked.append(token)
+        tokens.append(token)
 
     monkeypatch.setattr(main, "_revoke_google_token", fake_revoke)
+    return tokens
 
-    # 구글이 돌려줄 채널(CHANNEL_ID)은 다른 계정(other) 소속, 지금 로그인한 사람은 mine
+
+def _logged_in_as_mine(session_factory, their_token, my_plan="PRO"):
+    """구글이 돌려줄 채널(CHANNEL_ID)은 다른 계정(other) 소속, 이 브라우저에 로그인한 사람은 mine."""
     db = session_factory()
     other = User(google_user_id="other-google", email="other@example.com")
-    mine = User(google_user_id="mine-google", email="mine@example.com")
+    mine = User(google_user_id="mine-google", email="mine@example.com", plan=main.PlanType[my_plan])
     db.add_all([other, mine])
     db.commit()
-    db.add(Channel(user_id=other.id, youtube_channel_id=CHANNEL_ID, channel_title="Other Channel", oauth_refresh_token="theirs"))
+    db.add(Channel(user_id=other.id, youtube_channel_id=CHANNEL_ID, channel_title="Other Channel", oauth_refresh_token=their_token))
     my_channel = Channel(user_id=mine.id, youtube_channel_id="UC-mine", channel_title="Mine")
     db.add(my_channel)
     db.commit()
-    token = main.create_access_token(mine.id, my_channel.id, True)
-    db.close()
-
     client = TestClient(main.app)
-    client.cookies.set("auth_token", token)
-    state = _start_login(client)  # 로그인 상태에서 시작 = 채널 추가
-    location = _callback(client, state).headers["location"]
+    client.cookies.set("auth_token", main.create_access_token(mine.id, my_channel.id, True))
+    ids = {"mine": mine.id, "other": other.id}
+    db.close()
+    return client, ids
+
+
+def _owner_of(session_factory, youtube_channel_id):
+    db = session_factory()
+    try:
+        return db.query(Channel).filter(Channel.youtube_channel_id == youtube_channel_id).one()
+    finally:
+        db.close()
+
+
+def test_adding_a_channel_owned_by_another_account_is_refused(session_factory, revoked):
+    client, ids = _logged_in_as_mine(session_factory, their_token="theirs")
+    location = _callback(client, _start_login(client, "?link=true")).headers["location"]
 
     assert "error=channel_owned_elsewhere" in location and "auth_code=" not in location  # 다른 계정으로 넘어가지 않음
     assert revoked == ["refresh"]
-    db = session_factory()
-    try:
-        owned = db.query(Channel).filter(Channel.youtube_channel_id == CHANNEL_ID).one()
-        assert owned.oauth_refresh_token == "theirs"  # 남의 채널 권한을 덮어쓰지 않음
-    finally:
-        db.close()
+    owned = _owner_of(session_factory, CHANNEL_ID)
+    assert owned.user_id == ids["other"]
+    assert owned.oauth_refresh_token == "theirs"  # 남의 채널 권한을 덮어쓰지 않음
+
+
+def test_a_channel_disconnected_from_another_account_moves_to_this_account(session_factory, revoked):
+    client, ids = _logged_in_as_mine(session_factory, their_token=None)
+    location = _callback(client, _start_login(client, "?link=true")).headers["location"]
+
+    assert "auth_code=" in location
+    owned = _owner_of(session_factory, CHANNEL_ID)
+    assert owned.user_id == ids["mine"]
+    assert owned.oauth_refresh_token == "refresh"
+    assert revoked == []
+
+
+def test_moving_a_disconnected_channel_still_respects_the_channel_limit(session_factory, revoked):
+    client, ids = _logged_in_as_mine(session_factory, their_token=None, my_plan="BASIC")
+    location = _callback(client, _start_login(client, "?link=true")).headers["location"]
+
+    assert "error=channel_limit_reached" in location
+    assert _owner_of(session_factory, CHANNEL_ID).user_id == ids["other"]  # 옮기지 않음
+    assert revoked == ["refresh"]
+
+
+def test_login_button_ignores_a_leftover_session_from_another_account(session_factory, revoked):
+    # 다른 계정(mine)의 쿠키가 남은 브라우저에서 "로그인"을 누르면, mine에 채널 추가가 아니라 일반 로그인이다
+    client, ids = _logged_in_as_mine(session_factory, their_token=None)
+    location = _callback(client, _start_login(client)).headers["location"]
+
+    assert "auth_code=" in location
+    assert _owner_of(session_factory, CHANNEL_ID).user_id != ids["mine"]
 
 
 def test_reconnect_succeeds_when_the_same_channel_is_chosen(session_factory):
