@@ -1,0 +1,43 @@
+# ThumbnailFlow
+
+> ThumbnailFlow is a YouTube thumbnail A/B testing tool. It rotates thumbnail (and title) candidates on a video that is already published, compares views per hour (VPH) for each candidate, and automatically keeps the best-performing one.
+
+ThumbnailFlow는 유튜브 썸네일 A/B 테스트 도구입니다. 공개 중인 영상에 썸네일(과 제목) 후보를 번갈아 적용하고, 후보별 시간당 조회수를 비교해 가장 잘 되는 썸네일을 자동으로 남깁니다.
+
+## How it works
+
+1. Sign in with a personal Google account, then connect a YouTube channel (personal or Brand Account).
+2. Pick a published video and upload thumbnail candidates, optionally with a title for each.
+3. ThumbnailFlow swaps the candidates on a schedule through the official YouTube Data API and records views per hour for each one.
+4. After every candidate has run through several rotations and enough views have been collected, the candidate with the highest views per hour is applied to the video.
+5. If a test is stopped, or the channel is disconnected, the original thumbnail and title are restored.
+
+## Why views per hour instead of click-through rate
+
+Candidates swap every few hours, and YouTube's click-through rate data cannot be split at that granularity. Views per hour can be measured for each swap window, and each candidate runs through multiple rotations so no candidate only gets the same time of day.
+
+## Plans
+
+- BASIC (free): up to 4 tests per month, 1 test at a time, up to 3 candidates (A/B/C), swaps at least 4 hours apart, 1 YouTube channel.
+- PRO ($29/month): unlimited tests per month, multiple tests at the same time, up to 5 candidates (A–E), swaps as often as every 30 minutes, up to 3 YouTube channels, email notification when a test finishes.
+
+## Safety
+
+- Uses only the official YouTube Data API v3 with Google OAuth. No passwords are stored.
+- Access can be revoked at any time from Google account settings.
+- Payments are handled by Paddle; card details are never stored by ThumbnailFlow.
+
+## Limitations
+
+- Designed for regular (long-form) YouTube videos.
+- A video needs enough views during the test for a winner to be chosen.
+
+## Links
+
+- [Home (English)](https://trythumbnailflow.com/)
+- [홈 (한국어)](https://trythumbnailflow.com/ko)
+- [FAQ](https://trythumbnailflow.com/faq)
+- [Pricing](https://trythumbnailflow.com/pricing-public)
+- [Terms of Service](https://trythumbnailflow.com/terms)
+- [Privacy Policy](https://trythumbnailflow.com/privacy)
+- Support: admin@trythumbnailflow.com

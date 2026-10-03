@@ -12,8 +12,26 @@ export function generateMetadata() {
 export default async function FAQPage() {
   const { locale, t } = await getI18n();
 
+  // 검색엔진과 AI 검색이 질문·답을 그대로 읽어 갈 수 있게 FAQPage 구조화 데이터로도 싣는다 (화면의 문구와 같은 내용)
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    inLanguage: locale,
+    mainEntity: t.faq.sections.flatMap((section) =>
+      section.items.map((item) => ({
+        "@type": "Question",
+        name: item.q,
+        acceptedAnswer: { "@type": "Answer", text: item.a },
+      })),
+    ),
+  };
+
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-300">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd).replace(/</g, "\\u003c") }}
+      />
       <div className="max-w-3xl mx-auto px-6 py-16">
         <div className="flex items-center justify-between gap-4 mb-10">
           <Link
