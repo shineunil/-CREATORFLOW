@@ -74,17 +74,18 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
         />
       )}
       <aside
-        className={`fixed md:static inset-y-0 left-0 w-64 flex-shrink-0 border-r border-zinc-800 bg-[#111114] p-6 flex flex-col z-[60] md:z-auto transition-transform duration-300 ease-in-out ${
+        // overflow-hidden: 닫혀서 화면 밖으로 밀린 서랍의 내용(닫기 버튼 등)이 화면 왼쪽 끝으로 삐져나오지 않게
+        className={`fixed md:static inset-y-0 left-0 w-64 flex-shrink-0 border-r border-zinc-800 bg-[#111114] p-6 flex flex-col overflow-hidden z-[60] md:z-auto transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0`}
       >
         {/* PC에서는 로고가 화면 전체 폭 헤더에 있으므로, 로고·닫기 버튼은 휴대폰 서랍 메뉴에서만 보인다 */}
         <div className="flex items-center justify-between mb-10 md:hidden">
-          <Link href="/" className="flex items-center gap-2 px-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-            <div className="w-8 h-8 rounded bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(6,182,212,0.5)]" aria-hidden="true">
+          <Link href="/" className="flex items-center gap-2 px-2 min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            <div className="w-8 h-8 flex-shrink-0 rounded bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(6,182,212,0.5)]" aria-hidden="true">
               TF
             </div>
-            <span className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">THUMBNAILFLOW</span>
+            <span className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400 truncate">THUMBNAILFLOW</span>
           </Link>
           <button
             onClick={onClose}
