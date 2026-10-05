@@ -9,12 +9,13 @@ ThumbnailFlow는 유튜브 썸네일 A/B 테스트 도구입니다. 공개 중�
 1. Sign in with a personal Google account, then connect a YouTube channel (personal or Brand Account).
 2. Pick a published video and upload thumbnail candidates, optionally with a title for each.
 3. ThumbnailFlow swaps the candidates on a schedule through the official YouTube Data API and records views per hour for each one.
-4. After every candidate has run through several rotations and enough views have been collected, the candidate with the highest views per hour is applied to the video.
-5. If a test is stopped, or the channel is disconnected, the original thumbnail and title are restored.
+4. The next candidate is chosen so each one gets an even share of every time of day, instead of running in a fixed order.
+5. After every candidate has run at least twice and enough views have been collected, the candidate with the highest views per hour is applied to the video.
+6. If a test is stopped, or the channel is disconnected, the original thumbnail and title are restored.
 
 ## Why views per hour instead of click-through rate
 
-Candidates swap every few hours, and YouTube's click-through rate data cannot be split at that granularity. Views per hour can be measured for each swap window, and each candidate runs through multiple rotations so no candidate only gets the same time of day.
+Candidates swap every few hours, and YouTube's click-through rate data cannot be split at that granularity. Views per hour can be measured for each swap window. Because views also vary by time of day, the next candidate is the one that has run least during the upcoming hours, so every candidate covers mornings, afternoons, evenings and nights evenly. Videos published less than 7 days ago lose views quickly, so older videos give more reliable results.
 
 ## Plans
 

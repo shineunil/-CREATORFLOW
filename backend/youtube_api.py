@@ -171,7 +171,8 @@ async def get_recent_videos(refresh_token: str, max_results: int = 200) -> tuple
 
         while len(videos) < max_results:
             fetch_count = min(50, max_results - len(videos))
-            kwargs = dict(part="snippet", playlistId=uploads_playlist_id, maxResults=fetch_count)
+            # contentDetails를 같이 받아도 쿼터는 1 그대로다 (영상 공개일 videoPublishedAt이 여기 있다)
+            kwargs = dict(part="snippet,contentDetails", playlistId=uploads_playlist_id, maxResults=fetch_count)
             if next_page_token:
                 kwargs["pageToken"] = next_page_token
 
@@ -184,7 +185,9 @@ async def get_recent_videos(refresh_token: str, max_results: int = 200) -> tuple
                 videos.append({
                     "id": snippet['resourceId']['videoId'],
                     "title": snippet['title'],
-                    "thumbnail_url": snippet['thumbnails'].get('high', {}).get('url', '')
+                    "thumbnail_url": snippet['thumbnails'].get('high', {}).get('url', ''),
+                    # 올린 지 얼마 안 된 영상은 조회수가 빠르게 줄어 테스트 결과가 흔들린다 - 화면에서 안내할 때 쓴다
+                    "published_at": item.get('contentDetails', {}).get('videoPublishedAt') or snippet.get('publishedAt'),
                 })
 
             next_page_token = playlist_res.get('nextPageToken')

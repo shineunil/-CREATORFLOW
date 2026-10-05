@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, Suspense } from "react";
-import { ArrowLeft, UploadCloud, Upload, Plus, Play, CheckCircle2, Sparkles, Trash2, LayoutDashboard, RefreshCcw, Wand2, Loader2 } from "lucide-react";
+import { ArrowLeft, UploadCloud, Upload, Plus, Play, CheckCircle2, Sparkles, Trash2, LayoutDashboard, RefreshCcw, Wand2, Loader2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
@@ -36,6 +36,8 @@ function NewTestContent() {
   const router = useRouter();
   const { t, lp, locale } = useI18n();
   const N = t.newTest;
+  // 화면을 연 시각 기준으로 영상이 올라온 지 며칠인지 센다 (렌더마다 시계를 다시 읽지 않게 한 번만)
+  const [openedAt] = useState(() => Date.now());
   const searchParams = useSearchParams();
   const videoIdFromUrl = searchParams.get("videoId");
   
@@ -523,6 +525,19 @@ function NewTestContent() {
               <span className="whitespace-nowrap">{N.change}</span>
             </button>
           </div>
+
+          {(() => {
+            // 공개 첫 주에는 조회수가 빠르게 줄어 먼저 걸린 후보가 유리하다 - 막지는 않고 알려 준다
+            const publishedMs = selectedVideo?.published_at ? Date.parse(selectedVideo.published_at) : NaN;
+            const days = Math.floor((openedAt - publishedMs) / 86_400_000);
+            if (Number.isNaN(days) || days >= 7) return null;
+            return (
+              <div role="note" className="flex items-start gap-3 p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 text-amber-200 text-sm">
+                <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                <span className="break-keep">{N.newVideoNotice(Math.max(days, 0))}</span>
+              </div>
+            );
+          })()}
 
           <div>
             <div className="mb-4 border-b border-zinc-800 pb-4">

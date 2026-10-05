@@ -86,7 +86,7 @@ export const en = {
     /** 데스크톱에서 heroLine3 앞에서 줄을 바꿀지 (마지막 구절이 줄 끝에서 쪼개져 한 단어만 남는 걸 막기 위함) */
     heroBreakBeforeLine3: true,
     heroSub:
-      "Upload a few thumbnail and title variants. ThumbnailFlow rotates them on your live video and ranks each by views earned per hour — not raw view count — so a slow afternoon slot never gets mistaken for a loser.",
+      "Upload a few thumbnail and title variants. ThumbnailFlow rotates them on your live video and ranks each by views earned per hour — not raw view count — while giving every variant a fair share of mornings, afternoons and nights, so a slow time slot never gets mistaken for a loser.",
     heroCta: "Start testing — free",
     showcase: {
       control: "Control",
@@ -113,7 +113,7 @@ export const en = {
       },
       {
         title: "It rotates on its own",
-        desc: "ThumbnailFlow swaps the live thumbnail and title on your chosen schedule and discards the first few minutes after each swap so leftover exposure can't skew the count.",
+        desc: "ThumbnailFlow swaps the live thumbnail and title on your chosen schedule, picks the next variant so each one covers every time of day evenly, and discards the first few minutes after each swap so leftover exposure can't skew the count.",
       },
       {
         title: "Performance is tracked",
@@ -121,7 +121,7 @@ export const en = {
       },
       {
         title: "Winner auto-applied",
-        desc: "Once every variant has had a fair rotation, the highest-VPH thumbnail is automatically applied to your YouTube video. No action needed.",
+        desc: "Once every variant has run at least twice across different times of day, the highest-VPH thumbnail is automatically applied to your YouTube video. No action needed.",
       },
     ],
     processCta: "Try it on your own video",
@@ -149,7 +149,7 @@ export const en = {
       channels: "One dashboard, switch instantly",
     },
     compareNote:
-      "Faster iteration trades some statistical patience for speed — that's why ThumbnailFlow enforces its own minimum cycles and sample size before calling a winner, rather than declaring one on the first lucky swap.",
+      "Faster iteration trades some statistical patience for speed — that's why ThumbnailFlow waits until every variant has run a minimum number of times across the day and enough views are in before calling a winner, rather than declaring one on the first lucky swap.",
     compareCta: "Run your first test",
     pricingTitle: "Simple, transparent pricing.",
     pricingSub: "Start free. Upgrade when you're ready to go unlimited.",
@@ -261,6 +261,10 @@ export const en = {
           {
             q: "Can I stop a test before it finishes?",
             a: "Yes. You can manually stop a test at any time from the dashboard, and you can also immediately lock any specific variant as the winner without waiting for the test to complete.",
+          },
+          {
+            q: "Views change by time of day. Is the comparison fair?",
+            a: "Yes. Variants don't run in a fixed order. ThumbnailFlow picks the next variant so each one gets an even share of mornings, afternoons, evenings and nights, and it only calls a winner after every variant has run at least twice and enough views are in. Videos published less than a week ago lose views quickly, which can favor whichever variant runs first, so we recommend testing videos that are at least 7 days old.",
           },
         ],
       },
@@ -522,6 +526,8 @@ export const en = {
     inProgress: "Optimization in progress",
     selectForTest: "Select for Test",
     originalLabel: "Original Video (Candidate A)",
+    newVideoNotice: (days: number) =>
+      `This video was published ${days === 1 ? "1 day" : `${days} days`} ago. Views drop quickly in the first week, which favors whichever candidate runs first and can skew the result. Videos published more than 7 days ago give more reliable results.`,
     originalAlt: "Original",
     change: "Change",
     changeAria: "Change original video",

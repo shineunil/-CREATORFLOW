@@ -956,7 +956,8 @@ async def force_swap_ab_test(request: Request, test_id: int, db: Session = Depen
     if test.manual_swap_used:
         raise HTTPException(status_code=429, detail=msg("manual_swap_once"))
 
-    await scheduler_engine._do_swap(test, db)
+    # 사용자가 누른 "지금 교체"는 시간대 균형과 상관없이 반드시 다른 후보로 바꾼다
+    await scheduler_engine._do_swap(test, db, allow_stay=False)
     test.manual_swap_used = True
     db.commit()
 

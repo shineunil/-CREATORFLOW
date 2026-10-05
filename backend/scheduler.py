@@ -13,6 +13,7 @@ from youtube_api import (
     ThumbnailPermissionError,
 )
 from metrics_utils import compute_variation_vph
+from rotation import pick_next_variation
 from thumbnail_store import is_youtube_native_url, snapshot_original_thumbnail
 from test_policy import (
     has_enough_cycles,
@@ -89,7 +90,8 @@ class AVSchedulerEngine:
             all_vars = session.query(Variation).filter(Variation.ab_test_id == test.id).all()
             total_views_gained = sum(sum(l.views_gained for l in v.metric_logs) for v in all_vars)
 
-            enough_cycles = has_enough_cycles(test.swap_count, len(all_vars))
+            measured_windows = [len(v.metric_logs) for v in all_vars]
+            enough_cycles = has_enough_cycles(measured_windows)
             enough_sample = has_enough_sample(total_views_gained)
 
             if not (enough_cycles and enough_sample) and test.extension_count < MAX_AUTO_EXTENSIONS:
@@ -98,7 +100,7 @@ class AVSchedulerEngine:
                 test.extension_count += 1
                 reasons = []
                 if not enough_cycles:
-                    reasons.append(f"사이클 부족({test.swap_count}/{MIN_CYCLES * len(all_vars)}회 교체)")
+                    reasons.append(f"측정 부족(후보별 {measured_windows}구간, 후보마다 {MIN_CYCLES}구간 필요)")
                 if not enough_sample:
                     reasons.append(f"표본 부족(누적 +{total_views_gained} views < {MIN_SAMPLE_VIEWS})")
                 logger.info(
@@ -244,8 +246,12 @@ class AVSchedulerEngine:
 
         await self._do_swap(test, session)
 
-    async def _do_swap(self, test, session):
-        """실제 YouTube 썸네일/제목 교체 및 성과 기록 수행"""
+    async def _do_swap(self, test, session, allow_stay: bool = True):
+        """
+        실제 YouTube 썸네일/제목 교체 및 성과 기록 수행.
+        allow_stay: 시간대 균형상 지금 후보를 한 구간 더 두는 것이 맞으면 교체하지 않고 측정만 끊어 기록한다.
+                    사용자가 누른 "지금 교체"는 반드시 다른 후보로 바꿔야 하므로 False로 부른다.
+        """
 
         # 🔒 스케줄러의 자동 스왑과 사용자의 수동 강제 스왑(force_swap)/정지가 같은 테스트에 동시에
         # 걸리면 둘 다 같은 last_views_snapshot을 기준으로 delta_views를 계산하고 쿼터를 중복
@@ -281,14 +287,18 @@ class AVSchedulerEngine:
         # 현재 적용된 변인과 다음 변인 (DB만 본다. 처음 실행되는 경우 current_var는 None)
         all_vars = session.query(Variation).filter(Variation.ab_test_id == test.id).order_by(Variation.id).all()
         current_var = session.query(Variation).filter(Variation.id == test.current_variation_id).first() if test.current_variation_id else None
-        next_var = self._get_next_variation(all_vars, current_var)
+        # 직전 교체가 실패했으면 유튜브에 무엇이 걸려 있는지 확신할 수 없으니, 유지하지 않고 다시 교체한다
+        next_var = self._get_next_variation(
+            session, test, all_vars, current_var, allow_stay=allow_stay and not test.swap_failed,
+        )
         if not next_var:
             logger.error(f"[스케줄러] 테스트 [{test.id}] 다음 변인을 찾을 수 없습니다. 스왑 건너뜀.")
             return
+        stays = current_var is not None and next_var.id == current_var.id
 
         # 제목이 지금 유튜브에 걸린 제목과 같으면 제목 교체를 건너뛴다 (썸네일만 테스트하는 경우 쿼터가 절반).
-        needs_title = _title_differs(next_var.title_text, _live_title(all_vars, current_var))
-        needs_thumbnail = bool(next_var.thumbnail_image_url)
+        needs_title = not stays and _title_differs(next_var.title_text, _live_title(all_vars, current_var))
+        needs_thumbnail = not stays and bool(next_var.thumbnail_image_url)
 
         # YouTube Data API 쿼터는 프로젝트(앱) 전체 공유 자원이므로, 소진 위험이 있으면
         # 이번 스왑을 건너뛴다 (last_swapped_at을 갱신하지 않으므로 다음 tick에 다시 시도됨).
@@ -329,7 +339,17 @@ class AVSchedulerEngine:
         # last_views_snapshot은 스왑 성공 후에만 갱신 (실패 시 기준선 오염 방지)
         test.last_swapped_at = now
 
-        # 5. YouTube API를 호출하여 실제 썸네일과 제목 교체 (다음 변인은 위에서 이미 정함: A -> B -> C -> A)
+        # 4. 시간대 균형상 지금 후보를 한 구간 더 두는 경우: 유튜브는 그대로 두고 측정 구간만 새로 시작한다.
+        #    화면이 바뀌지 않았으니 워밍업(직전 썸네일 잔상 제외)도 필요 없다.
+        if stays:
+            test.last_views_snapshot = current_views
+            test.exposure_start_at = now
+            test.warmup_captured = True
+            test.swap_failed = False
+            logger.info(f"⏸ 영상 [{test.video.youtube_video_id}] 시간대 균형을 위해 '{next_var.name}'를 한 구간 더 유지합니다")
+            return
+
+        # 5. YouTube API를 호출하여 실제 썸네일과 제목 교체 (다음 변인은 위에서 시간대 균형으로 정함)
         try:
             thumbnail_ok = True
             if next_var.thumbnail_image_url:
@@ -433,20 +453,21 @@ class AVSchedulerEngine:
         logger.info(f" - [테스트 {test.id}] 원본 썸네일 보관 완료: {kept_url}")
         return True
 
-    def _get_next_variation(self, variations, current_var):
-        """B -> C -> A -> B 순환 로직 (최초 실행 시 컨트롤을 건너뛰고 첫 번째 새 썸네일부터 시작)"""
-        if not variations:
-            return None
-        if not current_var:
-            # 컨트롤(Variation A)은 이미 YouTube에 적용된 상태이므로 건너뛰고
-            # 첫 번째 새 변인(Variation B)부터 즉시 적용
-            non_control = [v for v in variations if not v.is_control]
-            return non_control[0] if non_control else variations[0]
-            
-        try:
-            # 리스트에서 현재 변인의 인덱스를 찾음
-            current_idx = next(i for i, v in enumerate(variations) if v.id == current_var.id)
-            next_idx = (current_idx + 1) % len(variations)
-            return variations[next_idx]
-        except StopIteration:
-            return variations[0]
+    def _get_next_variation(self, session, test, variations, current_var, allow_stay: bool = True):
+        """
+        다음에 걸 후보. 첫 교체는 원본(A)이 이미 걸려 있으니 B부터, 그 뒤로는 다가오는 시간대에
+        지금까지 가장 덜 걸렸던 후보를 고른다 (rotation.py).
+        """
+        now = datetime.now(timezone.utc)
+        var_ids = [v.id for v in variations]
+        logs = session.query(MetricLog).filter(MetricLog.variation_id.in_(var_ids)).all() if var_ids else []
+        exposures = [
+            (log.variation_id, log.measured_at - timedelta(hours=log.hours_exposed or 0), log.measured_at)
+            for log in logs if log.measured_at
+        ]
+        if current_var is not None:
+            # 지금 걸려 있는 후보의 이번 구간(아직 기록 전)도 넣어야, 방금까지 걸린 시간대가 반영된다
+            exposures.append((current_var.id, test.exposure_start_at or test.last_swapped_at, now))
+        return pick_next_variation(
+            variations, current_var, exposures, now, test.swap_interval_minutes, allow_stay=allow_stay,
+        )

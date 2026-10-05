@@ -53,21 +53,45 @@ def engine():
     return AVSchedulerEngine(db_session_maker=lambda: None)  # 실제로 세션을 만들지 않음 (테스트에서 직접 세션을 넘기므로)
 
 
-def test_get_next_variation_cycles_b_c_a_b(engine, db_session):
+def test_first_pick_is_b_because_the_original_is_already_live(engine, db_session):
     test, channel, video, variations = make_running_test(db_session, num_variations=3)
+    assert engine._get_next_variation(db_session, test, variations, None).id == variations[1].id
 
-    # 원본(A)은 이미 유튜브에 적용된 상태라 첫 교체는 B부터
-    first = engine._get_next_variation(variations, None)
-    assert first.id == variations[1].id
 
-    second = engine._get_next_variation(variations, variations[1])
-    assert second.id == variations[2].id
+def test_keeping_the_current_candidate_records_a_window_without_touching_youtube(engine, db_session, monkeypatch):
+    # 후보 2개 x 12시간: B는 어제 이 시간대(지금부터 12시간과 같은 시각)에 걸렸고, A는 방금 12시간 걸려 있었다.
+    # 예전 방식이면 B로 바꿔 B가 매일 같은 시간대만 맡았을 것 - 이제는 A가 한 구간 더 맡는다.
+    test, channel, video, variations = make_running_test(db_session, swap_interval_minutes=12 * 60)
+    now = datetime.now(timezone.utc)
+    test.current_variation_id = variations[0].id
+    test.last_swapped_at = now - timedelta(hours=12)
+    test.last_views_snapshot = 100
+    test.swap_count = 2
+    db_session.add(MetricLog(variation_id=variations[1].id, views_gained=50, hours_exposed=12, measured_at=now - timedelta(hours=12)))
+    db_session.commit()
+    calls = []
+    _stub_youtube(monkeypatch, calls)
 
-    wraps_around = engine._get_next_variation(variations, variations[2])
-    assert wraps_around.id == variations[0].id
+    run(engine._do_swap(test, db_session))
+    db_session.commit()
 
-    back_to_b = engine._get_next_variation(variations, variations[0])
-    assert back_to_b.id == variations[1].id
+    assert calls == []  # 유튜브는 그대로
+    assert test.current_variation_id == variations[0].id
+    assert test.swap_count == 2  # 실제 교체가 아니므로 늘지 않음
+    assert test.last_views_snapshot == 500 and test.warmup_captured is True
+    assert len(variations[0].metric_logs) == 1  # A가 걸려 있던 구간은 기록됨
+
+
+def test_manual_swap_always_changes_the_candidate(engine, db_session, monkeypatch):
+    test, channel, video, variations = make_running_test(db_session, swap_interval_minutes=12 * 60)
+    test.current_variation_id = variations[0].id
+    test.swap_count = 2
+    db_session.commit()
+    calls = []
+    _stub_youtube(monkeypatch, calls)
+
+    run(engine._do_swap(test, db_session, allow_stay=False))
+    assert test.current_variation_id == variations[1].id
 
 
 def test_first_swap_applies_first_new_variation_and_sets_swap_count(engine, db_session, monkeypatch):

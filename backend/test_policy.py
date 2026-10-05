@@ -35,11 +35,15 @@ def max_channels_for_plan(plan_value: str) -> int:
     return MAX_CHANNELS_PER_PLAN.get(plan_value, MAX_CHANNELS_PER_PLAN["BASIC"])
 
 
-def has_enough_cycles(swap_count: int, variation_count: int) -> bool:
-    """swap_count: 지금까지 성공적으로 반영된 스왑 횟수. 한 사이클 = 변인 개수만큼의 스왑."""
-    if variation_count <= 0:
+def has_enough_cycles(measured_windows: list[int]) -> bool:
+    """
+    measured_windows: 후보마다 지금까지 측정된(걸려 있다가 기록된) 구간 수.
+    후보를 시간대 균형에 맞춰 고르기 때문에 순서가 고정돼 있지 않다. 전체 교체 횟수 대신
+    모든 후보가 각각 MIN_CYCLES번 이상 측정됐는지로 본다 - 한 후보만 덜 걸린 채 승자가 정해지지 않게.
+    """
+    if not measured_windows:
         return False
-    return (swap_count // variation_count) >= MIN_CYCLES
+    return min(measured_windows) >= MIN_CYCLES
 
 
 def has_enough_sample(total_views_gained: int) -> bool:
