@@ -221,6 +221,13 @@ export default function TestInsights() {
                     <span className="text-xs font-bold text-zinc-200 truncate">{v.name}</span>
                     <span className="text-xs font-bold text-cyan-400 tabular-nums whitespace-nowrap">{formatNumber(v.vph, locale)} VPH</span>
                   </div>
+                  {/* 후보의 제목 - 길면 두 줄까지만 보이고, 마우스를 올리면 전체가 보인다 */}
+                  <p
+                    title={v.title_text || A.noTitle}
+                    className="mt-1 text-[11px] leading-snug text-zinc-400 line-clamp-2 break-keep min-h-[2.25rem]"
+                  >
+                    {v.title_text || A.noTitle}
+                  </p>
                 </button>
               );
             })}
