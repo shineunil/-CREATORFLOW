@@ -448,7 +448,7 @@ export const en = {
     welcomeProTitle: "Welcome to PRO!",
     welcomeProMsg: "Your account has been upgraded to PRO. Enjoy unlimited active tests and faster swap intervals.",
     deleteTitle: "Cancel & Delete Test",
-    deleteMsg: "Are you sure you want to cancel and delete this test?\nThe YouTube thumbnail will be safely restored to the original (A). This action cannot be undone.",
+    deleteMsg: "Are you sure you want to cancel and delete this test?\nThe YouTube thumbnail will be safely restored to the original (A), and the candidate images you uploaded will be deleted. This action cannot be undone.",
     deleteBasicNote: "\n\n⚠️ Note: Cancelled tests still count toward your 4 tests/month limit.",
     deleteConfirm: "Yes, delete permanently",
     deletingTitle: "Deleting....",

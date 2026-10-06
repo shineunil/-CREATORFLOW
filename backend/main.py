@@ -991,26 +991,41 @@ async def delete_ab_test(test_id: int, db: Session = Depends(get_db), channel: C
     if test.is_deleted:
         return {"message": msg("test_cancelled")}
 
-    await _restore_original(test, db, channel.oauth_refresh_token)
+    original_restored = await _restore_original(test, db, channel.oauth_refresh_token)
 
     # 논리적 삭제 (Soft Delete) - 쿼터 유지를 위해 DB에 남김
     test.is_deleted = True
     test.status = TestStatus.STOPPED
     db.commit()
+
+    # 후보 이미지는 지운다. 실패해도 삭제 자체는 끝났으니 로그만 남긴다.
+    try:
+        removed = await _delete_test_images(test, db, keep_original=not original_restored)
+        db.commit()
+        logger.info(f"테스트 ID [{test.id}] 삭제 - 이미지 {removed}개 정리 (원본 백업 {'보존' if not original_restored else '정리'})")
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"테스트 ID [{test.id}] 이미지 정리 실패: {e}")
     return {"message": msg("test_cancelled")}
 
 
-async def _restore_original(test: ABTest, db: Session, refresh_token: str | None):
-    """유튜브 썸네일과 제목을 원본(Candidate A)으로 되돌린다. 테스트 삭제와 채널 연동 해제에서 함께 쓴다."""
+async def _restore_original(test: ABTest, db: Session, refresh_token: str | None) -> bool:
+    """
+    유튜브 썸네일과 제목을 원본(Candidate A)으로 되돌린다. 테스트 삭제와 채널 연동 해제에서 함께 쓴다.
+    원본 썸네일이 유튜브에 다시 걸린 것이 확인되면(또는 되돌릴 썸네일이 없으면) True - 원본 백업 이미지를
+    지워도 되는지 판단하는 데 쓴다. 권한이 없거나 복구에 실패하면 False.
+    """
     if not refresh_token:
-        return
+        return False
     original_var = db.query(Variation).filter(Variation.ab_test_id == test.id, Variation.is_control == True).first()
+    thumbnail_restored = True
 
     if original_var:
         from youtube_api import update_youtube_thumbnail, update_youtube_title
-        
+
         # 원본 썸네일 복구
         if original_var.thumbnail_image_url:
+            thumbnail_restored = False
             import re as _re
             _YT_NATIVE = ("https://i.ytimg.com/", "https://img.youtube.com/")
             _backend = os.getenv("BACKEND_URL", "")
@@ -1030,7 +1045,7 @@ async def _restore_original(test: ABTest, db: Session, refresh_token: str | None
                             if resp.status_code == 200:
                                 with open(file_path, "wb") as f:
                                     f.write(resp.content)
-                                await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token)
+                                thumbnail_restored = bool(await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token))
                             else:
                                 logger.error(f"원본 썸네일 복구 실패 (상태 코드: {resp.status_code})")
                     except Exception as e:
@@ -1040,7 +1055,7 @@ async def _restore_original(test: ABTest, db: Session, refresh_token: str | None
                     file_name = original_var.thumbnail_image_url.split('/')[-1]
                     file_path = os.path.join("uploads", file_name)
                     if os.path.exists(file_path):
-                        await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token)
+                        thumbnail_restored = bool(await update_youtube_thumbnail(test.video.youtube_video_id, file_path, refresh_token))
                 except Exception as e:
                     logger.error(f"원본 썸네일 로컬 복구 실패: {e}")
 
@@ -1050,6 +1065,31 @@ async def _restore_original(test: ABTest, db: Session, refresh_token: str | None
                 await update_youtube_title(test.video.youtube_video_id, original_var.title_text, refresh_token)
             except Exception as e:
                 logger.error(f"원본 제목 복구 실패: {e}")
+    return thumbnail_restored
+
+
+async def _delete_test_images(test: ABTest, db: Session, keep_original: bool) -> int:
+    """
+    삭제한 테스트의 후보 이미지를 Cloudinary에서 지운다 ("영구 삭제"가 이미지까지 지우도록).
+    keep_original: 원본(A) 썸네일이 유튜브에 다시 걸린 게 확인되지 않았으면 원본 백업은 남긴다 - 지우면 원본을 영영 잃는다.
+    다른 테스트가 같은 이미지를 쓰고 있으면 남긴다. 조회수 기록(월 한도 계산용)은 그대로 두고 이미지 주소만 비운다.
+    """
+    from storage import cloud_public_id, delete_thumbnail_from_cloud
+
+    deleted = 0
+    for var in db.query(Variation).filter(Variation.ab_test_id == test.id).all():
+        url = var.thumbnail_image_url
+        if not cloud_public_id(url) or (var.is_control and keep_original):
+            continue
+        still_used = db.query(Variation).filter(
+            Variation.thumbnail_image_url == url, Variation.ab_test_id != test.id,
+        ).first()
+        if still_used:
+            continue
+        if await delete_thumbnail_from_cloud(url):
+            var.thumbnail_image_url = None
+            deleted += 1
+    return deleted
 
 @app.post("/api/upload")
 @limiter.limit("10/minute")

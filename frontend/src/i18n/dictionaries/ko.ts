@@ -441,7 +441,7 @@ export const ko: Dictionary = {
     welcomeProTitle: "PRO에 오신 것을 환영합니다!",
     welcomeProMsg: "계정이 PRO로 업그레이드되었습니다. 무제한 테스트와 더 빠른 교체 주기를 이용해 보세요.",
     deleteTitle: "테스트 취소 및 삭제",
-    deleteMsg: "이 테스트를 취소하고 삭제할까요?\n유튜브 썸네일은 원래 썸네일(A)로 안전하게 되돌아갑니다. 이 작업은 되돌릴 수 없습니다.",
+    deleteMsg: "이 테스트를 취소하고 삭제할까요?\n유튜브 썸네일은 원래 썸네일(A)로 안전하게 되돌아가고, 올려 두신 후보 이미지는 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
     deleteBasicNote: "\n\n⚠️ 참고: 취소한 테스트도 월 4회 한도에 포함됩니다.",
     deleteConfirm: "네, 영구 삭제합니다",
     deletingTitle: "삭제 중...",
