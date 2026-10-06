@@ -54,6 +54,26 @@ def setup():
         MetricLog(variation_id=b.id, views_gained=60, hours_exposed=2, measured_at=NOON),
     ])
     db.commit()
+    # 끝난 테스트 2개: 하나는 C가 원본보다 +50%로 승리, 하나는 원본이 이김
+    done_video = Video(channel_id=channel.id, youtube_video_id="vid3")
+    kept_video = Video(channel_id=channel.id, youtube_video_id="vid4")
+    db.add_all([done_video, kept_video])
+    db.commit()
+    for vid, end, winner_is_original in ((done_video, NOON - timedelta(days=2), False), (kept_video, NOON - timedelta(days=1), True)):
+        finished = ABTest(video_id=vid.id, status=TestStatus.COMPLETED, swap_interval_minutes=240,
+                          start_time=end - timedelta(days=1), end_time=end)
+        db.add(finished)
+        db.commit()
+        orig = Variation(ab_test_id=finished.id, name="Variation A", is_control=True, title_text=f"Title {vid.youtube_video_id}",
+                         is_winner=winner_is_original)
+        cand = Variation(ab_test_id=finished.id, name="Variation C", is_winner=not winner_is_original)
+        db.add_all([orig, cand])
+        db.commit()
+        db.add_all([
+            MetricLog(variation_id=orig.id, views_gained=40, hours_exposed=4, measured_at=end - timedelta(hours=4)),  # VPH 10
+            MetricLog(variation_id=cand.id, views_gained=60 if not winner_is_original else 20, hours_exposed=4, measured_at=end),
+        ])
+        db.commit()
     ids = {"test": test.id, "other_test": other_test.id, "a": a.id, "b": b.id}
     token = main.create_access_token(user.id, channel.id)
     db.close()
@@ -99,3 +119,22 @@ def test_best_thumbnail_is_chosen_by_views_per_hour(setup):
     best = client.get("/api/analytics").json()["best_variation"]
     # 누적 조회수는 A(80)가 많지만, 시간당 조회수는 B(30)가 높다 - 테스트 승자와 같은 기준
     assert best["name"] == "Variation B" and best["vph"] == 30 and best["total_views_gained"] == 60
+
+
+def test_analytics_reports_lift_over_the_original_thumbnail(setup):
+    client, _ = setup
+    data = client.get("/api/analytics").json()
+
+    # 끝난 테스트: 오래된 것부터. 승자 C는 원본(VPH 10)보다 +50%, 다른 테스트는 원본 유지(0%)
+    lifts = data["completed_lifts"]
+    assert [(x["winner_name"], x["lift_pct"], x["original_won"]) for x in lifts] == [
+        ("Variation C", 50.0, False),
+        ("Variation A", 0.0, True),
+    ]
+    assert data["average_lift_pct"] == 25.0
+
+    # 진행 중: B(VPH 30)가 원본 A(VPH 10)보다 +200% 앞서는 중
+    assert data["running_leaders"] == [{
+        "test_id": data["running_leaders"][0]["test_id"], "title": "vid1",
+        "leader_name": "Variation B", "leader_is_original": False, "lift_pct": 200.0,
+    }]

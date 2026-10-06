@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Tooltip as RechartsTooltip } from "recharts";
-import { Trophy } from "lucide-react";
+import { BarChart, Bar, Cell, LabelList, XAxis, YAxis, ResponsiveContainer, CartesianGrid, ReferenceLine, Tooltip as RechartsTooltip } from "recharts";
+import { Trophy, TrendingUp } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 import ChannelSelect from "@/components/layout/ChannelSelect";
@@ -19,16 +19,47 @@ type BestVariation = {
   youtube_video_id: string;
 };
 
+type Lift = {
+  test_id: number;
+  title: string;
+  winner_name: string;
+  original_won: boolean;
+  original_vph: number;
+  winner_vph: number;
+  lift_pct: number | null;
+  end_time: string | null;
+};
+
+type Leader = { test_id: number; title: string; leader_name: string; leader_is_original: boolean; lift_pct: number | null };
+
+/** 그래프 가로축용 짧은 제목 */
+function shortTitle(title: string) {
+  return title.length > 14 ? `${title.slice(0, 13)}…` : title;
+}
+
+function signed(pct: number) {
+  return `${pct > 0 ? "+" : ""}${pct}%`;
+}
+
 export default function AnalyticsPage() {
   const { t, locale } = useI18n();
   const A = t.analytics;
-  const [data, setData] = useState<{ total_tests: number, active_tests: number, total_views_gained: number, trend: any[], best_variation: BestVariation | null }>({
+  const [data, setData] = useState<{
+    total_tests: number;
+    active_tests: number;
+    best_variation: BestVariation | null;
+    completed_lifts: Lift[];
+    average_lift_pct: number | null;
+    running_leaders: Leader[];
+  }>({
     total_tests: 0,
     active_tests: 0,
-    total_views_gained: 0,
-    trend: [],
     best_variation: null,
+    completed_lifts: [],
+    average_lift_pct: null,
+    running_leaders: [],
   });
+  const lifts = (data.completed_lifts || []).filter((x) => x.lift_pct != null);
 
   const loadAnalytics = () => {
     apiFetch("/api/analytics")
@@ -68,38 +99,87 @@ export default function AnalyticsPage() {
           <p className="text-emerald-400/80 text-sm mb-1">{A.activeTests}</p>
           <div className="text-4xl font-bold text-emerald-400">{data.active_tests}</div>
         </div>
-        <div className="glass-panel p-6 rounded-2xl border border-cyan-500/20 bg-cyan-950/10">
-          <p className="text-cyan-400/80 text-sm mb-1">{A.extraViews}</p>
-          <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
-            +{formatNumber(data.total_views_gained, locale)}
-          </div>
+        {/* 실적: 원래 썸네일보다 이긴 썸네일이 시간당 조회수로 얼마나 나았는지 (끝난 테스트 평균) */}
+        <div className="glass-panel p-6 rounded-2xl border border-cyan-500/20 bg-cyan-950/10" title={A.avgLiftHint}>
+          <p className="text-cyan-400/80 text-sm mb-1">{A.avgLift}</p>
+          {data.average_lift_pct != null ? (
+            <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 tabular-nums">
+              {signed(data.average_lift_pct)}
+            </div>
+          ) : (
+            <div className="text-base font-semibold text-zinc-400 mt-3">{A.avgLiftEmpty}</div>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 glass-panel p-8 rounded-2xl border border-zinc-800/50">
-          <h2 className="text-xl font-bold mb-6">{A.trendTitle}</h2>
-          {data.trend.length === 0 ? (
-            <div className="h-64 flex items-center justify-center border-t border-zinc-800/50 pt-8">
-              <p className="text-zinc-400">{A.trendEmpty}</p>
+        <div className="lg:col-span-2 glass-panel p-8 rounded-2xl border border-zinc-800/50 flex flex-col gap-6">
+          <div>
+            <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
+              <TrendingUp size={18} className="text-cyan-400" aria-hidden="true" /> {A.liftTitle}
+            </h2>
+            <p className="text-sm text-zinc-400 break-keep">{A.liftSub}</p>
+          </div>
+
+          {lifts.length === 0 ? (
+            <div className="h-48 flex items-center justify-center border-t border-zinc-800/50">
+              <p className="text-zinc-400 text-sm text-center break-keep">{A.liftEmpty}</p>
             </div>
           ) : (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.trend}>
-                  <defs>
-                    <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#06b6d4" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <BarChart data={lifts.map((x) => ({ ...x, label: shortTitle(x.title) }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                  <XAxis dataKey="day" stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
-                  <RechartsTooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }} labelStyle={{ color: "#e4e4e7" }} />
-                  <Area type="monotone" dataKey="views_gained" stroke="#06b6d4" strokeWidth={2} fill="url(#trendFill)" />
-                </AreaChart>
+                  <XAxis dataKey="label" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} interval={0} />
+                  <YAxis stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${v}%`} />
+                  <ReferenceLine y={0} stroke="#52525b" />
+                  <RechartsTooltip
+                    cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                    contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }}
+                    labelStyle={{ color: "#e4e4e7" }}
+                    formatter={(value, _name, item) => {
+                      const lift = item?.payload as Lift | undefined;
+                      const text = lift?.original_won ? A.originalKept : signed(Number(value));
+                      return [`${text} (${lift?.winner_name ?? ""})`, A.liftLabel];
+                    }}
+                    labelFormatter={(_label, payload) => (payload?.[0]?.payload as Lift | undefined)?.title ?? ""}
+                  />
+                  <Bar dataKey="lift_pct" radius={[4, 4, 0, 0]} maxBarSize={56} minPointSize={4}>
+                    {lifts.map((x) => (
+                      <Cell key={x.test_id} fill={(x.lift_pct ?? 0) > 0 ? "#06b6d4" : "#52525b"} />
+                    ))}
+                    {/* 막대 위 글자: 원본이 이긴 테스트는 막대 높이가 0이라 글자로 결과를 보여 준다 */}
+                    <LabelList
+                      dataKey="lift_pct"
+                      position="top"
+                      fill="#e4e4e7"
+                      fontSize={12}
+                      formatter={(value) => (value === 0 ? A.originalKept : signed(Number(value)))}
+                    />
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* 진행 중인 테스트는 끝나기 전에도 지금 누가 원본보다 앞서는지 보여 준다 */}
+          {data.running_leaders?.length > 0 && (
+            <div className="border-t border-zinc-800/50 pt-5">
+              <h3 className="text-sm font-bold text-zinc-200 mb-3">{A.runningTitle}</h3>
+              <ul className="flex flex-col gap-2">
+                {data.running_leaders.map((x) => (
+                  <li key={x.test_id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
+                    <span className="text-zinc-300 truncate min-w-0 max-w-full">{x.title}</span>
+                    <span className={`font-bold tabular-nums ${x.lift_pct != null && x.lift_pct > 0 && !x.leader_is_original ? "text-cyan-400" : "text-zinc-400"}`}>
+                      {x.leader_is_original
+                        ? A.runningOriginalLead
+                        : x.lift_pct == null
+                          ? A.runningPending
+                          : A.runningLead(x.leader_name, x.lift_pct)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

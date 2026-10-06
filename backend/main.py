@@ -1354,13 +1354,71 @@ def get_analytics(db: Session = Depends(get_db), channel: Channel = Depends(get_
             "youtube_video_id": best_var.ab_test.video.youtube_video_id if best_var.ab_test and best_var.ab_test.video else None,
         }
 
+    lifts, leaders = _test_lifts(tests)
+    measured_lifts = [x["lift_pct"] for x in lifts if x["lift_pct"] is not None]
+
     return {
         "total_tests": total_tests,
         "active_tests": active_tests,
         "total_views_gained": total_views_gained,
         "trend": trend,
         "best_variation": best_variation,
+        # 실적: 원래 썸네일(A)보다 승자가 시간당 조회수로 얼마나 나았는지 (끝난 테스트마다, 그리고 평균)
+        "completed_lifts": lifts,
+        "average_lift_pct": round(sum(measured_lifts) / len(measured_lifts), 1) if measured_lifts else None,
+        # 진행 중인 테스트: 지금 1등 후보가 원본보다 얼마나 앞서는지
+        "running_leaders": leaders,
     }
+
+
+def _lift_pct(candidate_vph: float, original_vph: float) -> float | None:
+    """원본 대비 상승률(%). 원본을 아직 제대로 측정하지 못했으면(VPH 0) 비교할 수 없어 None."""
+    if original_vph <= 0:
+        return None
+    return round((candidate_vph - original_vph) / original_vph * 100, 1)
+
+
+def _test_lifts(tests) -> tuple[list[dict], list[dict]]:
+    """끝난 테스트의 승자 vs 원본, 진행 중인 테스트의 현재 1등 vs 원본을 시간당 조회수로 비교한다."""
+    lifts, leaders = [], []
+    for test in tests:
+        if test.is_deleted:
+            continue
+        control = next((v for v in test.variations if v.is_control), None)
+        if control is None:
+            continue
+        control_vph = compute_variation_vph(control)
+        title = control.title_text or (test.video.youtube_video_id if test.video else "")
+        if test.status == TestStatus.COMPLETED:
+            winner = next((v for v in test.variations if v.is_winner), None)
+            if winner is None:
+                continue
+            winner_vph = compute_variation_vph(winner)
+            lifts.append({
+                "test_id": test.id,
+                "title": title,
+                "winner_name": winner.name,
+                "original_won": winner.id == control.id,
+                "original_vph": round(control_vph, 2),
+                "winner_vph": round(winner_vph, 2),
+                "lift_pct": 0.0 if winner.id == control.id else _lift_pct(winner_vph, control_vph),
+                "end_time": _utc_iso(test.end_time),
+            })
+        elif test.status == TestStatus.RUNNING:
+            measured = [v for v in test.variations if v.metric_logs]
+            if not measured:
+                continue
+            leader = max(measured, key=compute_variation_vph)
+            leaders.append({
+                "test_id": test.id,
+                "title": title,
+                "leader_name": leader.name,
+                "leader_is_original": leader.id == control.id,
+                "lift_pct": 0.0 if leader.id == control.id else _lift_pct(compute_variation_vph(leader), control_vph),
+            })
+    # 오래된 테스트부터 (그래프 왼쪽 → 오른쪽)
+    lifts.sort(key=lambda x: x["end_time"] or "")
+    return lifts, leaders
 
 @app.get("/api/history")
 def get_history(db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
