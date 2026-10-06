@@ -1332,26 +1332,26 @@ def get_analytics(db: Session = Depends(get_db), channel: Channel = Depends(get_
         cumulative += daily_totals[day]
         trend.append({"day": day.strftime("%m-%d"), "views_gained": cumulative})
 
-    # 지금까지 가장 성과 좋았던 썸네일 후보 (전체 채널 기준, variation 단위 누적 조회수 최고)
-    best = (
-        db.query(Variation, func.sum(MetricLog.views_gained).label("total_views"))
-        .join(MetricLog, MetricLog.variation_id == Variation.id)
+    # 지금까지 가장 성과 좋았던 썸네일 후보 - 테스트 승자와 같은 기준(시간당 조회수, VPH)으로 고른다.
+    # 누적 조회수로 고르면 오래 걸려 있던 후보가 이기는 것처럼 보였다.
+    measured_vars = (
+        db.query(Variation)
         .join(ABTest, Variation.ab_test_id == ABTest.id)
         .join(Video, ABTest.video_id == Video.id)
-        .filter(Video.channel_id == channel.id)
-        .group_by(Variation.id)
-        .order_by(func.sum(MetricLog.views_gained).desc())
-        .first()
+        .filter(Video.channel_id == channel.id, ABTest.is_deleted == False)
+        .filter(Variation.metric_logs.any())
+        .all()
     )
     best_variation = None
-    if best:
-        var, total_views = best
+    best_var = max(measured_vars, key=compute_variation_vph, default=None)
+    if best_var is not None and compute_variation_vph(best_var) > 0:
         best_variation = {
-            "name": var.name,
-            "title_text": var.title_text,
-            "thumbnail_image_url": var.thumbnail_image_url,
-            "total_views_gained": int(total_views or 0),
-            "youtube_video_id": var.ab_test.video.youtube_video_id if var.ab_test and var.ab_test.video else None,
+            "name": best_var.name,
+            "title_text": best_var.title_text,
+            "thumbnail_image_url": best_var.thumbnail_image_url,
+            "total_views_gained": int(sum(l.views_gained or 0 for l in best_var.metric_logs)),
+            "vph": round(compute_variation_vph(best_var), 2),
+            "youtube_video_id": best_var.ab_test.video.youtube_video_id if best_var.ab_test and best_var.ab_test.video else None,
         }
 
     return {
@@ -1442,6 +1442,83 @@ def get_ab_tests(db: Session = Depends(get_db), channel: Channel = Depends(get_c
         })
 
     return {"tests": result}
+
+
+def _utc_iso(moment: datetime | None) -> str | None:
+    if moment is None:
+        return None
+    moment = moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+@app.get("/api/tests/{test_id}/insights")
+def get_test_insights(test_id: int, db: Session = Depends(get_db), channel: Channel = Depends(get_current_channel)):
+    """
+    분석 화면용 테스트 상세: 후보별 측정 구간 목록과, 하루 시간대(UTC 0~23시)별 노출 분·조회수 증가.
+    조회수는 구간 안에서 시간에 비례해 나눈 근사값이다 (구간 길이 = 교체 주기라 그보다 촘촘하게는 알 수 없다).
+    프론트가 브라우저 시간대에 맞춰 새벽·오전·오후·저녁으로 묶어 보여 준다.
+    """
+    from rotation import minutes_by_hour
+
+    test = db.query(ABTest).join(Video).filter(
+        ABTest.id == test_id, Video.channel_id == channel.id, ABTest.is_deleted == False,
+    ).first()
+    if not test:
+        raise HTTPException(status_code=404, detail=msg("test_not_found_or_forbidden"))
+
+    running = test.status == TestStatus.RUNNING
+    variations = []
+    for var in sorted(test.variations, key=lambda v: (not v.is_control, v.id)):
+        windows = []
+        minutes = [0.0] * 24
+        views = [0.0] * 24
+        for log in sorted((l for l in var.metric_logs if l.measured_at), key=lambda l: l.measured_at):
+            hours = log.hours_exposed or 0
+            end = log.measured_at
+            start = end - timedelta(hours=hours)
+            gained = log.views_gained or 0
+            windows.append({
+                "start": _utc_iso(start),
+                "end": _utc_iso(end),
+                "hours": round(hours, 2),
+                "views_gained": gained,
+                "vph": round(gained / hours, 2) if hours > 0 else 0,
+            })
+            by_hour = minutes_by_hour(start, end)
+            window_minutes = sum(by_hour)
+            for h, m in enumerate(by_hour):
+                minutes[h] += m
+                if window_minutes > 0:
+                    views[h] += gained * m / window_minutes
+        total_hours = sum(w["hours"] for w in windows)
+        total_views = sum(w["views_gained"] for w in windows)
+        variations.append({
+            "id": var.id,
+            "name": var.name,
+            "title_text": var.title_text,
+            "thumbnail_image_url": var.thumbnail_image_url,
+            "is_control": bool(var.is_control),
+            "is_winner": bool(var.is_winner),
+            "is_live": running and var.id == test.current_variation_id,
+            "total_hours": round(total_hours, 2),
+            "total_views_gained": total_views,
+            "vph": round(compute_variation_vph(var), 2),
+            "windows": windows,
+            "hourly_minutes": [round(m, 1) for m in minutes],
+            "hourly_views": [round(v, 2) for v in views],
+        })
+
+    return {
+        "test_id": test.id,
+        "video_id": test.video.youtube_video_id,
+        "status": test.status.name,
+        "swap_interval": test.swap_interval_minutes,
+        "start_time": _utc_iso(test.start_time),
+        "end_time": _utc_iso(test.end_time),
+        # 지금 걸려 있는 후보가 언제부터 측정 중인지 (진행 중인 구간은 다음 교체 때 기록된다)
+        "live_since": _utc_iso(test.exposure_start_at or test.last_swapped_at) if running and test.current_variation_id else None,
+        "variations": variations,
+    }
 
 # --- 결제 시스템 (Paddle Billing) ---
 import httpx as _httpx

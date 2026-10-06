@@ -8,12 +8,14 @@ import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 import ChannelSelect from "@/components/layout/ChannelSelect";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatNumber } from "@/i18n/format";
+import TestInsights from "@/components/analytics/TestInsights";
 
 type BestVariation = {
   name: string;
   title_text: string | null;
   thumbnail_image_url: string | null;
   total_views_gained: number;
+  vph?: number;
   youtube_video_id: string;
 };
 
@@ -119,9 +121,18 @@ export default function AnalyticsPage() {
                 <div className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-1">{data.best_variation.name}</div>
                 <h3 className="text-sm font-semibold text-zinc-100 line-clamp-2">{data.best_variation.title_text || A.noTitle}</h3>
               </div>
-              <div className="mt-auto pt-4 border-t border-zinc-800/50 flex justify-between items-end">
-                <span className="text-xs text-zinc-400 uppercase font-medium">{A.totalViewsGained}</span>
-                <span className="text-xl font-bold text-cyan-400">+{formatNumber(data.best_variation.total_views_gained, locale)}</span>
+              <div className="mt-auto pt-4 border-t border-zinc-800/50 flex flex-col gap-2">
+                {/* 테스트 승자와 같은 기준(시간당 조회수)으로 고른 썸네일 */}
+                {data.best_variation.vph != null && (
+                  <div className="flex justify-between items-end">
+                    <span className="text-xs text-zinc-400 uppercase font-medium">{A.bestVph}</span>
+                    <span className="text-xl font-bold text-cyan-400 tabular-nums">{formatNumber(data.best_variation.vph, locale)} VPH</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-end">
+                  <span className="text-xs text-zinc-400 uppercase font-medium">{A.totalViewsGained}</span>
+                  <span className="text-sm font-bold text-zinc-200 tabular-nums">+{formatNumber(data.best_variation.total_views_gained, locale)}</span>
+                </div>
               </div>
             </div>
           ) : (
@@ -131,6 +142,8 @@ export default function AnalyticsPage() {
           )}
         </div>
       </div>
+
+      <TestInsights />
     </div>
   );
 }

@@ -37,24 +37,43 @@ def init_db():
         _migrate_add_columns()
 
 
+_UTC_TIMESTAMP_COLUMNS = [
+    ("users", "created_at"),
+    ("ab_tests", "last_swapped_at"),
+    ("ab_tests", "start_time"),
+    ("ab_tests", "end_time"),
+    ("ab_tests", "exposure_start_at"),
+    ("metrics_logs", "measured_at"),
+]
+
+
 def _migrate_timestamps_to_utc():
-    """TIMESTAMP WITHOUT TIME ZONE 컬럼을 TIMESTAMPTZ로 일괄 변환합니다. (서버 시작 시 자동 실행, 멱등)"""
-    migrations = [
-        "ALTER TABLE users ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC'",
-        "ALTER TABLE ab_tests ALTER COLUMN last_swapped_at TYPE TIMESTAMPTZ USING last_swapped_at AT TIME ZONE 'UTC'",
-        "ALTER TABLE ab_tests ALTER COLUMN start_time TYPE TIMESTAMPTZ USING start_time AT TIME ZONE 'UTC'",
-        "ALTER TABLE ab_tests ALTER COLUMN end_time TYPE TIMESTAMPTZ USING end_time AT TIME ZONE 'UTC'",
-        "ALTER TABLE ab_tests ALTER COLUMN exposure_start_at TYPE TIMESTAMPTZ USING exposure_start_at AT TIME ZONE 'UTC'",
-        "ALTER TABLE metrics_logs ALTER COLUMN measured_at TYPE TIMESTAMPTZ USING measured_at AT TIME ZONE 'UTC'",
-    ]
+    """
+    아직 TIMESTAMP WITHOUT TIME ZONE인 컬럼만 TIMESTAMPTZ로 바꾼다. (서버 시작 시 자동 실행, 멱등)
+    예전엔 이미 TIMESTAMPTZ인 컬럼에도 매번 다시 실행했는데, 그 변환이 오류 없이 성공해 버려서
+    DB 접속 시간대가 UTC가 아니면(로컬 PostgreSQL은 Asia/Seoul) 재시작할 때마다 시각이 9시간씩 밀렸고,
+    운영에서도 재시작마다 테이블을 통째로 다시 썼다.
+    """
     with engine.connect() as conn:
-        for stmt in migrations:
+        pending = {
+            (row.table_name, row.column_name)
+            for row in conn.execute(text(
+                "SELECT table_name, column_name FROM information_schema.columns "
+                "WHERE table_schema = current_schema() AND data_type = 'timestamp without time zone'"
+            ))
+        }
+        for table, column in _UTC_TIMESTAMP_COLUMNS:
+            if (table, column) not in pending:
+                continue
             try:
-                conn.execute(text(stmt))
+                conn.execute(text(
+                    f"ALTER TABLE {table} ALTER COLUMN {column} TYPE TIMESTAMPTZ USING {column} AT TIME ZONE 'UTC'"
+                ))
                 conn.commit()
+                logger.info(f"Migrated {table}.{column} to TIMESTAMPTZ")
             except Exception as e:
-                conn.rollback()  # 이미 TIMESTAMPTZ면 무시하고 계속 진행
-                logger.debug(f"Migration skip (probably already applied): {e}")
+                conn.rollback()
+                logger.warning(f"Timestamp migration failed for {table}.{column}: {e}")
 
 def _migrate_add_columns():
     """신규 컬럼을 기존 테이블에 추가합니다. (서버 시작 시 자동 실행, 멱등)"""
