@@ -27,10 +27,18 @@ type Lift = {
   original_vph: number;
   winner_vph: number;
   lift_pct: number | null;
+  na_reason?: string | null;
   end_time: string | null;
 };
 
-type Leader = { test_id: number; title: string; leader_name: string; leader_is_original: boolean; lift_pct: number | null };
+type Leader = {
+  test_id: number;
+  title: string;
+  leader_name: string;
+  leader_is_original: boolean;
+  lift_pct: number | null;
+  na_reason?: string | null;
+};
 
 /** 그래프 가로축용 짧은 제목 */
 function shortTitle(title: string) {
@@ -59,7 +67,11 @@ export default function AnalyticsPage() {
     average_lift_pct: null,
     running_leaders: [],
   });
-  const lifts = (data.completed_lifts || []).filter((x) => x.lift_pct != null);
+  // 원본을 측정하지 못했거나 원본 조회수 증가가 0이면 상승률을 계산할 수 없다 - 숨기지 않고 "비교 불가"로 보여 준다
+  const lifts = data.completed_lifts || [];
+  const chartRows = lifts.map((x) => ({ ...x, label: shortTitle(x.title), bar: x.lift_pct ?? 0 }));
+  const liftText = (x: Lift | undefined) =>
+    !x ? "" : x.original_won ? A.originalKept : x.lift_pct == null ? A.liftNa : signed(x.lift_pct);
 
   const loadAnalytics = () => {
     apiFetch("/api/analytics")
@@ -128,7 +140,7 @@ export default function AnalyticsPage() {
           ) : (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={lifts.map((x) => ({ ...x, label: shortTitle(x.title) }))}>
+                <BarChart data={chartRows}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                   <XAxis dataKey="label" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} interval={0} />
                   <YAxis stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${v}%`} />
@@ -137,28 +149,39 @@ export default function AnalyticsPage() {
                     cursor={{ fill: "rgba(255,255,255,0.04)" }}
                     contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }}
                     labelStyle={{ color: "#e4e4e7" }}
-                    formatter={(value, _name, item) => {
+                    formatter={(_value, _name, item) => {
                       const lift = item?.payload as Lift | undefined;
-                      const text = lift?.original_won ? A.originalKept : signed(Number(value));
-                      return [`${text} (${lift?.winner_name ?? ""})`, A.liftLabel];
+                      const reason = lift?.lift_pct == null && lift?.na_reason ? ` - ${A.liftNaReasons[lift.na_reason] ?? ""}` : "";
+                      return [`${liftText(lift)} (${lift?.winner_name ?? ""})${reason}`, A.liftLabel];
                     }}
+                    wrapperStyle={{ maxWidth: 320, whiteSpace: "normal" }}
                     labelFormatter={(_label, payload) => (payload?.[0]?.payload as Lift | undefined)?.title ?? ""}
                   />
-                  <Bar dataKey="lift_pct" radius={[4, 4, 0, 0]} maxBarSize={56} minPointSize={4}>
-                    {lifts.map((x) => (
+                  <Bar dataKey="bar" radius={[4, 4, 0, 0]} maxBarSize={56} minPointSize={4}>
+                    {chartRows.map((x) => (
                       <Cell key={x.test_id} fill={(x.lift_pct ?? 0) > 0 ? "#06b6d4" : "#52525b"} />
                     ))}
-                    {/* 막대 위 글자: 원본이 이긴 테스트는 막대 높이가 0이라 글자로 결과를 보여 준다 */}
-                    <LabelList
-                      dataKey="lift_pct"
-                      position="top"
-                      fill="#e4e4e7"
-                      fontSize={12}
-                      formatter={(value) => (value === 0 ? A.originalKept : signed(Number(value)))}
-                    />
+                    {/* 막대 위 글자: 원본 유지·비교 불가는 막대 높이가 0이라 글자로 결과를 보여 준다 */}
+                    <LabelList dataKey="test_id" position="top" fill="#e4e4e7" fontSize={12}
+                      formatter={(id) => liftText(lifts.find((x) => x.test_id === Number(id)))} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* 상승률을 계산할 수 없었던 끝난 테스트와 그 이유 */}
+          {lifts.some((x) => x.lift_pct == null) && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4">
+              <h3 className="text-sm font-bold text-amber-200 mb-2">{A.liftNaTitle}</h3>
+              <ul className="flex flex-col gap-2">
+                {lifts.filter((x) => x.lift_pct == null).map((x) => (
+                  <li key={x.test_id} className="text-sm">
+                    <span className="font-semibold text-zinc-200 break-keep">{x.title}</span>
+                    <p className="text-zinc-400 break-keep mt-0.5">{(x.na_reason && A.liftNaReasons[x.na_reason]) || A.liftNa}</p>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
@@ -174,7 +197,7 @@ export default function AnalyticsPage() {
                       {x.leader_is_original
                         ? A.runningOriginalLead
                         : x.lift_pct == null
-                          ? A.runningPending
+                          ? (x.na_reason && A.runningNaReasons[x.na_reason]) || A.runningPending
                           : A.runningLead(x.leader_name, x.lift_pct)}
                     </span>
                   </li>

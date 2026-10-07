@@ -384,6 +384,17 @@ export const ko: Dictionary = {
     runningLead: (name: string, pct: number) => `${name}이(가) 원본보다 ${pct >= 0 ? "+" : ""}${pct}% 앞서는 중`,
     runningOriginalLead: "지금은 원본이 가장 앞서는 중",
     runningPending: "원본 측정 전이라 아직 비교할 수 없어요",
+    liftNaTitle: "비교할 수 없는 테스트",
+    liftNaReasons: {
+      original_not_measured:
+        "원본 썸네일이 한 번도 측정되기 전에 테스트가 끝났어요. 테스트는 새 후보(B)부터 시작해서, 원본은 순서가 다시 돌아와야 측정됩니다. 기간을 조금 더 길게 잡아 보세요.",
+      original_no_views:
+        "원본 썸네일이 걸려 있던 동안 조회수가 한 번도 늘지 않아서 비교할 기준이 없어요. 조회수가 꾸준히 나오는 영상이나 더 긴 기간으로 테스트해 보세요.",
+    } as Record<string, string>,
+    runningNaReasons: {
+      original_not_measured: "원본 차례가 아직 오지 않아 비교할 수 없어요",
+      original_no_views: "원본이 걸려 있던 동안 조회수가 늘지 않아 아직 비교할 수 없어요",
+    } as Record<string, string>,
     noData: "아직 데이터가 없습니다.",
     testSection: "테스트별 분석",
     testSectionSub: "후보 썸네일을 누르면 측정 구간과 시간대별 성과를 볼 수 있어요.",

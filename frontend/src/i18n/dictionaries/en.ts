@@ -391,6 +391,17 @@ export const en = {
     runningLead: (name: string, pct: number) => `${name} is ${pct >= 0 ? "+" : ""}${pct}% ahead of the original`,
     runningOriginalLead: "The original is leading right now",
     runningPending: "The original hasn't been measured yet, so there's nothing to compare",
+    liftNaTitle: "Tests that couldn't be compared",
+    liftNaReasons: {
+      original_not_measured:
+        "The test ended before the original thumbnail was measured even once. Tests start with a new candidate (B), so the original is only measured when its turn comes back. Try a slightly longer test.",
+      original_no_views:
+        "The video gained no views while the original thumbnail was live, so there's no baseline to compare against. Try a video with steadier views or a longer test.",
+    } as Record<string, string>,
+    runningNaReasons: {
+      original_not_measured: "The original's turn hasn't come yet, so there's nothing to compare",
+      original_no_views: "No views were gained while the original was live, so there's nothing to compare yet",
+    } as Record<string, string>,
     noData: "No data yet.",
     testSection: "Test Breakdown",
     testSectionSub: "Click a candidate thumbnail to see its measured windows and how it did at each time of day.",

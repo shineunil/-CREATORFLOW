@@ -136,5 +136,23 @@ def test_analytics_reports_lift_over_the_original_thumbnail(setup):
     # 진행 중: B(VPH 30)가 원본 A(VPH 10)보다 +200% 앞서는 중
     assert data["running_leaders"] == [{
         "test_id": data["running_leaders"][0]["test_id"], "title": "vid1",
-        "leader_name": "Variation B", "leader_is_original": False, "lift_pct": 200.0,
+        "leader_name": "Variation B", "leader_is_original": False, "lift_pct": 200.0, "na_reason": None,
     }]
+    assert all(x["na_reason"] is None for x in lifts)
+
+
+def test_a_test_whose_original_was_never_measured_is_listed_with_the_reason(setup):
+    client, ids = setup
+    from models import ABTest as _T, Variation as _V, MetricLog as _M
+    db = next(main.app.dependency_overrides[main.get_db]())
+    test = db.get(_T, ids["test"])
+    test.status = TestStatus.COMPLETED
+    db.get(_V, ids["b"]).is_winner = True
+    db.query(_M).filter(_M.variation_id == ids["a"]).delete()  # 원본 차례가 오기 전에 끝난 테스트
+    db.commit()
+    db.close()
+
+    lifts = client.get("/api/analytics").json()["completed_lifts"]
+    row = next(x for x in lifts if x["test_id"] == ids["test"])
+    # 숨기지 않고, 상승률 대신 이유를 보낸다
+    assert row["lift_pct"] is None and row["na_reason"] == "original_not_measured"
