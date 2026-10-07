@@ -1,4 +1,12 @@
-from test_policy import has_enough_cycles, has_enough_sample, MIN_CYCLES, MIN_SAMPLE_VIEWS
+import pytest
+
+from test_policy import has_enough_cycles, has_enough_sample, warmup_minutes_for, MIN_CYCLES, MIN_SAMPLE_VIEWS
+
+
+@pytest.mark.parametrize("interval, expected", [(30, 3), (60, 6), (120, 12), (240, 15), (1440, 15)])
+def test_warmup_scales_with_the_swap_interval(interval, expected):
+    # 짧은 주기에서 측정 시간의 절반을 버리지 않도록 주기의 10% (3~15분)
+    assert warmup_minutes_for(interval) == expected
 
 
 def test_has_enough_cycles_when_every_candidate_reached_the_threshold():

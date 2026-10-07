@@ -762,6 +762,8 @@ async def _apply_first_variant_in_background(test_id: int):
         session.rollback()
     finally:
         session.close()
+        # 스케줄러는 필요한 시각에만 깨어나므로, 새 테스트의 측정 시작·교체 시각을 일정에 넣게 한다
+        scheduler_engine.wake_soon()
 
 # --- A/B Test 로직 ---
 @app.post("/api/tests", response_model=ABTestResponse)
@@ -958,6 +960,7 @@ async def force_swap_ab_test(request: Request, test_id: int, db: Session = Depen
 
     # 사용자가 누른 "지금 교체"는 시간대 균형과 상관없이 반드시 다른 후보로 바꾼다
     await scheduler_engine._do_swap(test, db, allow_stay=False)
+    scheduler_engine.wake_soon()  # 교체 시각이 바뀌었으니 다음 측정·교체 일정을 다시 잡는다
     test.manual_swap_used = True
     db.commit()
 

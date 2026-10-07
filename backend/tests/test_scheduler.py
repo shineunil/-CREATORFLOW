@@ -314,3 +314,60 @@ def test_winner_that_is_already_live_is_not_uploaded_again(engine, db_session, m
 
 async def _async_return(value):
     return value
+
+
+# --- 필요한 시각에만 깨어나기 ---
+
+from types import SimpleNamespace  # noqa: E402
+
+from scheduler import next_wake_time, RETRY_MINUTES, MAX_SLEEP_MINUTES, WAKE_BUFFER_SECONDS  # noqa: E402
+
+NOW = datetime(2026, 10, 8, 12, 0, tzinfo=timezone.utc)
+BUFFER = timedelta(seconds=WAKE_BUFFER_SECONDS)
+
+
+def _running(interval=30, swapped_ago=0, warmup_captured=False, swap_failed=False, end_in=24 * 60, needs_reconnect=False):
+    return SimpleNamespace(
+        swap_interval_minutes=interval,
+        last_swapped_at=NOW - timedelta(minutes=swapped_ago),
+        warmup_captured=warmup_captured,
+        swap_failed=swap_failed,
+        end_time=NOW + timedelta(minutes=end_in),
+        video=SimpleNamespace(channel=SimpleNamespace(needs_reconnect=needs_reconnect)),
+    )
+
+
+def test_wakes_right_when_the_warmup_ends():
+    # 30분 주기: 교체 3분 뒤(워밍업 끝)에 바로 측정을 시작한다 - 예전엔 10분 간격 확인이라 20분째에야 시작
+    assert next_wake_time([_running(interval=30)], NOW) == NOW + timedelta(minutes=3) + BUFFER
+
+
+def test_wakes_right_when_the_next_swap_is_due():
+    assert next_wake_time([_running(interval=30, swapped_ago=10, warmup_captured=True)], NOW) == NOW + timedelta(minutes=20) + BUFFER
+
+
+def test_earliest_test_decides_and_idle_channels_sleep_up_to_an_hour():
+    tests = [_running(interval=240, warmup_captured=True), _running(interval=30, swapped_ago=25, warmup_captured=True)]
+    assert next_wake_time(tests, NOW) == NOW + timedelta(minutes=5) + BUFFER
+    # 진행 중인 테스트가 없으면 DB를 깨우지 않고 한 시간 뒤에 한 번만 확인한다
+    assert next_wake_time([], NOW) == NOW + timedelta(minutes=MAX_SLEEP_MINUTES) + BUFFER
+
+
+def test_overdue_or_failed_work_is_retried_after_a_pause_instead_of_spinning():
+    overdue = _running(interval=30, swapped_ago=45, warmup_captured=True)  # 쿼터 부족 등으로 교체를 못 함
+    failed = _running(interval=30, swap_failed=True)
+    for test in (overdue, failed):
+        assert next_wake_time([test], NOW) == NOW + timedelta(minutes=RETRY_MINUTES) + BUFFER
+
+
+def test_a_channel_waiting_for_reconnect_only_wakes_for_the_test_end():
+    # 교체(30분 뒤)는 건너뛰고 테스트 종료 시각(40분 뒤)에만 깨어난다
+    test = _running(interval=30, end_in=40, needs_reconnect=True)
+    assert next_wake_time([test], NOW) == NOW + timedelta(minutes=40) + BUFFER
+
+
+def test_wake_soon_reschedules_the_next_check_within_seconds(engine):
+    engine.wake_soon()
+    job = engine.scheduler.get_job("ab-test-tick")
+    run_at = job.trigger.run_date
+    assert run_at - datetime.now(run_at.tzinfo) < timedelta(seconds=10)

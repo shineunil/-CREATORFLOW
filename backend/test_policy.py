@@ -10,8 +10,15 @@ MIN_SAMPLE_VIEWS = int(os.getenv("MIN_WINNER_SAMPLE_VIEWS", "50"))
 MAX_AUTO_EXTENSIONS = int(os.getenv("MAX_AUTO_TEST_EXTENSIONS", "2"))
 
 # 스왑 직후 워밍업 구간(분) - 직전 썸네일의 잔상 노출 효과를 점수에서 배제하기 위해
-# 이 기간이 지난 뒤에 조회수 기준선을 다시 캡처한다
-SWAP_WARMUP_MINUTES = int(os.getenv("SWAP_WARMUP_MINUTES", "15"))
+# 이 기간이 지난 뒤에 조회수 기준선을 다시 캡처한다. 교체 주기의 10%로 하되 3~15분 사이로 둔다.
+# (예전엔 항상 15분이라 30분 주기에서는 측정할 시간의 절반이 버려졌다)
+SWAP_WARMUP_MINUTES = int(os.getenv("SWAP_WARMUP_MINUTES", "15"))  # 최대
+MIN_SWAP_WARMUP_MINUTES = 3
+
+
+def warmup_minutes_for(swap_interval_minutes: int) -> float:
+    """이 교체 주기에서 교체 직후 집계에서 뺄 시간(분). 30분 → 3, 1시간 → 6, 2시간 → 12, 4시간 이상 → 15."""
+    return min(SWAP_WARMUP_MINUTES, max(MIN_SWAP_WARMUP_MINUTES, (swap_interval_minutes or 0) * 0.1))
 
 # BASIC 요금제가 선택할 수 있는 최소 교체 주기(분). 이보다 짧은 주기는 PRO 전용.
 BASIC_MIN_SWAP_INTERVAL_MINUTES = int(os.getenv("BASIC_MIN_SWAP_INTERVAL_MINUTES", "240"))  # 4시간

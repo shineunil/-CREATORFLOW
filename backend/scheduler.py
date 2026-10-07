@@ -21,7 +21,7 @@ from test_policy import (
     MIN_CYCLES,
     MIN_SAMPLE_VIEWS,
     MAX_AUTO_EXTENSIONS,
-    SWAP_WARMUP_MINUTES,
+    warmup_minutes_for,
 )
 from quota_guard import has_quota_for, record_usage, check_and_reserve_usage, COST_VIDEOS_LIST, COST_VIDEOS_UPDATE, COST_THUMBNAILS_SET
 
@@ -41,21 +41,98 @@ def _title_differs(new_title, live_title) -> bool:
     """새 제목이 있고 지금 제목과 다를 때만 제목 교체(쿼터 51)가 필요하다."""
     return bool(new_title) and new_title.strip() != (live_title or "").strip()
 
+_JOB_ID = "ab-test-tick"
+RETRY_MINUTES = 10       # 교체 실패·쿼터 부족 등으로 이번에 처리하지 못한 일을 다시 볼 간격
+MAX_SLEEP_MINUTES = 60   # 할 일이 없어도 이 간격으로는 한 번 확인한다 (놓친 변화가 있어도 오래 멈추지 않게)
+WAKE_BUFFER_SECONDS = 5  # 기한 직후에 깨어나야 "기한이 지났다"로 판정된다
+
+
+def _as_utc(moment: datetime) -> datetime:
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def next_wake_time(tests, now: datetime) -> datetime:
+    """
+    진행 중인 테스트들이 다음에 할 일(워밍업 끝 측정 시작, 교체, 테스트 종료)이 생기는 가장 이른 시각.
+    예전엔 10분마다 DB를 훑어서 측정 시작·교체가 최대 10분씩 늦었고(30분 주기면 측정 시간의 2/3가 버려짐),
+    할 일이 없어도 DB를 깨워 Neon 무료 컴퓨트 시간을 계속 썼다. 이제는 필요한 시각에만 깨어난다.
+    """
+    due = []
+    for test in tests:
+        if test.end_time:
+            due.append(_as_utc(test.end_time))
+        channel = test.video.channel if test.video else None
+        if channel is not None and channel.needs_reconnect:
+            continue  # 재연동 전까지는 교체하지 않는다 (종료 시각만 챙긴다)
+        if test.swap_failed:
+            due.append(now + timedelta(minutes=RETRY_MINUTES))
+            continue
+        last = _as_utc(test.last_swapped_at) if test.last_swapped_at else now
+        if not test.warmup_captured:
+            due.append(last + timedelta(minutes=warmup_minutes_for(test.swap_interval_minutes)))
+        due.append(last + timedelta(minutes=test.swap_interval_minutes or 0))
+
+    wake = now + timedelta(minutes=MAX_SLEEP_MINUTES)
+    for moment in due:
+        if moment <= now:
+            # 기한이 지났는데 이번에 처리하지 못했다 (쿼터 부족, 일시 오류 등) - 곧바로 다시 돌지 않고 잠시 뒤 재시도
+            moment = now + timedelta(minutes=RETRY_MINUTES)
+        wake = min(wake, moment)
+    return wake + timedelta(seconds=WAKE_BUFFER_SECONDS)
+
+
 class AVSchedulerEngine:
     def __init__(self, db_session_maker):
         self.scheduler = AsyncIOScheduler()
         self.db_session_maker = db_session_maker
-        
-        # 10분마다 실행하며, 교체 주기가 도달한 테스트만 처리합니다.
-        self.scheduler.add_job(self.check_and_swap_variations, 'interval', minutes=10)
+        self._wake_requested = False
+        # 서버가 켜지면 곧 한 번 확인하고, 그 뒤로는 다음 할 일이 생기는 시각에 맞춰 스스로 다시 예약한다.
+        self._schedule(datetime.now(timezone.utc) + timedelta(seconds=10))
+
+    def _schedule(self, run_at: datetime):
+        self.scheduler.add_job(
+            self.check_and_swap_variations, "date", run_date=run_at, id=_JOB_ID, replace_existing=True,
+            # 서버가 잠깐 바빠 몇 초 늦어도 건너뛰지 않게 (건너뛰면 다음 예약이 끊긴다)
+            misfire_grace_time=3600, coalesce=True,
+        )
+
+    def wake_soon(self):
+        """테스트를 만들거나 직접 교체한 직후처럼 일정이 바뀌었을 때, 몇 초 뒤 다시 확인하게 한다."""
+        self._wake_requested = True
+        self._schedule(datetime.now(timezone.utc) + timedelta(seconds=3))
 
     def start(self):
         logger.info("🚀 A/B Test Scheduler Engine Started...")
         self.scheduler.start()
 
     async def check_and_swap_variations(self):
+        self._wake_requested = False
+        next_run = datetime.now(timezone.utc) + timedelta(minutes=RETRY_MINUTES)
+        try:
+            await self._run_due_tests()
+            next_run = self._compute_next_run()
+        finally:
+            # 처리 중에 새 테스트가 생겼으면(wake_soon) 그 테스트도 곧 보도록, 아니면 다음 할 일 시각에 맞춰 예약
+            if self._wake_requested:
+                next_run = datetime.now(timezone.utc) + timedelta(seconds=3)
+                self._wake_requested = False
+            self._schedule(next_run)
+            logger.info(f"다음 확인: {next_run.isoformat(timespec='seconds')}")
+
+    def _compute_next_run(self) -> datetime:
+        session = self.db_session_maker()
+        try:
+            running = session.query(ABTest).filter(ABTest.status == TestStatus.RUNNING, ABTest.is_deleted == False).all()
+            return next_wake_time(running, datetime.now(timezone.utc))
+        except Exception as e:
+            logger.error(f"다음 확인 시각 계산 실패 - {RETRY_MINUTES}분 뒤 다시 확인합니다: {e}")
+            return datetime.now(timezone.utc) + timedelta(minutes=RETRY_MINUTES)
+        finally:
+            session.close()
+
+    async def _run_due_tests(self):
         logger.info(f"[{datetime.now(timezone.utc).isoformat()}] Scheduler tick: scanning active tests...")
-        
+
         Session = self.db_session_maker()
         try:
             # 1. 진행 중(RUNNING)인 모든 A/B 테스트 조회
@@ -216,11 +293,11 @@ class AVSchedulerEngine:
             logger.debug(f" - [테스트 {test.id}] 채널 {channel.id} 재연동 필요 - 건너뜀")
             return
 
-        # 0-1. 워밍업 구간(스왑 직후 SWAP_WARMUP_MINUTES) 종료 시점에 조회수 기준선을 다시 캡처한다.
+        # 0-1. 워밍업 구간(스왑 직후, 교체 주기의 10% · 3~15분) 종료 시점에 조회수 기준선을 다시 캡처한다.
         #      직전 썸네일의 잔상 노출로 인한 조회수가 새 변인의 점수에 섞이는 것을 막기 위함.
         if not test.warmup_captured:
-            minutes_since_swap = (datetime.now(timezone.utc) - test.last_swapped_at).total_seconds() / 60
-            if minutes_since_swap >= SWAP_WARMUP_MINUTES:
+            minutes_since_swap = (datetime.now(timezone.utc) - _as_utc(test.last_swapped_at)).total_seconds() / 60
+            if minutes_since_swap >= warmup_minutes_for(test.swap_interval_minutes):
                 refresh_token = channel.oauth_refresh_token
                 if refresh_token:
                     try:
