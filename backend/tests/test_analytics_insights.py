@@ -141,6 +141,23 @@ def test_analytics_reports_lift_over_the_original_thumbnail(setup):
     assert all(x["na_reason"] is None for x in lifts)
 
 
+def test_deleted_tests_are_not_counted_in_the_overview(setup):
+    client, ids = setup
+    data = client.get("/api/analytics").json()
+    assert (data["total_tests"], data["completed_tests"], data["active_tests"], data["stopped_tests"]) == (3, 2, 1, 0)
+
+    from models import ABTest as _T
+    db = next(main.app.dependency_overrides[main.get_db]())
+    deleted = db.get(_T, ids["test"])
+    deleted.is_deleted, deleted.status = True, TestStatus.STOPPED  # 사용자가 삭제(취소)한 테스트
+    db.commit()
+    db.close()
+
+    data = client.get("/api/analytics").json()
+    # 화면에서 사라진 테스트는 숫자에서도 빠진다
+    assert (data["total_tests"], data["completed_tests"], data["active_tests"], data["stopped_tests"]) == (2, 2, 0, 0)
+
+
 def test_a_test_whose_original_was_never_measured_is_listed_with_the_reason(setup):
     client, ids = setup
     from models import ABTest as _T, Variation as _V, MetricLog as _M

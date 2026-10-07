@@ -378,6 +378,8 @@ export const en = {
     noTitle: "No title",
     totalViewsGained: "Total Views Gained",
     bestVph: "Views per hour",
+    testBreakdown: (completed: number, running: number, stopped: number) =>
+      `${completed} completed · ${running} running · ${stopped} stopped`,
     avgLift: "Average lift over original",
     avgLiftHint: "How much higher the winning thumbnail's views per hour were than the original's, on average",
     avgLiftEmpty: "Shown once a test finishes",

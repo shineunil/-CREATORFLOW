@@ -55,6 +55,8 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<{
     total_tests: number;
     active_tests: number;
+    completed_tests?: number;
+    stopped_tests?: number;
     best_variation: BestVariation | null;
     completed_lifts: Lift[];
     average_lift_pct: number | null;
@@ -106,6 +108,10 @@ export default function AnalyticsPage() {
         <div className="glass-panel p-6 rounded-2xl border border-zinc-800/50">
           <p className="text-zinc-400 text-sm mb-1">{A.totalTests}</p>
           <div className="text-4xl font-bold">{data.total_tests}</div>
+          {/* 숫자가 무엇으로 이루어졌는지 (삭제한 테스트는 세지 않는다) */}
+          <p className="text-xs text-zinc-400 mt-2 tabular-nums">
+            {A.testBreakdown(data.completed_tests ?? 0, data.active_tests, data.stopped_tests ?? 0)}
+          </p>
         </div>
         <div className="glass-panel p-6 rounded-2xl border border-emerald-500/20 bg-emerald-950/10">
           <p className="text-emerald-400/80 text-sm mb-1">{A.activeTests}</p>

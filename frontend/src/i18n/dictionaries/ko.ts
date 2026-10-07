@@ -371,6 +371,8 @@ export const ko: Dictionary = {
     noTitle: "제목 없음",
     totalViewsGained: "총 조회수 증가",
     bestVph: "시간당 조회수",
+    testBreakdown: (completed: number, running: number, stopped: number) =>
+      `완료 ${completed} · 진행 중 ${running} · 중지 ${stopped}`,
     avgLift: "원본 대비 평균 상승률",
     avgLiftHint: "이긴 썸네일이 원래 썸네일보다 시간당 조회수가 평균 얼마나 높았는지",
     avgLiftEmpty: "테스트가 끝나면 표시돼요",

@@ -1296,9 +1296,13 @@ def get_analytics(db: Session = Depends(get_db), channel: Channel = Depends(get_
     if not channel:
         return {"total_tests": 0, "total_views_gained": 0, "active_tests": 0, "trend": [], "best_variation": None}
         
-    tests = db.query(ABTest).join(Video).filter(Video.channel_id == channel.id).all()
+    # 화면의 테스트 목록처럼, 사용자가 삭제(취소)한 테스트는 세지 않는다 - 숫자와 보이는 테스트 수가 맞아야 한다.
+    # (무료 플랜의 월 4회 한도는 삭제한 테스트도 포함해 따로 센다)
+    tests = db.query(ABTest).join(Video).filter(Video.channel_id == channel.id, ABTest.is_deleted == False).all()
     total_tests = len(tests)
     active_tests = sum(1 for t in tests if t.status == TestStatus.RUNNING)
+    completed_tests = sum(1 for t in tests if t.status == TestStatus.COMPLETED)
+    stopped_tests = sum(1 for t in tests if t.status == TestStatus.STOPPED)
     
     # 누적 추가 획득 조회수 (모든 MetricLog의 views_gained 합계)
     total_views_query = (
@@ -1360,6 +1364,8 @@ def get_analytics(db: Session = Depends(get_db), channel: Channel = Depends(get_
     return {
         "total_tests": total_tests,
         "active_tests": active_tests,
+        "completed_tests": completed_tests,
+        "stopped_tests": stopped_tests,
         "total_views_gained": total_views_gained,
         "trend": trend,
         "best_variation": best_variation,
