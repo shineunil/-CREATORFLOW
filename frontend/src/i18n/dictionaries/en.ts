@@ -260,7 +260,7 @@ export const en = {
           },
           {
             q: "Can I stop a test before it finishes?",
-            a: "Yes. You can manually stop a test at any time from the dashboard, and you can also immediately lock any specific variant as the winner without waiting for the test to complete.",
+            a: "Yes. Click \"Lock Winning Thumbnail\" on the dashboard at any time to stop the test and immediately apply the variant with the highest views per hour so far. If you cancel the test instead, your original thumbnail and title come back.",
           },
           {
             q: "Views change by time of day. Is the comparison fair?",
