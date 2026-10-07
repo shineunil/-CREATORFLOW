@@ -702,6 +702,7 @@ export const ko: Dictionary = {
     billingTitle: "결제",
     currentPlan: "현재 요금제: ",
     portalNote: " — 해지, 결제 수단, 영수증은 Paddle 결제 포털에서 관리합니다.",
+    proUntilNote: (date: string) => ` — 구독이 해지되었습니다. 이미 결제한 기간이 끝나는 ${date}까지 PRO가 유지됩니다.`,
     manageSub: "구독 관리 (Paddle)",
     upgrade: "PRO로 업그레이드",
     portalErrorTitle: "결제 포털을 열 수 없습니다",

@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Request, HTTPException, Depends
 import os, logging, hmac, hashlib, json
+from datetime import datetime, timezone
+import httpx
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User, PlanType
+from models import User
 from env_utils import is_dev_environment
+from billing import end_subscription, period_end_of, record_paid_period, resume_subscription
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -58,15 +61,19 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
                 user = db.query(User).filter(User.id == int(user_id)).first()
             except (ValueError, TypeError):
                 pass
+        if user is None and subscription_id:
+            # 갱신 결제에 custom_data가 빠져 와도 구독 ID로 찾는다
+            user = db.query(User).filter(User.stripe_subscription_id == subscription_id).first()
 
         if user:
-            user.plan = PlanType.PRO
+            resume_subscription(user)
+            record_paid_period(user, data)
             if customer_id:
                 user.stripe_customer_id = customer_id    # Paddle customer ID 재사용
             if subscription_id:
                 user.stripe_subscription_id = subscription_id  # Paddle subscription ID 재사용
             db.commit()
-            logger.info(f"[Paddle Webhook] ✅ user_id={user.id} ({user.email}) → PRO 업그레이드")
+            logger.info(f"[Paddle Webhook] ✅ user_id={user.id} ({user.email}) → PRO (결제 기간 끝: {user.paid_until})")
         else:
             logger.warning(f"[Paddle Webhook] 유저 찾기 실패 (user_id={user_id})")
 
@@ -74,20 +81,51 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
         subscription_id = data.get("id")
         user = db.query(User).filter(User.stripe_subscription_id == subscription_id).first() if subscription_id else None
         if user:
-            user.plan = PlanType.BASIC
+            if user.paid_until is None:
+                # 이 기능 전에 결제한 유저는 결제 기간이 저장돼 있지 않다 - Paddle에서 마지막 결제를 조회
+                fetched = await _fetch_paid_until(subscription_id)
+                if fetched:
+                    user.paid_until = fetched
+            keep_until = end_subscription(user, datetime.now(timezone.utc))
             db.commit()
-            logger.info(f"[Paddle Webhook] ⬇️ user_id={user.id} → BASIC 다운그레이드")
+            if keep_until:
+                logger.info(f"[Paddle Webhook] ⏳ user_id={user.id} 구독 종료 - 결제한 기간이 남아 {keep_until.isoformat()}까지 PRO 유지")
+            else:
+                logger.info(f"[Paddle Webhook] ⬇️ user_id={user.id} → BASIC 다운그레이드")
         else:
             logger.warning(f"[Paddle Webhook] 구독 취소 - subscription_id로 유저 찾기 실패: {subscription_id}")
 
     elif event_type == "subscription.updated":
-        # 구독 상태 변경 (예: paused → active 등)
+        # 구독 상태 변경 (예: paused → active, 갱신으로 결제 기간이 넘어감 등)
         subscription_id = data.get("id")
         status = data.get("status", "")
         user = db.query(User).filter(User.stripe_subscription_id == subscription_id).first() if subscription_id else None
         if user and status == "active":
-            user.plan = PlanType.PRO
+            resume_subscription(user)
+            record_paid_period(user, data)
             db.commit()
-            logger.info(f"[Paddle Webhook] ✅ user_id={user.id} → PRO 복원 (구독 재활성)")
+            logger.info(f"[Paddle Webhook] ✅ user_id={user.id} → PRO 유지/복원 (결제 기간 끝: {user.paid_until})")
 
     return {"status": "success"}
+
+
+async def _fetch_paid_until(subscription_id: str):
+    """구독의 마지막 완료 결제가 덮는 기간의 끝. 조회할 수 없으면 None (그러면 예전처럼 바로 BASIC)."""
+    api_key = os.getenv("PADDLE_API_KEY", "")
+    if not api_key:
+        return None
+    sandbox = os.getenv("PADDLE_ENVIRONMENT", "").strip().lower() == "sandbox"
+    base = "https://sandbox-api.paddle.com" if sandbox else "https://api.paddle.com"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"{base}/transactions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                params={"subscription_id": subscription_id, "status": "completed", "order_by": "created_at[DESC]", "per_page": 1},
+            )
+            resp.raise_for_status()
+            transactions = resp.json().get("data") or []
+    except Exception as e:
+        logger.warning(f"[Paddle Webhook] 마지막 결제 조회 실패 ({subscription_id}): {e}")
+        return None
+    return period_end_of(transactions[0]) if transactions else None

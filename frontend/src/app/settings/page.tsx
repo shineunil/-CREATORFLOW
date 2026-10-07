@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const [userEmail, setUserEmail] = useState<string>(t.common.loading);
   const [isPro, setIsPro] = useState(false);
   const [plan, setPlan] = useState<string>("BASIC");
+  const [proUntil, setProUntil] = useState<string | null>(null);
 
   // 알림 이메일 인증 상태
   const [notifEmail, setNotifEmail] = useState<string | null>(null);
@@ -100,6 +101,7 @@ export default function SettingsPage() {
         else setUserEmail(S.noEmail);
         setIsPro(!!data.is_pro);
         setPlan(data.plan || "BASIC");
+        setProUntil(data.pro_until || null);
         setNotifEmail(data.notification_email || null);
         setNotifEmailVerified(!!data.notification_email_verified);
         if (data.notification_email) setNotifEmailInput(data.notification_email);
@@ -513,7 +515,9 @@ export default function SettingsPage() {
             </h2>
             <p className="text-xs text-zinc-400 mb-4">
               {S.currentPlan}<span className="font-bold text-zinc-200">{plan}</span>
-              {isPro && S.portalNote}
+              {isPro && (proUntil
+                ? S.proUntilNote(new Date(proUntil).toLocaleDateString(locale === "ko" ? "ko-KR" : "en-US", { year: "numeric", month: "long", day: "numeric" }))
+                : S.portalNote)}
             </p>
             {isPro ? (
               <button

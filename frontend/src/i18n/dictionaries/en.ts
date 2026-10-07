@@ -709,6 +709,7 @@ export const en = {
     billingTitle: "Billing",
     currentPlan: "Current plan: ",
     portalNote: " — manage cancellations, payment methods, and invoices through Paddle's billing portal.",
+    proUntilNote: (date: string) => ` — your subscription is canceled. PRO stays active until ${date}, the end of the period you already paid for.`,
     manageSub: "Manage Subscription (Paddle)",
     upgrade: "Upgrade to PRO",
     portalErrorTitle: "Can't open billing portal",

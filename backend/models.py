@@ -35,6 +35,10 @@ class User(Base):
     # checkout.session.completed 웹훅을 받을 때 채워지며, 결제 이력이 없는 유저는 계속 null.
     stripe_customer_id = Column(String, nullable=True)
     stripe_subscription_id = Column(String, nullable=True)
+    # 마지막으로 결제된 기간이 끝나는 시각 (결제·갱신 웹훅마다 갱신). 해지 알림엔 이 정보가 없어서 미리 저장해 둔다.
+    paid_until = Column(DateTime(timezone=True), nullable=True)
+    # 해지했지만 결제한 기간이 남아 PRO를 유지하는 마지막 시각. 이 시각이 지나면 BASIC으로 내린다 (billing.py).
+    pro_until = Column(DateTime(timezone=True), nullable=True)
     notification_email = Column(String, nullable=True)
     notification_email_verified = Column(Boolean, default=False)
     # M-6: 이메일 알림 수신 여부 (기본값 True — 명시적으로 끄기 전까지 수신)

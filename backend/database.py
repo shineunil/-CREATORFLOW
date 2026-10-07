@@ -90,6 +90,9 @@ def _migrate_add_columns():
         "CREATE INDEX IF NOT EXISTS idx_metriclogs_var_id  ON metrics_logs(variation_id)",
         # M-6: 이메일 알림 opt-out 컬럼
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_alerts_enabled BOOLEAN NOT NULL DEFAULT TRUE",
+        # 해지 후에도 결제한 기간 끝까지 PRO 유지
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS paid_until TIMESTAMPTZ",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS pro_until TIMESTAMPTZ",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

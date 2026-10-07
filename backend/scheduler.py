@@ -13,6 +13,7 @@ from youtube_api import (
     ThumbnailPermissionError,
 )
 from metrics_utils import compute_variation_vph
+from billing import expire_due_plans
 from rotation import pick_next_variation
 from thumbnail_store import is_youtube_native_url, snapshot_original_thumbnail
 from test_policy import (
@@ -109,6 +110,7 @@ class AVSchedulerEngine:
         self._wake_requested = False
         next_run = datetime.now(timezone.utc) + timedelta(minutes=RETRY_MINUTES)
         try:
+            self._expire_canceled_plans()
             await self._run_due_tests()
             next_run = self._compute_next_run()
         finally:
@@ -118,6 +120,17 @@ class AVSchedulerEngine:
                 self._wake_requested = False
             self._schedule(next_run)
             logger.info(f"다음 확인: {next_run.isoformat(timespec='seconds')}")
+
+    def _expire_canceled_plans(self):
+        """해지 후 결제 기간이 끝난 PRO를 BASIC으로. 어차피 깨어난 김에 확인한다 (DB를 따로 깨우지 않음)."""
+        session = self.db_session_maker()
+        try:
+            expire_due_plans(session, datetime.now(timezone.utc))
+        except Exception as e:
+            session.rollback()
+            logger.error(f"해지 플랜 만료 처리 실패 - 다음 확인 때 다시 시도합니다: {e}")
+        finally:
+            session.close()
 
     def _compute_next_run(self) -> datetime:
         session = self.db_session_maker()

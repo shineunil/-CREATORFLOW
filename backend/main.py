@@ -34,6 +34,7 @@ from metrics_utils import compute_variation_vph
 from thumbnail_store import process_image_for_youtube as _process_image_for_youtube, publish_local_image
 from test_policy import BASIC_MIN_SWAP_INTERVAL_MINUTES, MAX_CONCURRENT_TESTS_PER_CHANNEL
 from messages import msg, current_locale, set_request_locale, locale_from_accept_language, SUPPORTED_LOCALES
+from billing import expire_if_due
 
 load_dotenv()
 
@@ -165,6 +166,9 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user = db.query(User).filter(User.id == int(user_id)).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    # 해지 후 유지 기간이 막 끝났다면 스케줄러를 기다리지 않고 바로 BASIC으로 보여 준다
+    if expire_if_due(user, datetime.now(timezone.utc)):
+        db.commit()
     return user
 
 def get_current_channel(request: Request, db: Session = Depends(get_db)) -> Channel:
@@ -1623,6 +1627,8 @@ def get_current_user_profile(request: Request, db: Session = Depends(get_db), us
         "email": user.email,
         "plan": user.plan.value if hasattr(user.plan, "value") else str(user.plan),
         "is_pro": user.plan == PlanType.PRO or user.plan == PlanType.AGENCY,
+        # 해지했지만 결제한 기간이 남아 PRO를 유지하는 마지막 시각 (해지 안 했으면 null)
+        "pro_until": _utc_iso(user.pro_until) if user.pro_until else None,
         "has_channel": channel is not None,
         "channel_title": channel.channel_title if channel else None,
         "needs_reconnect": channel.needs_reconnect if channel else False,
