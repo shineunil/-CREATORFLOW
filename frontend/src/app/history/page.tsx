@@ -49,13 +49,13 @@ export default function HistoryPage() {
             <div key={i} className="glass-panel p-6 rounded-2xl border border-zinc-800/50 flex flex-col md:flex-row justify-between gap-6">
               <div>
                 <p className="text-xs text-zinc-400 mb-2">{t.history.ended(formatDate(test.end_time, locale))}</p>
-                <h3 className="text-lg font-bold">{test.video?.youtube_video_id}</h3>
+                <h3 className="text-lg font-bold">{test.video_id}</h3>
               </div>
               <div className="flex gap-4">
                 {test.variations?.map((v: any) => (
                   <div key={v.id} className="p-3 bg-zinc-900/50 rounded-lg text-sm border border-zinc-800">
                     <div className="font-bold">{v.title_text}</div>
-                    <div className="text-zinc-400">{t.history.viewsGained(formatNumber(v.views_gained ?? 0, locale))}</div>
+                    <div className="text-zinc-400">{t.history.viewsGained(formatNumber(v.total_views_gained ?? 0, locale))}</div>
                   </div>
                 ))}
               </div>
