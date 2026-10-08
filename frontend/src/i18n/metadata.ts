@@ -19,7 +19,8 @@ export function absoluteUrl(path: string, locale: Locale): string {
 export function publicPageSeo(path: string, locale: Locale, title: string, description: string): Metadata {
   const t = dictionaries[locale].meta;
   const url = absoluteUrl(path, locale);
-  const images = [{ url: "/hero-leading.jpg", width: 480, height: 360, alt: t.ogImageAlt }];
+  // 링크 미리보기는 1200×630이 표준 (작은 이미지는 큰 카드 대신 작은 썸네일로 나온다) - app/og.png/route.tsx
+  const images = [{ url: "/og.png", width: 1200, height: 630, alt: t.ogImageAlt }];
   return {
     description,
     alternates: {

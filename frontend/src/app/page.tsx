@@ -36,9 +36,9 @@ export default function LandingPage() {
     name: "ThumbnailFlow",
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
-    url: "https://trythumbnailflow.com",
-    description:
-      "A/B testing tool that automatically rotates YouTube thumbnail and title variants on your live video and keeps the one with the highest views per hour.",
+    url: locale === "ko" ? "https://trythumbnailflow.com/ko" : "https://trythumbnailflow.com",
+    inLanguage: locale,
+    description: t.meta.ogDescription,
     offers: [
       {
         "@type": "Offer",
