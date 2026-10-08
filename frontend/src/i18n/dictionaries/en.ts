@@ -557,6 +557,26 @@ export const en = {
     viewsGained: "Views Gained",
     startedAt: "Started At",
     totalViews: "Total Views",
+    // Shown when nothing is running, to lead into the next test
+    nextTestTitle: "No active optimizations",
+    nextTestSub: "Check the results of your finished tests, then test your next video.",
+    nextTestBtn: "Test Your Next Video",
+    // Summary cards for finished tests
+    recentResultsTitle: "Recent Results",
+    viewAllHistory: "View all in Optimization History →",
+    viewDetails: "View Details",
+    appliedBadge: "Applied on YouTube",
+    winnerLine: (name: string, title: string) => `Winner ${name} · ${title}`,
+    liftValue: (pct: number) => `${pct >= 0 ? "+" : ""}${pct}% views per hour vs. the original`,
+    originalWon: "The original performed best — your original thumbnail is applied",
+    liftNa: {
+      original_not_measured: "The test ended before the original was measured, so it can't be compared",
+      original_no_views: "The original gained no views while it was live, so it can't be compared",
+    } as Record<string, string>,
+    stoppedResult: "This test was stopped before a winner was chosen",
+    resultTotalViews: (n: string) => `+${n} views during the test`,
+    lowSampleBadge: "Low sample - for reference",
+    lowSampleTip: "Fewer than 50 views were gained during the test, so the winner may be due to chance. Try a video with steady views or a longer test.",
   },
 
   newTest: {

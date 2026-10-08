@@ -26,11 +26,14 @@ import { SERVICE_UNAVAILABLE_ERROR, startChannelConnect } from "@/lib/auth";
 import { CHANNEL_SWITCHED_EVENT } from "@/lib/channelSwitch";
 import { useI18n } from "@/i18n/I18nProvider";
 import RichText from "@/i18n/RichText";
-import { formatDate, parseServerDate } from "@/i18n/format";
+import { formatDate, formatNumber, parseServerDate } from "@/i18n/format";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
 
-const formatLocalDateTime = (iso: string | null | undefined): string => {
+// 대시보드에 결과 카드로 보여 줄 끝난 테스트 수 (나머지는 최적화 기록 페이지)
+const RECENT_RESULTS_LIMIT = 3;
+
+const formatLocalDateTime =(iso: string | null | undefined): string => {
   if (!iso) return "-";
   try {
     const d = parseServerDate(iso);
@@ -287,6 +290,12 @@ export default function Dashboard() {
             showAlert(D.successTitle, D.stoppedMsg, "success");
             // 조기 종료는 승자를 확정하므로 서버 상태와 같은 COMPLETED로 둔다
             setTestData(prevData => prevData.map(test => test.test_id === testId ? { ...test, status: "COMPLETED" } : test));
+            // 결과 카드에 필요한 승자·원본 대비 상승률은 서버가 계산하므로 다시 불러온다
+            const myToken = ++testsRefreshTokenRef.current;
+            apiFetch("/api/tests").then(r => r.json()).then(d => {
+              if (testsRefreshTokenRef.current !== myToken) return;
+              setTestData(d.tests || []);
+            }).catch(err => console.error(err));
           } else {
             showAlert(t.common.error, D.stopError, "error");
           }
@@ -327,6 +336,11 @@ export default function Dashboard() {
       setIsSwapping(null);
     }
   };
+
+  // 진행 중인 테스트는 크게 위에, 끝난 테스트는 최근 몇 개만 결과 요약 카드로 아래에 보여 준다 (나머지는 최적화 기록)
+  const isFinished = (test: any) => test.status === "COMPLETED" || test.status === "STOPPED";
+  const activeTests = testData.filter((test: any) => !isFinished(test));
+  const finishedTests = testData.filter(isFinished);
 
   return (
     <>
@@ -403,7 +417,19 @@ export default function Dashboard() {
             </Link>
           </div>
         ) : (
-          testData.map((test: any) => (
+          <>
+          {activeTests.length === 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-4 p-6 rounded-2xl bg-zinc-900/30 border border-zinc-800/50 border-dashed">
+              <div>
+                <h2 className="text-lg font-bold text-white mb-1">{D.nextTestTitle}</h2>
+                <p className="text-sm text-zinc-400">{D.nextTestSub}</p>
+              </div>
+              <Link href="/new" className="px-5 py-2.5 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+                <Sparkles size={18} aria-hidden="true" /> {D.nextTestBtn}
+              </Link>
+            </div>
+          )}
+          {activeTests.map((test: any) => (
             <div key={test.test_id} className="relative z-10 animate-fade-in-up">
               <div className="glass-panel rounded-2xl p-6 flex flex-wrap gap-8 justify-between items-end border border-zinc-800/50 mb-6 bg-zinc-900/40">
                 <div>
@@ -422,7 +448,7 @@ export default function Dashboard() {
                       </span>
                     )}
                   </div>
-                  <h2 className="text-2xl font-bold mb-1 line-clamp-1">{test.video?.title || test.youtube_video_id}</h2>
+                  <h2 className="text-2xl font-bold mb-1 line-clamp-1">{test.title || test.video_id}</h2>
                   <p className="text-sm text-zinc-400">{formatTestDuration(test.start_time, test.end_time, test.status, t, locale)}</p>
                 </div>
 
@@ -485,12 +511,98 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
-          ))
+          ))}
+          {finishedTests.length > 0 && (
+            <section aria-labelledby="recent-results" className="pt-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+                <h2 id="recent-results" className="text-xl font-bold">{D.recentResultsTitle}</h2>
+                <Link href="/history" className="text-sm text-cyan-400 hover:text-cyan-300 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded">
+                  {D.viewAllHistory}
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {finishedTests.slice(0, RECENT_RESULTS_LIMIT).map((test: any) => (
+                  <ResultCard key={test.test_id} test={test} />
+                ))}
+              </div>
+            </section>
+          )}
+          </>
         )}
       </div>
 
       <Modal {...modalConfig} />
     </>
+  );
+}
+
+function ResultCard({ test }: { test: any }) {
+  const { t, locale } = useI18n();
+  const D = t.dashboard;
+  const winner = test.variations.find((v: any) => v.is_winner);
+  const shown = winner || test.variations.find((v: any) => v.is_control) || test.variations[0];
+  const decided = test.status === "COMPLETED" && !!winner;
+  const result = test.result;
+
+  let outcome = D.stoppedResult;
+  let positive = false;
+  if (decided) {
+    if (result?.original_won) outcome = D.originalWon;
+    else if (result?.lift_pct != null) {
+      outcome = D.liftValue(result.lift_pct);
+      positive = result.lift_pct > 0;
+    } else outcome = D.liftNa[result?.na_reason] ?? "";
+  }
+
+  return (
+    <article className="glass-panel rounded-2xl border border-zinc-800/50 bg-zinc-900/40 overflow-hidden flex flex-col">
+      <div className="w-full aspect-video bg-zinc-800 flex items-center justify-center">
+        {shown?.thumbnail_image_url?.startsWith("http") ? (
+          <img src={shown.thumbnail_image_url} alt={D.thumbnailAlt(shown.name)} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-zinc-400 text-sm">{t.common.noImage}</span>
+        )}
+      </div>
+      <div className="p-5 flex flex-col gap-3 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {test.status === "STOPPED" ? (
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-700/40 text-zinc-200 text-xs font-bold border border-zinc-600">
+              <PauseCircle size={12} aria-hidden="true" /> {D.stoppedBadge}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20">
+              <CheckCircle2 size={12} aria-hidden="true" /> {D.finishedBadge}
+            </span>
+          )}
+          {decided && (
+            <span className="px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold border border-cyan-500/20">{D.appliedBadge}</span>
+          )}
+          {decided && test.low_sample && (
+            <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 text-xs font-bold border border-amber-500/30">{D.lowSampleBadge}</span>
+          )}
+        </div>
+
+        <div>
+          <h3 className="font-bold leading-snug line-clamp-2">{test.title || test.video_id}</h3>
+          {decided && <p className="text-xs text-zinc-400 mt-1 line-clamp-1">{D.winnerLine(winner.name, winner.title_text || "")}</p>}
+        </div>
+
+        <p className={`text-sm font-semibold ${positive ? "text-cyan-400" : "text-zinc-200"}`}>{outcome}</p>
+        <p className="text-xs text-zinc-400">
+          {D.resultTotalViews(formatNumber(test.total_views_gained ?? 0, locale))} · {formatTestDuration(test.start_time, test.end_time, test.status, t, locale)}
+        </p>
+        {decided && test.low_sample && <p className="text-xs text-amber-400/90 leading-relaxed">{D.lowSampleTip}</p>}
+
+        <div className="mt-auto flex flex-wrap gap-2 pt-2">
+          <Link href="/analytics" className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold rounded-lg border border-zinc-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            {D.viewDetails}
+          </Link>
+          <Link href="/new" className="px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-sm font-semibold rounded-lg border border-cyan-500/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            {D.nextTestBtn}
+          </Link>
+        </div>
+      </div>
+    </article>
   );
 }
 

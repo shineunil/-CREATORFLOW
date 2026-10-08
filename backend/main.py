@@ -32,7 +32,7 @@ from schemas import ABTestCreate, ABTestResponse
 from env_utils import is_dev_environment, allow_test_upgrade
 from metrics_utils import compute_variation_vph
 from thumbnail_store import process_image_for_youtube as _process_image_for_youtube, publish_local_image
-from test_policy import BASIC_MIN_SWAP_INTERVAL_MINUTES, MAX_CONCURRENT_TESTS_PER_CHANNEL
+from test_policy import BASIC_MIN_SWAP_INTERVAL_MINUTES, MAX_CONCURRENT_TESTS_PER_CHANNEL, has_enough_sample
 from messages import msg, current_locale, set_request_locale, locale_from_accept_language, SUPPORTED_LOCALES
 from billing import expire_if_due
 
@@ -1508,19 +1508,30 @@ def get_ab_tests(db: Session = Depends(get_db), channel: Channel = Depends(get_c
                 "title_text": var.title_text,
                 "thumbnail_image_url": var.thumbnail_image_url,
                 "is_winner": var.is_winner,
+                "is_control": var.is_control,
                 "chart_data": chart_data,
                 "total_views_gained": sum(log.views_gained for log in var.metric_logs),
                 "vph": round(compute_variation_vph(var), 2)
             })
-            
+
+        # 영상 제목은 따로 저장하지 않으므로, 분석 페이지처럼 원본 후보의 제목을 테스트 이름으로 쓴다
+        control = next((v for v in test.variations if v.is_control), None)
+        total_views = sum(v["total_views_gained"] for v in vars_data)
+        # 끝난 테스트의 승자 vs 원본 비교 (분석 페이지의 상승률과 같은 계산)
+        lifts, _ = _test_lifts([test]) if test.status == TestStatus.COMPLETED else ([], [])
         result.append({
             "test_id": test.id,
             "video_id": test.video.youtube_video_id,
+            "title": (control.title_text if control else None) or test.video.youtube_video_id,
             "status": test.status.name,
             "swap_interval": test.swap_interval_minutes,
             "start_time": test.start_time.isoformat() if test.start_time else None,
             "end_time": test.end_time.isoformat() if test.end_time else None,
             "manual_swap_used": test.manual_swap_used or False,
+            "total_views_gained": total_views,
+            # 조회수가 너무 적어 승자가 우연일 수 있는 결과 ("표본 부족 - 참고용")
+            "low_sample": not has_enough_sample(total_views),
+            "result": lifts[0] if lifts else None,
             "variations": vars_data,
         })
 

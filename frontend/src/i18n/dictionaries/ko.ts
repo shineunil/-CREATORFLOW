@@ -550,6 +550,26 @@ export const ko: Dictionary = {
     viewsGained: "조회수 증가",
     startedAt: "시작 시각",
     totalViews: "총 조회수",
+    // 진행 중인 테스트가 없을 때 다음 테스트로 이어 주는 안내
+    nextTestTitle: "진행 중인 최적화가 없습니다",
+    nextTestSub: "끝난 테스트의 결과를 확인하고, 다음 영상도 테스트해 보세요.",
+    nextTestBtn: "다음 영상 테스트하기",
+    // 끝난 테스트 결과 요약 카드
+    recentResultsTitle: "최근 결과",
+    viewAllHistory: "최적화 기록에서 모두 보기 →",
+    viewDetails: "자세히 보기",
+    appliedBadge: "유튜브에 적용됨",
+    winnerLine: (name: string, title: string) => `승자 ${name} · ${title}`,
+    liftValue: (pct: number) => `원본 대비 시간당 조회수 ${pct >= 0 ? "+" : ""}${pct}%`,
+    originalWon: "원본이 가장 좋았어요 — 원래 썸네일이 적용됐습니다",
+    liftNa: {
+      original_not_measured: "원본이 측정되기 전에 끝나서 원본과 비교할 수 없어요",
+      original_no_views: "원본이 걸려 있던 동안 조회수가 늘지 않아 원본과 비교할 수 없어요",
+    } as Record<string, string>,
+    stoppedResult: "승자를 정하기 전에 중단된 테스트입니다",
+    resultTotalViews: (n: string) => `테스트 동안 조회수 +${n}회`,
+    lowSampleBadge: "표본 부족 - 참고용",
+    lowSampleTip: "테스트 동안 늘어난 조회수가 50회 미만이라, 승자가 우연히 정해졌을 수 있어요. 조회수가 꾸준한 영상이나 더 긴 기간으로 다시 테스트해 보세요.",
   },
 
   newTest: {

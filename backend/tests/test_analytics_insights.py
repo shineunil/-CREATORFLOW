@@ -141,6 +141,35 @@ def test_analytics_reports_lift_over_the_original_thumbnail(setup):
     assert all(x["na_reason"] is None for x in lifts)
 
 
+def test_dashboard_tests_carry_a_title_and_the_finished_result(setup):
+    client, _ = setup
+    tests = {t["video_id"]: t for t in client.get("/api/tests").json()["tests"]}
+
+    # 영상 제목은 저장하지 않으므로 원본 후보의 제목, 없으면 영상 ID를 이름으로 쓴다
+    assert tests["vid3"]["title"] == "Title vid3"
+    assert tests["vid1"]["title"] == "vid1"
+
+    # 끝난 테스트는 분석 페이지와 같은 원본 대비 상승률을 함께 보낸다
+    assert tests["vid3"]["result"]["lift_pct"] == 50.0 and tests["vid3"]["low_sample"] is False
+    assert tests["vid4"]["result"]["original_won"] is True
+    assert tests["vid1"]["result"] is None  # 진행 중
+    assert [v["is_control"] for v in tests["vid3"]["variations"]] == [True, False]
+
+
+def test_a_finished_test_with_few_views_is_marked_low_sample(setup):
+    client, _ = setup
+    from models import MetricLog as _M, Variation as _V, ABTest as _T, Video as _Vid
+    db = next(main.app.dependency_overrides[main.get_db]())
+    test = db.query(_T).join(_Vid).filter(_Vid.youtube_video_id == "vid3").first()
+    for log in db.query(_M).join(_V).filter(_V.ab_test_id == test.id):
+        log.views_gained = 2  # 테스트 동안 조회수 +4 - 승자가 우연일 수 있다
+    db.commit()
+    db.close()
+
+    tests = {t["video_id"]: t for t in client.get("/api/tests").json()["tests"]}
+    assert tests["vid3"]["total_views_gained"] == 4 and tests["vid3"]["low_sample"] is True
+
+
 def test_deleted_tests_are_not_counted_in_the_overview(setup):
     client, ids = setup
     data = client.get("/api/analytics").json()
